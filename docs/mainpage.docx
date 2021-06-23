@@ -1,0 +1,91 @@
+/*! \mainpage CMZed 
+ *
+ * Basic Exact Diagonalization (ED / FCI) implementation.
+ * Not based on efficiency, but rather as a simple code base
+ * for inexpensive calculations and to test other implementations.
+ *
+ * \section intro_sec Introduction
+ *
+ * The CMZed library implements a basic Hamiltonian class,
+ * with a Lanczos algorithm to compute ground state energies, 
+ * state vector and 1- and 2-rdms. The Hamiltonian class evaluates
+ * matrix elements by implementing Slater-Condon rules.
+ *
+ * The basic input for any ED/FCI method is an FCIDUMP file 
+ * defining the many-Fermion Hamiltonian in 2nd quantization. 
+ * Given a general Hamiltonian \f$H\f$ as
+ *
+ * \f[
+ *  H = E_0 + \sum_{p,q,\sigma}\ t_{p,q}\ c^\dagger_{p,\sigma} c_{q,\sigma}
+ *      +\sum_{p,q,r,s,\sigma,\sigma'}\ U_{p,q,r,s}\ c^\dagger_{p,\sigma}
+ *       c^\dagger_{q,\sigma'} c_{s,\sigma'} c_{r,\sigma},
+ * \f]
+ *
+ * Where \f$c^\dagger_{p,\sigma}\f$ is the creation operator
+ * for spatial orbital \f$p\f$ with spin \f$\sigma = \left\{\uparrow,\downarrow\right\}\f$. Thus \f$E_0\f$
+ * corresponds to the core energy of the system, \f$t_{p,q}\f$ 
+ * represent the 1-body integrals (hopping terms) and the
+ * \f$U_{p,q,r,s}\f$ correspond to the 2-body integrals
+ * (electronic repulsion). In this library, we assume that 
+ * spin up and spin down electrons behave exactly the same way,
+ * hence we cannot describe magnetic fields (e.g.).
+ * Further, we assume a number conserving Hamiltonian
+ * Hence, one has to specify how many electrons of each spin
+ * to populate the system with. 
+ *
+ * \section install_sec Installation
+ *
+ * CMZed is a C++ library, with CMake installation provided.
+ * This should (hopefully) make integrating it into existing
+ * codes reasonably painless.
+ *
+ * \subsection dependencies Dependencies
+ *
+ * -# Lapack for generalized eigenvalue solver.
+ * -# Eigen library for matrix and vector classes.
+ * -# CMake >= 3.14
+ * -# OpenMP (optional)
+ * -# doxygen (optional, to build this documentation)
+ *
+ * \subsection install_steps Installation Steps
+ * 
+ * -# mkdir build
+ * -# cd build
+ * -# cmake /path/to/CMZed/ -DBUILD_SHARED_LIBS=ON (for static library, this flag is not needed)  
+ * -# cmake <tt>--</tt>build . 
+ * -# cmake <tt>--</tt>install . <tt>--</tt>prefix "/path/to/CMZed/install"
+ * -# Enjoy! CMZed is installed as shared library. 
+ *
+ * The executable main (from main/main.c++) just displays the
+ * current version of the code. It can be used as template
+ * for applications, although the test cases in tests/
+ * are likely to be more useful for this purpose.
+ *
+ * \subsection install_options Installation Options
+ *
+ * Optional: In step (3), there are a couple of options that can be set
+ *
+ * - Include -DBUILD_TESTS=ON to build the test cases in test/. 
+ *   Running ctest in the build directory after step (4) 
+ *   will check running some of these. You can use the test 
+ *   cases to get an idea of how to use the library.
+ * Further, if doxygen is available, this documentation can 
+ * be built after step (4) following
+ *
+ * -# cd /path/to/CMZed/build/
+ * -# doxygen doc_config
+ *
+ * \section todos TODOs
+ *
+ * There are some further functionalities that could be
+ * added to the CMZed library. In particular, right now
+ * the following come to mind:
+ *
+ * - Allow the description of magnetic fields, by expressing
+ *   the Hamiltonian in terms of spin-orbitals, not spatial-orbitals.
+ * - Allow for non-number-conserving terms.
+ *
+ * \section authors Authors
+ *
+ * This library is authored by Carlos Mejuto Zaera and Stephen J. Cotton.
+ */

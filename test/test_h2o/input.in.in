@@ -1,0 +1,10 @@
+#FCIDUMP FILE
+fcidump_file @PATH_TO_TEST@/test_h2o/FCIDUMP.dat
+#NR OF ORBITALS
+norbs 5
+#NR OF SPIN UP ELECTRONS
+nups 4
+#NR OF SPIN DOWN ELECTRONS
+ndos 4
+#PRINT INFO
+print T

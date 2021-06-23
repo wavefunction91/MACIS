@@ -1,0 +1,8 @@
+#FCIDUMP FILE
+fcidump_file @PATH_TO_TEST@/test_Hamil/FCIDUMP.dat
+#NR OF ORBITALS
+norbs 2
+#NR OF SPIN UP ELECTRONS
+nups 1
+#NR OF SPIN DOWN ELECTRONS
+ndos 1
