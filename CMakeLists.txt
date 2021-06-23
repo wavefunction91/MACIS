@@ -1,7 +1,19 @@
 cmake_minimum_required(VERSION 3.14)
 
 # set the project name
-project(CMZed VERSION 1.0 LANGUAGES CXX)
+project(CMZed VERSION 1.0 LANGUAGES C CXX)
+
+# Pull proper BLAS/LAPACK discovery modules
+include( FetchContent )
+FetchContent_Declare( linalg-cmake-modules
+  GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
+  GIT_TAG        89c82b78505f60657ef33b5bf38e5da059dff7f2
+)
+FetchContent_GetProperties( linalg-cmake-modules )
+if( NOT linalg-cmake-modules_POPULATED )
+  FetchContent_Populate( linalg-cmake-modules )
+  list( APPEND CMAKE_MODULE_PATH ${linalg-cmake-modules_SOURCE_DIR} )
+endif()
 
 option( CMZED_ENABLE_OPENMP "Enable OpenMP Bindings" ON )
 
@@ -17,6 +29,8 @@ find_package( Eigen3 CONFIG REQUIRED )
 
 # option of building tests
 option(BUILD_TESTS "Build test cases, checking different aspects of the library" OFF)
+
+add_subdirectory(external/lobpcgxx)
 
 add_subdirectory(inc)
 add_subdirectory(src)

@@ -13,7 +13,7 @@ foreach( testdir ${TEST_DIRECTORIES} )
     # add executable
     add_executable( ${testdir}.x ${testdir}/${testdir}.c++ )
     # links
-    target_link_libraries( ${testdir}.x CMZed)
+    target_link_libraries( ${testdir}.x CMZed lobpcgxx )
     # if applicable, copy input file
     if( EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${testdir}/input.in.in" )
       configure_file(${testdir}/input.in.in ${testdir}/input.in)

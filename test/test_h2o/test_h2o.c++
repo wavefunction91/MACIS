@@ -13,6 +13,9 @@
 #include<fstream>
 #include "unsupported/Eigen/SparseExtra"
 
+#include <lobpcgxx/lobpcg.hpp>
+#include <random>
+
 using namespace std;
 using namespace cmz::ed;
 
@@ -56,7 +59,44 @@ int main( int argn, char* argv[] )
 
     SpMatDOp Hwrap( Hmat );
 
+#if 0
     GetGS( Hwrap, E0, psi0, input );
+#else
+    lobpcgxx::operator_action_type<double> HamOp = 
+      [&]( int64_t n , int64_t k , const double* x , int64_t ldx ,
+           double* y , int64_t ldy ) -> void {
+
+        Eigen::Map<const Eigen::MatrixXd> xmap(x,ldx,k); 
+        Eigen::Map<Eigen::MatrixXd>       ymap(y,ldy,k);
+        ymap.block(0,0,n,k).noalias() = Hmat * xmap;
+
+      };
+    lobpcgxx::lobpcg_settings settings;
+    settings.conv_tol = 1e-6;
+    settings.maxiter  = 2000;
+    settings.print_iter = true;
+    lobpcgxx::lobpcg_operator<double> lob_op( HamOp );
+
+    int64_t K = 4;
+    int64_t N = Hmat.rows();
+    std::vector<double> X0( N * K );
+
+    // Random vectors 
+    std::default_random_engine gen;
+    std::normal_distribution<> dist(0., 1.);
+    auto rand_gen = [&](){ return dist(gen); };
+    std::generate( X0.begin(), X0.end(), rand_gen );
+    lobpcgxx::cholqr( N, K, X0.data(), N ); // Orthogonalize
+
+    std::vector<double> lam(K), res(K);
+    lobpcgxx::lobpcg( settings, N, K, K, lob_op, lam.data(), X0.data(), N,
+      res.data() );
+
+    E0 = lam[0];
+    psi0 = Eigen::Map<Eigen::VectorXd>( X0.data(), N );
+
+    std::cout << std::scientific << std::setprecision(5);
+#endif
 
     cout << "Ground state energy: " << E0 + ints.core_energy << endl;
 
