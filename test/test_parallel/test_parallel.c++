@@ -21,6 +21,16 @@
 using namespace std;
 using namespace cmz::ed;
 
+
+template <typename index_t = int32_t>
+sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian(
+  const SetSlaterDets& stts,
+  const FermionHamil&  Hop,
+  const intgrls::integrals& ints,
+  const double H_thresh = 1e-9
+);
+
+
 int main( int argn, char* argv[] )
 {
   if( argn != 2 )
@@ -58,57 +68,7 @@ int main( int argn, char* argv[] )
     // New code
     cout << "Building Hamiltonian matrix (new)" << endl;
     auto hbuild_new_st = now();
-    const double h_thresh = 1e-9;
-
-    // Form CSR adjacency
-    std::vector<int32_t> colind, rowptr; 
-    std::vector<double> nzval;
-    rowptr.reserve(stts.size()+1); rowptr.push_back(0);
-
-    int32_t i = 0;
-    for( auto& det : stts ) {
-      auto sd_exes = det.GetSinglesAndDoubles( &ints );
-
-      std::vector<int32_t> colind_local; colind_local.reserve(sd_exes.size()+1);
-      std::vector<double>  nzval_local; nzval_local.reserve(sd_exes.size()+1);
-      colind_local.push_back(i);
-      nzval_local.push_back( Hop.GetHmatel( det, det ) );
-      for( auto& ex_det : sd_exes ) {
-        auto it = stts.find( ex_det );
-        if( it != stts.end() ) {
-          // Compute Matrix Element
-          auto h_el = Hop.GetHmatel( det, *it );
-          if( std::abs(h_el) > h_thresh ) {
-            colind_local.push_back( std::distance(stts.begin(), it ) );
-            nzval_local.push_back( h_el );
-          }
-        }
-      }
-
-      // Set sorted indices for col index
-      const size_t nnz_col = colind_local.size();
-      std::vector<int32_t> idx(nnz_col);
-      std::iota( idx.begin(), idx.end(), 0);
-      std::sort( idx.begin(), idx.end(), 
-        [&](auto _i, auto _j){ return colind_local[_i] < colind_local[_j]; }
-      );
-
-      // Place into permanent storage 
-      for( auto j = 0; j < nnz_col; ++j ) {
-        colind.push_back( colind_local[idx[j]] );
-        nzval. push_back( nzval_local[idx[j]]  );
-      }
-
-      rowptr.push_back( rowptr.back() + nnz_col );
-      ++i;
-    }
-
-    // Copy into CSR matrix
-    sparsexx::csr_matrix<double,int32_t> Hcsr(stts.size(),stts.size(),0,0);
-    Hcsr.colind() = std::move(colind);
-    Hcsr.rowptr() = std::move(rowptr);
-    Hcsr.nzval()  = std::move(nzval);
-
+    auto Hcsr = make_csr_hamiltonian<int32_t>( stts, Hop, ints, 1e-9 );
     auto hbuild_new_en = now();
 
     std::cout << "NNZ = " << Hcsr.nnz() << std::endl;
@@ -130,16 +90,9 @@ int main( int argn, char* argv[] )
     lobpcgxx::operator_action_type<double> HamOp = 
       [&]( int64_t n , int64_t k , const double* x , int64_t ldx ,
            double* y , int64_t ldy ) -> void {
-
-#if 0
-        Eigen::Map<const Eigen::MatrixXd> xmap(x,ldx,k); 
-        Eigen::Map<Eigen::MatrixXd>       ymap(y,ldy,k);
-        ymap.block(0,0,n,k).noalias() = Hmat * xmap;
-#else
         sparsexx::spblas::gespmbv( k, 1., Hcsr, x, ldx, 0., y, ldy );
-#endif
-
       };
+
     lobpcgxx::lobpcg_settings settings;
     settings.conv_tol = 1e-6;
     settings.maxiter  = 2000;
@@ -181,3 +134,100 @@ int main( int argn, char* argv[] )
   }
   return 0;
 }
+
+
+
+
+
+template <typename index_t = int32_t>
+sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian(
+  const SetSlaterDets& stts,
+  const FermionHamil&  Hop,
+  const intgrls::integrals& ints,
+  const double H_thresh
+) {
+
+
+  // Form CSR adjacency
+  std::vector<index_t> colind, rowptr;
+  std::vector<double>  nzval;
+
+  const auto ndets = stts.size();
+  rowptr.reserve( ndets + 1 );
+  rowptr.push_back(0);
+
+  index_t i = 0;
+  for( const auto& det : stts ) {
+
+    // Form all single/double excitations from current det
+    // XXX: This is proabably too much work, no?
+    auto sd_exes = det.GetSinglesAndDoubles( &ints );
+    const auto nsd_det = sd_exes.size();
+
+    // Initialize memory for adjacency row
+    std::vector<index_t> colind_local; colind_local.reserve( nsd_det + 1 );
+    std::vector<double>  nzval_local;  nzval_local .reserve( nsd_det + 1 );
+
+    // Initialize adjacency row with diagonal element
+    colind_local.push_back(i++);
+    nzval_local .push_back( Hop.GetHmatel( det, det ) );
+
+    // Loop over singles and doubles
+    for( const auto& ex_det : sd_exes ) {
+      // Attempt to locate excited determinant in full determinant list
+      auto it = stts.find( ex_det );
+
+      // If ex_det in list and ( det | H | ex_det) > thresh, append to adjacency
+      if( it != stts.end() ) {
+        const auto h_el = Hop.GetHmatel(det, *it);
+        if( std::abs( h_el ) > H_thresh ) {
+          colind_local.push_back( std::distance( stts.begin(), it ) );
+          nzval_local .push_back( h_el );
+        }
+      }
+    } // End loop over excited determinants
+
+    // Sort column indicies selected for adjacency row
+    const size_t nnz_col = colind_local.size();
+    std::vector<index_t> idx( nnz_col );
+    std::iota( idx.begin(), idx.end(), 0 );
+    std::sort( idx.begin(), idx.end(),
+      [&]( auto _i, auto _j ) { return colind_local[_i] < colind_local[_j]; }
+    );
+
+    // Place into permanent storage 
+    for( auto j = 0; j < nnz_col; ++j ) {
+      colind.push_back( colind_local[idx[j]] );
+      nzval. push_back( nzval_local[idx[j]]  );
+    }
+
+    // Update next rowptr
+    rowptr.push_back( rowptr.back() + nnz_col );
+
+  } // End loop over all determinants 
+
+
+  // Move resources into CSR matrix
+  const auto nnz = colind.size();
+  sparsexx::csr_matrix<double, index_t> H( ndets, ndets, nnz, 0 );
+  H.colind() = std::move(colind);
+  H.rowptr() = std::move(rowptr);
+  H.nzval()  = std::move(nzval);
+
+  return H;
+
+}
+
+template 
+sparsexx::csr_matrix<double,int32_t> make_csr_hamiltonian<int32_t>(
+  const SetSlaterDets&, const FermionHamil&, const intgrls::integrals&,
+  const double H_thresh
+);
+
+template 
+sparsexx::csr_matrix<double,int64_t> make_csr_hamiltonian<int64_t>(
+  const SetSlaterDets&, const FermionHamil&, const intgrls::integrals&,
+  const double H_thresh
+);
+
+
