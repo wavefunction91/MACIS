@@ -19,3 +19,6 @@ foreach( testdir ${TEST_DIRECTORIES} )
       configure_file(${testdir}/input.in.in ${testdir}/input.in)
     endif()
 endforeach( testdir ${TEST_DIRECTORIES} )
+
+add_executable( test_parallel.x test_parallel/test_parallel.c++ )
+target_link_libraries( test_parallel.x CMZed lobpcgxx sparsexx )

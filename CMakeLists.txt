@@ -31,6 +31,7 @@ find_package( Eigen3 CONFIG REQUIRED )
 option(BUILD_TESTS "Build test cases, checking different aspects of the library" OFF)
 
 add_subdirectory(external/lobpcgxx)
+add_subdirectory(external/sparsexx)
 
 add_subdirectory(inc)
 add_subdirectory(src)
