@@ -81,8 +81,6 @@ void lobpcg( const lobpcg_settings& settings, int64_t N, int64_t K, int64_t NR,
     const lobpcg_convergence_check<T> conv_check, 
     lobpcg_convergence<T>& conv ) { 
 
-  //std::cout << "IN NEW CODE" << std::endl;
-
   const int64_t LWORK_MIN = lobpcg_lwork( N, K );
 
   if( LWORK < 0 ) {
