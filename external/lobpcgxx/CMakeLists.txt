@@ -7,6 +7,7 @@ find_package( OpenMP )
 include( FetchContent )
 FetchContent_Declare( blaspp
   GIT_REPOSITORY https://bitbucket.org/icl/blaspp.git 
+  GIT_TAG 2021.04.01
 )
 FetchContent_Declare( lapackpp
   GIT_REPOSITORY https://bitbucket.org/icl/lapackpp.git 

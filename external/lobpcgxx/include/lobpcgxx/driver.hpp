@@ -78,7 +78,7 @@ template <typename T>
 void lobpcg( const lobpcg_settings& settings, int64_t N, int64_t K, int64_t NR, 
     const lobpcg_operator<T> op_functor, detail::real_t<T>* LAMR, T* V, int64_t LDV,
     detail::real_t<T>* res, T* WORK, int64_t& LWORK,
-    const lobpcg_convergence_check<T> conv_check, 
+    const lobpcg_convergence_check<T>& conv_check, 
     lobpcg_convergence<T>& conv ) { 
 
   const int64_t LWORK_MIN = lobpcg_lwork( N, K );

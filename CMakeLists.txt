@@ -6,8 +6,10 @@ project(CMZed VERSION 1.0 LANGUAGES C CXX)
 # Pull proper BLAS/LAPACK discovery modules
 include( FetchContent )
 FetchContent_Declare( linalg-cmake-modules
-  GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
-  GIT_TAG        89c82b78505f60657ef33b5bf38e5da059dff7f2
+  #GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
+  #GIT_TAG        89c82b78505f60657ef33b5bf38e5da059dff7f2
+  GIT_REPOSITORY https://github.com/ajaypanyala/linalg-cmake-modules.git
+  GIT_TAG        main
 )
 FetchContent_GetProperties( linalg-cmake-modules )
 if( NOT linalg-cmake-modules_POPULATED )

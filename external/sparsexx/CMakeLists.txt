@@ -1,4 +1,4 @@
-cmake_minimum_required( VERSION 3.14 FATAL_ERROR )
+cmake_minimum_required( VERSION 3.18 FATAL_ERROR )
 project( sparsexx VERSION 0.1.0 LANGUAGES C CXX )
 
 # Append local cmake directory to find CMAKE Modules
@@ -19,10 +19,9 @@ option( SPARSEXX_ENABLE_RANGES_V3 "Enable Ranges-v3"                ON )
 
 if( SPARSEXX_ENABLE_MKL )
   find_package( IntelMKL COMPONENTS lp64 REQUIRED )
-  if( TARGET IntelMKL::mkl )
-    set( SPARSEXX_ENABLE_MKL ON )
-    target_compile_definitions( IntelMKL::mkl INTERFACE "SPARSEXX_ENABLE_MKL=1" )
-    set( SPARSEXX_EXTERNAL_LIBRARIES IntelMKL::mkl )
+  if( TARGET IntelMKL::IntelMKL )
+    target_compile_definitions( IntelMKL::IntelMKL INTERFACE "SPARSEXX_ENABLE_MKL=1" )
+    set( SPARSEXX_EXTERNAL_LIBRARIES IntelMKL::IntelMKL )
   endif()
 endif()
 
@@ -31,7 +30,7 @@ endif()
 
 
 #cmake_policy( SET CMP0079 NEW )
-cmake_policy( VERSION 3.14 )
+cmake_policy( VERSION 3.18 )
 include( FetchContent )
 
 
@@ -94,7 +93,6 @@ if( SPARSEXX_ENABLE_CEREAL )
   endif()
   list(APPEND SPARSEXX_EXTERNAL_LIBRARIES cereal)
 endif()
-
 
 
 add_library               ( sparsexx INTERFACE                               )

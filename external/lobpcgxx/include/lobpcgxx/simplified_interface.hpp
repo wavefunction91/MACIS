@@ -1,6 +1,7 @@
 #pragma once
 
 #include "driver.hpp"
+#include "convergence.hpp"
 
 
 
@@ -11,8 +12,9 @@ void lobpcg( const lobpcg_settings& settings, int64_t N, int64_t K, int64_t NR,
     const lobpcg_operator<T> op_functor, detail::real_t<T>* LAMR, T* V, int64_t LDV,
     detail::real_t<T>* res, T* WORK, int64_t& LWORK, lobpcg_convergence<T>& conv ) { 
 
+  lobpcg_convergence_check<T> check = lobpcg_relres_convergence_check<T>;
   lobpcg( settings, N, K, NR, op_functor, LAMR, V, LDV, res, WORK, LWORK,
-    lobpcg_relres_convergence_check<T>, conv );
+    check, conv );
 
 }
 
