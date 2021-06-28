@@ -143,14 +143,20 @@ sparsexx::detail::enable_if_csr_matrix_t<SpMatType>
     }
 #else
 
-    std::vector< decltype(unique_colind.begin()) > indx_rank_bounds;
-    indx_rank_bounds.emplace_back( unique_colind.begin() );
+    std::vector< decltype(unique_colind.begin()) > rank_bnds;
+    rank_bnds.emplace_back( unique_colind.begin() );
     for(int ir = 0; ir < comm_size; ++ir) {
-      indx_rank_bounds.emplace_back( unique_colind.upper_bound(row_tiling[ir+1]-1) );
+      rank_bnds.emplace_back( unique_colind.upper_bound(row_tiling[ir+1]-1) );
     }
 
     for(int ir = 0; ir < comm_size; ++ir) {
-      for( auto uit = indx_rank_bounds[ir]; uit != indx_rank_bounds[ir+1]; ++uit ) {
+      if( ir == comm_rank )
+      for( auto uit = rank_bnds[ir]; uit != rank_bnds[ir+1]; ++uit ) {
+        local_v[*uit] = V[*uit - row_tiling[ir]];
+      }
+        
+      else
+      for( auto uit = rank_bnds[ir]; uit != rank_bnds[ir+1]; ++uit ) {
         MPI_Get( local_v.data() + *uit, sizeof(T), MPI_BYTE, ir,
           (*uit) - row_tiling[ir], sizeof(T), MPI_BYTE, V_win );
       }

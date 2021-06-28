@@ -95,6 +95,7 @@ int main( int argn, char* argv[] )
     // New Hamiltonian build
     if(world_rank == 0 ) {
       cout << "Building Hamiltonian matrix (new)" << endl;
+      std::cout << "NDETS = " << stts.size() << std::endl;
       auto hbuild_new_st = now();
       Hcsr = make_csr_hamiltonian<int32_t>( stts, Hop, ints, 1e-9 );
       auto hbuild_new_en = now();
@@ -206,7 +207,6 @@ int main( int argn, char* argv[] )
 
     if( world_rank == 0 ) {
       for( auto i = 0; i < AV.size(); ++i ) {
-        //std::cout << i << ", " << V[i] << ", " << AV[i] << ", " << AV_dist[i] << std::endl;
         AV[i] = std::abs(AV[i] - AV_dist[i]);
       }
       std::cout << "MAX DIFF = " << *std::max_element(AV.begin(),AV.end()) 
