@@ -75,7 +75,7 @@ namespace cmz
         (Vsum:double:omp_out=omp_out+omp_in)\
         initializer(omp_priv=0.)
       #pragma omp parallel for reduction (Vsum:res)
-      for(int i = 0; i < vecR.size();i++) res += vecR[i] * vecL[i];
+      for(size_t i = 0; i < vecR.size();i++) res += vecR[i] * vecL[i];
       return res;
     }
     
@@ -96,7 +96,7 @@ namespace cmz
         (Vsum:std::complex<double>:omp_out=omp_out+omp_in)\
         initializer(omp_priv=std::complex<double>(0.,0.))
       #pragma omp parallel for reduction (Vsum:res)
-      for(int i = 0; i < vecR.size();i++) res += conj(vecR[i]) * vecL[i];
+      for(size_t i = 0; i < vecR.size();i++) res += conj(vecR[i]) * vecL[i];
       return res;
     }
     
@@ -117,7 +117,7 @@ namespace cmz
         (Vsum:std::complex<double>:omp_out=omp_out+omp_in)\
         initializer(omp_priv=std::complex<double>(0.,0.))
       #pragma omp parallel for reduction (Vsum:res)
-      for(int i = 0; i < vecR.size();i++) res += conj(vecR[i]) * std::complex<double>(vecL[i], 0.);
+      for(size_t i = 0; i < vecR.size();i++) res += conj(vecR[i]) * std::complex<double>(vecL[i], 0.);
       return res;
     }
     
@@ -173,7 +173,7 @@ namespace cmz
         throw( "Error in MyAdd!! Sizes of vectors do not match!" );
       std::fill(res.begin(), res.end(), 0.);
       #pragma omp parallel for
-      for(int i = 0; i < veca.size(); i++)
+      for(size_t i = 0; i < veca.size(); i++)
         res[i] = a * veca[i] + b * vecb[i];
     }
     

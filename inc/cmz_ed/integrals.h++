@@ -57,7 +57,7 @@ namespace cmz
       
           short i,j,a,b;
       
-          four_indx(short i, short a, short j, short b): i(i), a(a), j(j), b(b)
+          four_indx(short i, short a, short j, short b): i(i), j(j), a(a), b(b)
           {
             order();
           }
