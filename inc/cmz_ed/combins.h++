@@ -30,7 +30,7 @@ namespace cmz
      * @author Carlos Mejuto Zaera
      * @date 05/06/2021
      */
-    std::vector<unsigned long> BuildCombs( unsigned short Nbits, unsigned short Nset);
+    std::vector<uint64_t> BuildCombs( uint64_t Nbits, uint64_t Nset);
 
   }// namespace ed
 }// namespace cmz

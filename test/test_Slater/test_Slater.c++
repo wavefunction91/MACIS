@@ -19,9 +19,9 @@ int main( int argn, char* argv[] )
   }  
   try
   {
-    unsigned short Norbs = atoi( argv[1] );
-    unsigned short Nups  = atoi( argv[2] );
-    unsigned short Ndos  = atoi( argv[3] );
+    uint64_t Norbs = atoi( argv[1] );
+    uint64_t Nups  = atoi( argv[2] );
+    uint64_t Ndos  = atoi( argv[3] );
 
     if( Norbs > 16 )
       throw( "cmz::ed is not ready for more than 16 orbitals!" );
@@ -34,8 +34,8 @@ int main( int argn, char* argv[] )
     for( SetSlaterDets_It it = stts.begin(); it != stts.end(); it++ )
     {
       cout << " --- " << it->ToStr() << endl;
-      vector<unsigned short> occs_up = it->GetOccOrbsUp();
-      vector<unsigned short> occs_do = it->GetOccOrbsDo();
+      auto occs_up = it->GetOccOrbsUp();
+      auto occs_do = it->GetOccOrbsDo();
       cout << " ------> Up Orbitals Occupied  : ";
       for( auto o : occs_up ) cout << o << ", ";
       cout << endl << " ------> Down Orbitals Occupied: ";

@@ -55,9 +55,9 @@ namespace cmz
       class four_indx{
         public:
       
-          short i,j,a,b;
+          int64_t i,j,a,b;
       
-          four_indx(short i, short a, short j, short b): i(i), j(j), a(a), b(b)
+          four_indx(int64_t i, int64_t a, int64_t j, int64_t b): i(i), j(j), a(a), b(b)
           {
             order();
           }
@@ -111,9 +111,9 @@ namespace cmz
       class two_indx{
         public:
       
-          short i,a;
+          int64_t i,a;
       
-          two_indx(short i, short a): i(i), a(a)
+          two_indx(int64_t i, int64_t a): i(i), a(a)
           {
             order();
           }
@@ -171,7 +171,7 @@ struct std::hash<cmz::ed::intgrls::four_indx>
   {
     const auto &[i,a,j,b] = idx;
 
-    auto s = []( short bits, size_t i ) { return i <<= bits; };
+    auto s = []( int64_t bits, size_t i ) { return i <<= bits; };
     return i + s(16,a) + s(32,j) + s(48,b);
   }
 };
@@ -188,7 +188,7 @@ struct std::hash<cmz::ed::intgrls::two_indx>
   size_t operator ()( const cmz::ed::intgrls::two_indx &idx ) const
   {
     const auto &[i,a] = idx;
-    auto s = []( short bits, size_t i ) { return i <<= bits; };
+    auto s = []( int64_t bits, size_t i ) { return i <<= bits; };
     return i + s(16,a);
   }
 };
@@ -214,31 +214,31 @@ namespace cmz
        */
       class indexer
       {
-        int norbitals;
+        int64_t norbitals;
         public:
          
           /**
            * @brief Constructor, taking nr. of orbitals in the system.
            *
-           * @param [in] int norbs: Nr. of orbitals. 
+           * @param [in] int64_t norbs: Nr. of orbitals. 
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          indexer(int norbs) : norbitals(norbs) {}
+          indexer(int64_t norbs) : norbitals(norbs) {}
       
           /**
            * @brief Access two-index quantity. 
            *
-           * @param [in] int i: Virtual orbital index. 
-           * @param [in] int a: Occupied orbital index. 
+           * @param [in] int64_t i: Virtual orbital index. 
+           * @param [in] int64_t a: Occupied orbital index. 
            *
            * @returns int: Index corresponding to (i,a) two-body index.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          int operator()(int i, int a) const
+          int64_t operator()(int64_t i, int64_t a) const
           {
             i %= norbitals; a %= norbitals; //Assuming integrals are equal for different spin
             return i + norbitals * a;
@@ -247,17 +247,17 @@ namespace cmz
           /**
            * @brief Access four-index quantity. 
            *
-           * @param [in] int i: Virtual orbital index 1. 
-           * @param [in] int j: Virtual orbital index 2. 
-           * @param [in] int a: Occupied orbital index 1. 
-           * @param [in] int b: Occupied orbital index 2. 
+           * @param [in] int64_t i: Virtual orbital index 1. 
+           * @param [in] int64_t j: Virtual orbital index 2. 
+           * @param [in] int64_t a: Occupied orbital index 1. 
+           * @param [in] int64_t b: Occupied orbital index 2. 
            *
            * @returns int: Index corresponding to <ij|ab> four-body index.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          int operator()(int i, int j, int a, int b) const
+          int64_t operator()(int64_t i, int64_t j, int64_t a, int64_t b) const
           {
             i %= norbitals; a %= norbitals; //Assuming integrals are equal for different spin
             j %= norbitals; b %= norbitals;
@@ -268,8 +268,8 @@ namespace cmz
            * @brief Check if two spin orbital indices correspond to the
            *        the same spin 
            *
-           * @param [in] int i: Orbital index 1. 
-           * @param [in] int a: Orbital index 2. 
+           * @param [in] int64_t i: Orbital index 1. 
+           * @param [in] int64_t a: Orbital index 2. 
            *
            * @returns bool: Do the two spin orbital indices correspond to the
            *                same spin? 
@@ -277,7 +277,7 @@ namespace cmz
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          bool same_spin(int i, int a) const
+          bool same_spin(int64_t i, int64_t a) const
           {
             return (i < norbitals && a < norbitals) || (i >= norbitals && a >= norbitals);
           }
@@ -296,10 +296,10 @@ namespace cmz
        */
       class integrals{
         public:
-          int norbitals;
-          int n_iorbitals; //Nr. of inactive  orbitals
-          int n_aorbitals; //Nr. of active    orbitals
-          int n_sorbitals; //Nr. of secondary orbitals
+          int64_t norbitals;
+          int64_t n_iorbitals; //Nr. of inactive  orbitals
+          int64_t n_aorbitals; //Nr. of active    orbitals
+          int64_t n_sorbitals; //Nr. of secondary orbitals
           std::vector<int> iorbs, aorbs, sorbs; //Lists of orbitals, for iterations
           intgrls::indexer indexer;
       
@@ -316,23 +316,23 @@ namespace cmz
            * @brief Empty table constructor. By default, all orbitals
            *        are assumed to be active.
            *
-           * @param [in] int norbitals: Nr. of orbitals.
+           * @param [in] int64_t norbitals: Nr. of orbitals.
            *
            * @author Carlos Mejuto Zaera
            * @date 05/04/2021
            */
-          integrals( int norbitals ): norbitals(norbitals), n_iorbitals(0), n_aorbitals(norbitals), n_sorbitals(0), indexer(norbitals) { init_orb_lists();}
+          integrals( int64_t norbitals ): norbitals(norbitals), n_iorbitals(0), n_aorbitals(norbitals), n_sorbitals(0), indexer(norbitals) { init_orb_lists();}
       
           /**
            * @brief Constructor from FCIDUMP file. 
            *
-           * @param [in] int norbitals: Nr. of orbitals.
+           * @param [in] int64_t norbitals: Nr. of orbitals.
            * @param [in] const string &file: FCIDUMP file.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          integrals( int norbitals, const string &file): integrals(norbitals)
+          integrals( int64_t norbitals, const string &file): integrals(norbitals)
           {
             read_FCIdump(file);
             copy_to_vectors();
@@ -341,7 +341,7 @@ namespace cmz
           /**
            * @brief Constructor from iterable containers. 
            *
-           * @param [in] int norbitals: Nr. of orbitals.
+           * @param [in] int64_t norbitals: Nr. of orbitals.
            * @param [in] const iterable &t_in: One-body integrals.
            * @param [in] const iterable &u_in: Two-body integrals.
            *
@@ -349,7 +349,7 @@ namespace cmz
            * @date 05/04/2021
            */
           template<class iterable>
-          integrals( int norbitals, const iterable &t_in, const iterable &u_in) : integrals(norbitals)
+          integrals( int64_t norbitals, const iterable &t_in, const iterable &u_in) : integrals(norbitals)
           {
             buildFromIterables(t_in, u_in);
             updateStoredInts();
@@ -358,14 +358,14 @@ namespace cmz
           /**
            * @brief Update active space information. 
            *
-           * @param [in] int n_iorbs: Nr. of inactive  orbitals.
-           * @param [in] int n_aorbs: Nr. of active    orbitals.
-           * @param [in] int n_sorbs: Nr. of secondary orbitals.
+           * @param [in] int64_t n_iorbs: Nr. of inactive  orbitals.
+           * @param [in] int64_t n_aorbs: Nr. of active    orbitals.
+           * @param [in] int64_t n_sorbs: Nr. of secondary orbitals.
            *
            * @author Carlos Mejuto Zaera
            * @date 05/04/2021
            */
-          void UpdateActiveSpace( int n_iorbs, int n_aorbs, int n_sorbs )
+          void UpdateActiveSpace( int64_t n_iorbs, int64_t n_aorbs, int64_t n_sorbs )
           {
             n_iorbitals = n_iorbs;
             n_aorbitals = n_aorbs;
@@ -390,25 +390,25 @@ namespace cmz
             aorbs.resize(n_aorbitals);
             sorbs.resize(n_sorbitals);
       
-            int i;
+            int64_t i;
             for(i = 0; i < n_iorbitals; i++) iorbs[i] = i;
-            for(int indx = 0; indx < n_aorbitals; i++, indx++) aorbs[indx] = i;
-            for(int indx = 0; indx < n_sorbitals; i++, indx++) sorbs[indx] = i;
+            for(int64_t indx = 0; indx < n_aorbitals; i++, indx++) aorbs[indx] = i;
+            for(int64_t indx = 0; indx < n_sorbitals; i++, indx++) sorbs[indx] = i;
           }
       
           /**
            * @brief Access one-body integral (i|a) stored in the
            *        unordered map. 
            *
-           * @param [in] int i: Virtual  orbital index.
-           * @param [in] int a: Occupied orbital index.
+           * @param [in] int64_t i: Virtual  orbital index.
+           * @param [in] int64_t a: Occupied orbital index.
            *
            * @returns double: One-body integral (i|a).
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          double map_get( int i, int a ) const
+          double map_get( int64_t i, int64_t a ) const
           {
             i %= norbitals;
             a %= norbitals;
@@ -422,17 +422,17 @@ namespace cmz
            *        unordered map. Notice that unordered map is stored
            *        in chemical notation (ia|jb). 
            *
-           * @param [in] int i: Virtual  orbital index 1.
-           * @param [in] int j: Virtual  orbital index 2.
-           * @param [in] int a: Occupied orbital index 1.
-           * @param [in] int b: Occupied orbital index 2.
+           * @param [in] int64_t i: Virtual  orbital index 1.
+           * @param [in] int64_t j: Virtual  orbital index 2.
+           * @param [in] int64_t a: Occupied orbital index 1.
+           * @param [in] int64_t b: Occupied orbital index 2.
            *
            * @returns double: Two-body integral <ij|ab>.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          double map_get( int i, int j, int a, int b ) const
+          double map_get( int64_t i, int64_t j, int64_t a, int64_t b ) const
           {
             i %= norbitals; j %= norbitals;
             a %= norbitals; b %= norbitals;
@@ -444,50 +444,50 @@ namespace cmz
           /**
            * @brief Check if spin orbital index corresponds to spin up.
            *
-           * @param [in] int i: Spin orbital index.
+           * @param [in] int64_t i: Spin orbital index.
            *
            * @returns bool: Does this spin orbital correspond to spin up?
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          bool isup(int i) const {return i < norbitals;}
+          bool isup(int64_t i) const {return i < norbitals;}
           /**
            * @brief Check if spin orbital index corresponds to spin down.
            *
-           * @param [in] int i: Spin orbital index.
+           * @param [in] int64_t i: Spin orbital index.
            *
            * @returns bool: Does this spin orbital correspond to spin down?
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          bool isdo(int i) const {return !isup(i);}
+          bool isdo(int64_t i) const {return !isup(i);}
           /**
            * @brief Check if spin orbital indices corresponds to the same spin.
            *
-           * @param [in] int i: Spin orbital index 1.
-           * @param [in] int a: Spin orbital index 2.
+           * @param [in] int64_t i: Spin orbital index 1.
+           * @param [in] int64_t a: Spin orbital index 2.
            *
            * @returns bool: Do these spin orbital indices correspond to the same spin.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          bool same_spin(int i, int a) const {return (isup(i) && isup(a)) || (isdo(i) && isdo(a));}
+          bool same_spin(int64_t i, int64_t a) const {return (isup(i) && isup(a)) || (isdo(i) && isdo(a));}
       
           /**
            * @brief Access one-body integral (i|a) 
            *
-           * @param [in] int i: Virtual  orbital index.
-           * @param [in] int a: Occupied orbital index.
+           * @param [in] int64_t i: Virtual  orbital index.
+           * @param [in] int64_t a: Occupied orbital index.
            *
            * @returns double: Two-body integral (i|a).
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          double get(int i, int a) const
+          double get(int64_t i, int64_t a) const
           {
             if(!same_spin(i,a)) return 0.;
             return t[ indexer(i,a) ];
@@ -496,17 +496,17 @@ namespace cmz
           /**
            * @brief Access two-body integral in physics notation <ij|ab>.
            *
-           * @param [in] int i: Virtual  orbital index 1.
-           * @param [in] int j: Virtual  orbital index 2.
-           * @param [in] int a: Occupied orbital index 1.
-           * @param [in] int b: Occupied orbital index 2.
+           * @param [in] int64_t i: Virtual  orbital index 1.
+           * @param [in] int64_t j: Virtual  orbital index 2.
+           * @param [in] int64_t a: Occupied orbital index 1.
+           * @param [in] int64_t b: Occupied orbital index 2.
            *
            * @returns double: Two-body integral <ij|ab>.
            *
            * @author Carlos Mejuto Zaera 
            * @date 05/04/2021
            */
-          double getPhys(int i, int j, int a, int b) const
+          double getPhys(int64_t i, int64_t j, int64_t a, int64_t b) const
           {
             if(!same_spin(i,a) || !same_spin(j,b)) return 0.;
             return u[ indexer(i, j, a, b) ];
@@ -515,17 +515,17 @@ namespace cmz
           /**
            * @brief Access two-body integral in chemistry notation (ia|jb).
            *
-           * @param [in] int i: Virtual  orbital index 1.
-           * @param [in] int j: Virtual  orbital index 2.
-           * @param [in] int a: Occupied orbital index 1.
-           * @param [in] int b: Occupied orbital index 2.
+           * @param [in] int64_t i: Virtual  orbital index 1.
+           * @param [in] int64_t j: Virtual  orbital index 2.
+           * @param [in] int64_t a: Occupied orbital index 1.
+           * @param [in] int64_t b: Occupied orbital index 2.
            *
            * @returns double: Two-body integral (ia|jb).
            *
            * @author Carlos Mejuto Zaera 
            * @date 05/04/2021
            */
-          double getChem(int i, int a, int j, int b) const
+          double getChem(int64_t i, int64_t a, int64_t j, int64_t b) const
           {
             if(!same_spin(i,a) || !same_spin(j,b)) return 0.;
             return u[ indexer(i, j, a, b) ];
@@ -534,14 +534,14 @@ namespace cmz
           /**
            * @brief Update one-body integral (i|a) 
            *
-           * @param [in] int i: Virtual  orbital index.
-           * @param [in] int a: Occupied orbital index.
+           * @param [in] int64_t i: Virtual  orbital index.
+           * @param [in] int64_t a: Occupied orbital index.
            * @param [in] double val: New value for integral.
            *
            * @author Carlos Mejuto Zaera 
            * @date 05/04/2021
            */
-          void update(int i, int a, double val)
+          void update(int64_t i, int64_t a, double val)
           {
             if(!same_spin(i,a)) return;
             t[ indexer(i,a) ] = val;
@@ -550,16 +550,16 @@ namespace cmz
           /**
            * @brief Update two-body integral in physics notation <ij|ab>.
            *
-           * @param [in] int i: Virtual  orbital index 1.
-           * @param [in] int j: Virtual  orbital index 2.
-           * @param [in] int a: Occupied orbital index 1.
-           * @param [in] int b: Occupied orbital index 2.
+           * @param [in] int64_t i: Virtual  orbital index 1.
+           * @param [in] int64_t j: Virtual  orbital index 2.
+           * @param [in] int64_t a: Occupied orbital index 1.
+           * @param [in] int64_t b: Occupied orbital index 2.
            * @param [in] double val: New value for <ij|ab>.
            *
            * @author Carlos Mejuto Zaera 
            * @date 05/04/2021
            */
-          void update(int i, int j, int a, int b, double val)
+          void update(int64_t i, int64_t j, int64_t a, int64_t b, double val)
           {
             if(!same_spin(i,a) || !same_spin(j,b)) return;
             u[ indexer(i, j, a, b) ] = val;
@@ -589,14 +589,14 @@ namespace cmz
             std::fill(t.begin(), t.end(), 0.);
             std::fill(u.begin(), u.end(), 0.);
       
-            for( int i=0; i<norbitals; ++i )
-              for( int a=0; a<norbitals; ++a )
+            for( int64_t i=0; i<norbitals; ++i )
+              for( int64_t a=0; a<norbitals; ++a )
                 t[ indexer( i,a ) ] = map_get( i,a );
       
-            for( int i=0; i<norbitals; ++i )
-              for( int j=0; j<norbitals; ++j )
-                for( int a=0; a<norbitals; ++a )
-                  for( int b=0; b<norbitals; ++b )
+            for( int64_t i=0; i<norbitals; ++i )
+              for( int64_t j=0; j<norbitals; ++j )
+                for( int64_t a=0; a<norbitals; ++a )
+                  for( int64_t b=0; b<norbitals; ++b )
                     u[ indexer( i,j,a,b ) ] = map_get( i,j,a,b );
           }
     
@@ -656,11 +656,11 @@ namespace cmz
           VecD rotate1( const eigMatD &V, const VecD &A ) const
           {
             VecD tmp(size_t(pow(norbitals,2)), 0.);
-            for( int i=0; i<norbitals; ++i )
+            for( int64_t i=0; i<norbitals; ++i )
             {
-              for( int a=0; a<norbitals; ++a )
-                for( int ii=0; ii<norbitals; ++ii )
-                  for( int aa=0; aa<norbitals; ++aa )
+              for( int64_t a=0; a<norbitals; ++a )
+                for( int64_t ii=0; ii<norbitals; ++ii )
+                  for( int64_t aa=0; aa<norbitals; ++aa )
                     tmp[ indexer( i,a ) ] += V(ii,i) * A[ indexer( ii,aa ) ] * V(aa,a);
             }
             return tmp;
@@ -680,21 +680,21 @@ namespace cmz
           VecD rotate2( const eigMatD &V, const VecD &A ) const
           {
             VecD tmp(size_t(pow(norbitals,4)), 0.);
-            for( int i=0; i<norbitals; ++i ) for( int j=0; j<norbitals; ++j )
+            for( int64_t i=0; i<norbitals; ++i ) for( int64_t j=0; j<norbitals; ++j )
             {
-              for( int a=0; a<norbitals; ++a ) for( int b=0; b<norbitals; ++b )
-                for( int ii=0; ii<norbitals; ++ii )
-                  for( int aa=0; aa<norbitals; ++aa )
+              for( int64_t a=0; a<norbitals; ++a ) for( int64_t b=0; b<norbitals; ++b )
+                for( int64_t ii=0; ii<norbitals; ++ii )
+                  for( int64_t aa=0; aa<norbitals; ++aa )
                     tmp[ indexer( i,j,a,b ) ] += V(ii,i) * A[ indexer( ii,j,aa,b ) ] * V(aa,a);
             }
       
             VecD another_tmp = tmp;
             std::fill(tmp.begin(), tmp.end(), 0.);
-            for( int i=0; i<norbitals; ++i ) for( int j=0; j<norbitals; ++j )
+            for( int64_t i=0; i<norbitals; ++i ) for( int64_t j=0; j<norbitals; ++j )
             {
-              for( int a=0; a<norbitals; ++a ) for( int b=0; b<norbitals; ++b )
-                for( int jj=0; jj<norbitals; ++jj )
-                  for( int bb=0; bb<norbitals; ++bb )
+              for( int64_t a=0; a<norbitals; ++a ) for( int64_t b=0; b<norbitals; ++b )
+                for( int64_t jj=0; jj<norbitals; ++jj )
+                  for( int64_t bb=0; bb<norbitals; ++bb )
                     tmp[ indexer( i,j,a,b ) ] += V(jj,j) * another_tmp[ indexer( i,jj,a,bb ) ] * V(bb,b);
             }
       
@@ -717,11 +717,11 @@ namespace cmz
           VecD rotate1AS( const eigMatD &V, const VecD &A ) const
           {
             VecD tmp(size_t(pow(norbitals,2)), 0.);
-            for( int i=0; i<norbitals; ++i )
+            for( int64_t i=0; i<norbitals; ++i )
             {
-              for( int a=0; a<norbitals; ++a )
-                for( int ii=0; ii<norbitals; ++ii )
-                  for( int aa=0; aa<norbitals; ++aa )
+              for( int64_t a=0; a<norbitals; ++a )
+                for( int64_t ii=0; ii<norbitals; ++ii )
+                  for( int64_t aa=0; aa<norbitals; ++aa )
                     tmp[ indexer( i,a ) ] += V(ii,i) * A[ indexer( ii,aa ) ] * V(aa,a);
             }
             return tmp;
@@ -745,37 +745,37 @@ namespace cmz
             std::copy( aorbs.begin(), aorbs.end(), occorbs.begin() + iorbs.size() );
     
             VecD tmp(size_t(pow(norbitals,4)), 0.);
-            for( int i=0; i<norbitals; ++i ) for( int j=0; j<norbitals; ++j )
+            for( int64_t i=0; i<norbitals; ++i ) for( int64_t j=0; j<norbitals; ++j )
             {
-              for( int a=0; a<norbitals; ++a ) for( auto const &bb : occorbs )
-                for( int b=0; b<norbitals; ++b )
+              for( int64_t a=0; a<norbitals; ++a ) for( auto const &bb : occorbs )
+                for( int64_t b=0; b<norbitals; ++b )
                     tmp[ indexer( i,j,a,bb ) ] += A[ indexer( i,j,a,b ) ] * V(b,bb);
             }
       
             VecD another_tmp = tmp;
             std::fill(tmp.begin(), tmp.end(), 0.);
-            for( int i=0; i<norbitals; ++i ) for( int j=0; j<norbitals; ++j )
+            for( int64_t i=0; i<norbitals; ++i ) for( int64_t j=0; j<norbitals; ++j )
             {
-              for( int aa=0; aa<norbitals; ++aa ) for( auto const &bb : occorbs )
-                for( int a=0; a<norbitals; ++a )
+              for( int64_t aa=0; aa<norbitals; ++aa ) for( auto const &bb : occorbs )
+                for( int64_t a=0; a<norbitals; ++a )
                     tmp[ indexer( i,j,aa,bb ) ] += another_tmp[ indexer( i,j,a,bb ) ] * V(a,aa);
             }
       
             another_tmp = tmp;
             std::fill(tmp.begin(), tmp.end(), 0.);
-            for( int i=0; i<norbitals; ++i ) for( int jj=0; jj<norbitals; ++jj )
+            for( int64_t i=0; i<norbitals; ++i ) for( int64_t jj=0; jj<norbitals; ++jj )
             {
-              for( int aa=0; aa<norbitals; ++aa ) for( auto const &bb : occorbs )
-                for( int j=0; j<norbitals; ++j )
+              for( int64_t aa=0; aa<norbitals; ++aa ) for( auto const &bb : occorbs )
+                for( int64_t j=0; j<norbitals; ++j )
                     tmp[ indexer( i,jj,aa,bb ) ] += V(j,jj) * another_tmp[ indexer( i,j,aa,bb ) ];
             }
       
             another_tmp = tmp;
             std::fill(tmp.begin(), tmp.end(), 0.);
-            for( int ii=0; ii<norbitals; ++ii ) for( int jj=0; jj<norbitals; ++jj )
+            for( int64_t ii=0; ii<norbitals; ++ii ) for( int64_t jj=0; jj<norbitals; ++jj )
             {
-              for( int aa=0; aa<norbitals; ++aa ) for( auto const &bb : occorbs )
-                for( int i=0; i<norbitals; ++i )
+              for( int64_t aa=0; aa<norbitals; ++aa ) for( auto const &bb : occorbs )
+                for( int64_t i=0; i<norbitals; ++i )
                     tmp[ indexer( ii,jj,aa,bb ) ] += V(i,ii) * another_tmp[ indexer( i,jj,aa,bb ) ];
             }
             
@@ -818,10 +818,10 @@ namespace cmz
             std::cout << "READING FCIDUMP FILE " << file << std::endl;
       
             string line;
-            int i, j, a, b;
+            int64_t i, j, a, b;
             double matel;
       
-            int count = 0;
+            int64_t count = 0;
             bool ignored = false; //For ignoring 1-electron energies
       
             while(std::getline(ifile, line))
@@ -895,17 +895,17 @@ namespace cmz
           {
             //Update the stored integrals. Important for printing
             //First, one-body terms
-            for (int i = 0; i < norbitals; i++)
+            for (int64_t i = 0; i < norbitals; i++)
             {
-              for (int a = 0; a < norbitals; a++)
+              for (int64_t a = 0; a < norbitals; a++)
                 t_store.insert_or_assign( two_indx(i,a), t[ indexer(i,a) ] );
             }
             //Finally, two-body terms
-            for (int i = 0; i < norbitals; i++)
+            for (int64_t i = 0; i < norbitals; i++)
             {
-              for (int j = 0; j < norbitals; j++)
-                for (int a = 0; a < norbitals; a++)
-                  for (int b = 0; b < norbitals; b++)
+              for (int64_t j = 0; j < norbitals; j++)
+                for (int64_t a = 0; a < norbitals; a++)
+                  for (int64_t b = 0; b < norbitals; b++)
                     u_store.insert_or_assign( four_indx(i,a,j,b), u[ indexer(i,j,a,b) ] );
             }
           }
@@ -923,7 +923,7 @@ namespace cmz
             std::ofstream out( file );
             out.precision(12);
             auto w5 = std::setw(5), w20 = std::setw(20);
-            const int n = norbitals;
+            const int64_t n = norbitals;
             std::cout << "Writing integrals to " << file << std::endl;
             std::cout << "Going to write " << t_store.size() + u_store.size() << " integrals" << std::endl;
       

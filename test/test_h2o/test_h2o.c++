@@ -32,9 +32,9 @@ int main( int argn, char* argv[] )
     Input_t input;
     ReadInput(in_file, input);
 
-    unsigned short Norbs = getParam<int>( input, "norbs" );
-    unsigned short Nups  = getParam<int>( input, "nups"  );
-    unsigned short Ndos  = getParam<int>( input, "ndos"  );
+    uint64_t Norbs = getParam<int>( input, "norbs" );
+    uint64_t Nups  = getParam<int>( input, "nups"  );
+    uint64_t Ndos  = getParam<int>( input, "ndos"  );
     bool print = true;
     string fcidump = getParam<string>( input, "fcidump_file" );
 

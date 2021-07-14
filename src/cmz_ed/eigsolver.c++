@@ -15,15 +15,15 @@ namespace cmz
        eigvecs.resize(alphas.size(), alphas.size());
        //INITIALIZE VARIABLES
        char JOBZ = 'I';        // COMPUTE EIGENVALUES AND EIGENVECTORS OF THE TRIDIAGONAL MATRIX
-       int N = alphas.size(), LDZ = N, INFO; // SIZES
+       int  N = alphas.size(), LDZ = N, INFO; // SIZES
        double *D, *E; // DIAGONAL AND SUB-DIAGONAL ELEMENTS
        double *WORK, *Z;   // WORKSPACE AND EIGENVECTORS
        //INITIALIZE MATRIX 
        D = new double[N];
-       for(int i = 0; i < N; i++)
+       for(int64_t i = 0; i < N; i++)
          D[i] = alphas[i];
        E = new double[N-1];
-       for(int i = 1; i < N; i++)
+       for(int64_t i = 1; i < N; i++)
          E[i-1] = betas[i];
        //ALLOCATE MEMORY
        WORK  = new double[2*N -2];

@@ -7,7 +7,7 @@ namespace cmz
     namespace rdm
     {
 
-      rdms::rdms( int norbitals, const VectorXd &vec, const SetSlaterDets &stts ) : rdms(norbitals)
+      rdms::rdms( int64_t norbitals, const VectorXd &vec, const SetSlaterDets &stts ) : rdms(norbitals)
       {
         // Constructure using a many-Fermion state and Slater
         // determinant list.
@@ -25,20 +25,20 @@ namespace cmz
           slater_det bra(*l_it);
           slater_det ket(*r_it);
           // Store occupied orbitals by spin
-          std::vector<unsigned short> occs_up = ket.GetOccOrbsUp();
-          std::vector<unsigned short> occs_do = ket.GetOccOrbsDo();
+          std::vector<uint64_t> occs_up = ket.GetOccOrbsUp();
+          std::vector<uint64_t> occs_do = ket.GetOccOrbsDo();
           // Determine number of excitations between both determinants.
-          unsigned short exc_up = bra.CountExcUp( ket );
-          unsigned short exc_do = bra.CountExcDo( ket );
+          uint64_t exc_up = bra.CountExcUp( ket );
+          uint64_t exc_do = bra.CountExcDo( ket );
           // Double Up-Up
           if( exc_up == 4 && exc_do == 0 )
           {
-            unsigned short o1 = ket.GetFlippedOccIndx( bra );
-            unsigned short v1 = bra.GetFlippedOccIndx( ket );
+            uint64_t o1 = ket.GetFlippedOccIndx( bra );
+            uint64_t v1 = bra.GetFlippedOccIndx( ket );
             double sign = bra.SingleExcUp( o1, v1 );
             sign = ket.SingleExcUp( v1, o1 );
-            unsigned short o2 = ket.GetFlippedOccIndx( bra );
-            unsigned short v2 = bra.GetFlippedOccIndx( ket );
+            uint64_t o2 = ket.GetFlippedOccIndx( bra );
+            uint64_t v2 = bra.GetFlippedOccIndx( ket );
             sign *= ket.SingleExcUp( v2, o2 );
             rdm2[ indexer(v1,v2,o1,o2) ] += sign * contrib * 0.5;
             rdm2[ indexer(v1,v2,o2,o1) ] -= sign * contrib * 0.5;
@@ -48,12 +48,12 @@ namespace cmz
           // Double Do-Do
           else if( exc_do == 4 && exc_do == 0 )
           {
-            unsigned short o1 = ket.GetFlippedOccIndx( bra );
-            unsigned short v1 = bra.GetFlippedOccIndx( ket );
+            uint64_t o1 = ket.GetFlippedOccIndx( bra );
+            uint64_t v1 = bra.GetFlippedOccIndx( ket );
             double sign = bra.SingleExcDo( o1, v1 );
             sign = ket.SingleExcDo( v1, o1 );
-            unsigned short o2 = ket.GetFlippedOccIndx( bra );
-            unsigned short v2 = bra.GetFlippedOccIndx( ket );
+            uint64_t o2 = ket.GetFlippedOccIndx( bra );
+            uint64_t v2 = bra.GetFlippedOccIndx( ket );
             sign *= ket.SingleExcDo( v2, o2 );
             rdm2[ indexer(v1,v2,o1,o2) ] += sign * contrib * 0.5;
             rdm2[ indexer(v1,v2,o2,o1) ] -= sign * contrib * 0.5;
@@ -63,12 +63,12 @@ namespace cmz
           // Double Up-Do
           else if( exc_up == 2 && exc_do == 2 )
           {
-            unsigned short oup = ket.GetFlippedOccIndxUp( bra );
-            unsigned short vup = bra.GetFlippedOccIndxUp( ket );
+            uint64_t oup = ket.GetFlippedOccIndxUp( bra );
+            uint64_t vup = bra.GetFlippedOccIndxUp( ket );
             double sign = bra.SingleExcUp( oup, vup );
             sign = ket.SingleExcUp( vup, oup );
-            unsigned short odo = ket.GetFlippedOccIndxDo( bra );
-            unsigned short vdo = bra.GetFlippedOccIndxDo( ket );
+            uint64_t odo = ket.GetFlippedOccIndxDo( bra );
+            uint64_t vdo = bra.GetFlippedOccIndxDo( ket );
             sign *= ket.SingleExcDo( vdo, odo );
             rdm2[ indexer(vup,vdo,oup,odo) ] += sign * contrib * 0.5;
             rdm2[ indexer(vdo,vup,odo,oup) ] += sign * contrib * 0.5;
@@ -76,8 +76,8 @@ namespace cmz
           // Single Up
           else if( exc_up == 2 && exc_do == 0 )
           {
-            unsigned short o1 = ket.GetFlippedOccIndx( bra );
-            unsigned short v1 = bra.GetFlippedOccIndx( ket );
+            uint64_t o1 = ket.GetFlippedOccIndx( bra );
+            uint64_t v1 = bra.GetFlippedOccIndx( ket );
             double sign = ket.SingleExcUp( v1, o1 );
 
             // One-body contribution
@@ -101,8 +101,8 @@ namespace cmz
           // Single Do
           else if( exc_up == 0 && exc_do == 2 )
           {
-            unsigned short o1 = ket.GetFlippedOccIndx( bra );
-            unsigned short v1 = bra.GetFlippedOccIndx( ket );
+            uint64_t o1 = ket.GetFlippedOccIndx( bra );
+            uint64_t v1 = bra.GetFlippedOccIndx( ket );
             double sign = ket.SingleExcDo( v1, o1 );
 
             // One-body contribution
@@ -130,8 +130,8 @@ namespace cmz
           SetSlaterDets_It it = std::next( stts.begin(), ist );
           double contrib = vec(ist) * vec(ist); 
           // Store occupied orbitals by spin
-          std::vector<unsigned short> occs_up = it->GetOccOrbsUp();
-          std::vector<unsigned short> occs_do = it->GetOccOrbsDo();
+          std::vector<uint64_t> occs_up = it->GetOccOrbsUp();
+          std::vector<uint64_t> occs_do = it->GetOccOrbsDo();
           // One-body terms
           for( auto o : occs_up )
             rdm1[ indexer(o,o) ] += contrib;

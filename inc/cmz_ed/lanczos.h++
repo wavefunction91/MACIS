@@ -60,7 +60,7 @@ namespace cmz
          * @author Carlos Mejuto Zaera
          * @date 05/04/2021
          */
-        int rows() const {return mat->rows();}
+        int64_t rows() const {return mat->rows();}
     };
     
     /**
@@ -106,7 +106,7 @@ namespace cmz
          * @author Carlos Mejuto Zaera
          * @date 05/04/2021
          */
-        int rows() const {return mat->rows();}
+        int64_t rows() const {return mat->rows();}
     };
     
     /**
@@ -114,7 +114,7 @@ namespace cmz
      *
      * @param [in] const Eigen::VectorXd &start_vec: Starting vector.
      * @param [in] const MatOp &H: Wrapped Matrix. Has to be Hermitian!
-     * @param [in] int nLanIts: Maximal number of iterations.
+     * @param [in] int64_t nLanIts: Maximal number of iterations.
      * @param [out] std::vector<double> &alphas: Diagonal of the tri-diagonal H. 
      * @param [out] std::vector<double> &betas: Off-diagonal of the tri-diagonal H.
      * @param [in] double tol: Lanczos tolerance.
@@ -123,12 +123,12 @@ namespace cmz
      * @date 05/04/2021
      */
     template<class MatOp>
-    void MyLanczos(const VectorXd &start_vec, const MatOp &H, int nLanIts, VecD &alphas, VecD &betas, double tol)
+    void MyLanczos(const VectorXd &start_vec, const MatOp &H, int64_t nLanIts, VecD &alphas, VecD &betas, double tol)
     {
       //LANCZOS ROUTINE USING TEMPLATED MATRIX
       //CLASS. ONLY NEEDS TO PROVIDE A MATRIX
       //VECTOR PRODUCT.
-      int n = start_vec.rows();
+      int64_t n = start_vec.rows();
       VectorXd qold  = VectorXd::Zero(n);
       VectorXd qtemp = VectorXd::Zero(n);
       VectorXd qnew  = VectorXd::Zero(n);
@@ -139,7 +139,7 @@ namespace cmz
       betas.resize(nLanIts+1, 0.);
     
       double normpsi = sqrt(MyInnProd(start_vec, start_vec));
-      int nlan = -1, itermax = nLanIts;
+      int64_t nlan = -1, itermax = nLanIts;
     
       nlan++;
       qold = start_vec / normpsi;
@@ -179,7 +179,7 @@ namespace cmz
      *
      * @param [in] const Eigen::VectorXd &start_vec: Starting vector.
      * @param [in] const MatOp &H: Wrapped Matrix. Has to be Hermitian!
-     * @param [in] int nLanIts: Maximal number of iterations.
+     * @param [in] int64_t nLanIts: Maximal number of iterations.
      * @param [in] Eigen::VectorXd &vec_P: Eigenvector in the Krylov basis. 
      * @param [out] Eigen::VectorXd &vec_BP: Eigenvector in the original basis. 
      *
@@ -187,11 +187,11 @@ namespace cmz
      * @date 05/04/2021
      */
     template<class MatOp>
-    void MyLanczos_BackProj(const VectorXd &start_vec, const MatOp &H, int nLanIts, VectorXd &vec_P, VectorXd &vec_BP)
+    void MyLanczos_BackProj(const VectorXd &start_vec, const MatOp &H, int64_t nLanIts, VectorXd &vec_P, VectorXd &vec_BP)
     {
       //REBUILD THE EIGENVECTOR FROM A PREVIOUS LANZOS
       //CALCULATION.
-      int n = start_vec.rows();
+      int64_t n = start_vec.rows();
       VectorXd qold  = VectorXd::Zero(n);
       VectorXd qtemp = VectorXd::Zero(n);
       VectorXd qnew  = VectorXd::Zero(n);
@@ -200,7 +200,7 @@ namespace cmz
       VecD betas(nLanIts+1, 0.);
     
       double normpsi = sqrt(MyInnProd(start_vec, start_vec));
-      int nlan = -1, itermax = nLanIts;
+      int64_t nlan = -1, itermax = nLanIts;
     
       vec_BP = VectorXd::Zero(n);
       
@@ -247,7 +247,7 @@ namespace cmz
      * @date 05/04/2021
      */
     template<class MatOp>
-    int GetGSEn_Lanczos(const VectorXd &start_vec, const MatOp &H, double &E0, VectorXd &psi0_Lan, const Input_t &input)
+    int64_t GetGSEn_Lanczos(const VectorXd &start_vec, const MatOp &H, double &E0, VectorXd &psi0_Lan, const Input_t &input)
     {
       //COMPUTE LOWEST EIGENVALUE OF MATRIX H
       //USING LANCZOS. RETURNS EIGENVECTOR IN
@@ -259,7 +259,7 @@ namespace cmz
       try{E0tol = getParam<double>(input, "E0tol");}catch(...){E0tol = 1.E-8;}
       try{print = getParam<bool>(input, "print");}catch(...){print = false;}
     
-      int n = start_vec.rows();
+      int64_t n = start_vec.rows();
       VectorXd qold  = VectorXd::Zero(n);
       VectorXd qtemp = VectorXd::Zero(n);
       VectorXd qnew  = VectorXd::Zero(n);
@@ -269,7 +269,7 @@ namespace cmz
       double currE0, prevE0;
     
       double normpsi = sqrt(MyInnProd(start_vec, start_vec));
-      int nlan = -1, itermax = 1000;
+      int64_t nlan = -1, itermax = 1000;
     
       nlan++;
       qold = start_vec / normpsi;
@@ -371,7 +371,7 @@ namespace cmz
       try{E0tol = getParam<double>(input, "E0tol");}catch(...){E0tol = 1.E-8;}
       try{print = getParam<bool>(input, "print");}catch(...){print = false;}
     
-      int n = start_vec.rows();
+      int64_t n = start_vec.rows();
       VectorXd qold  = VectorXd::Zero(n);
       VectorXd qtemp = VectorXd::Zero(n);
       VectorXd qnew  = VectorXd::Zero(n);
@@ -382,7 +382,7 @@ namespace cmz
       double currE0, prevE0;
     
       double normpsi = sqrt(MyInnProd(start_vec, start_vec));
-      int nlan = -1, itermax = 1000;
+      int64_t nlan = -1, itermax = 1000;
     
       nlan++;
       qold = start_vec / normpsi;
@@ -446,7 +446,7 @@ namespace cmz
       }
       else
       {
-        for(int i = 0; i < kry_vecs.size(); i++)
+        for(int64_t i = 0; i < kry_vecs.size(); i++)
           psi0 += eigvecs.col(0)(i) * kry_vecs[i];
       }
     }
@@ -471,7 +471,7 @@ namespace cmz
       //Computes the lowest eigenvalue and corresponding
       //eigenvector from the dense matrix H by using Lanczos.
      
-      int n = H.rows();
+      int64_t n = H.rows();
       //Initial vector. We choose (1,0,0,0,...)t
       //for HF, Otherwhise  (1,1,1,1,...)t
       VectorXd start_psi = isHF ? VectorXd::Zero(n) : VectorXd::Ones(n);
@@ -479,7 +479,7 @@ namespace cmz
       //Determine lowest eigenvalue for the given
       //tolerance.
       VectorXd psi0_Lan;
-      int nLanIts = GetGSEn_Lanczos(start_psi, H, E0, psi0_Lan, input);
+      int64_t nLanIts = GetGSEn_Lanczos(start_psi, H, E0, psi0_Lan, input);
       //Reconstruct the eigenvector
       MyLanczos_BackProj(start_psi, H, nLanIts, psi0_Lan, psi0);
       start_psi = psi0;

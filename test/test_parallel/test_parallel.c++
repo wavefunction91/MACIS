@@ -62,9 +62,9 @@ int main( int argn, char* argv[] )
     Input_t input;
     ReadInput(in_file, input);
 
-    unsigned short Norbs = getParam<int>( input, "norbs" );
-    unsigned short Nups  = getParam<int>( input, "nups"  );
-    unsigned short Ndos  = getParam<int>( input, "ndos"  );
+    uint64_t Norbs = getParam<int>( input, "norbs" );
+    uint64_t Nups  = getParam<int>( input, "nups"  );
+    uint64_t Ndos  = getParam<int>( input, "ndos"  );
     bool print = true;
     string fcidump = getParam<string>( input, "fcidump_file" );
 
@@ -304,9 +304,9 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian(
   rowptr.reserve( ndets + 1 );
   rowptr.push_back(0);
 
+#if 0
   index_t i = 0;
   for( const auto& det : stts ) {
-
     // Form all single/double excitations from current det
     // XXX: This is proabably too much work, no?
     auto sd_exes = det.GetSinglesAndDoubles( &ints );
@@ -353,6 +353,29 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian(
     rowptr.push_back( rowptr.back() + nnz_col );
 
   } // End loop over all determinants 
+#else
+
+  index_t i = 0;
+  for( auto bra : stts ) {
+    size_t nnz_col = 0;
+
+    index_t j = 0;
+    for( auto ket : stts ) {
+      if( std::popcount( bra.GetState() ^ ket.GetState() ) <= 4 ) {
+        const auto h_el = Hop.GetHmatel( bra, ket );
+        if( std::abs(h_el) > H_thresh ) {
+          nnz_col++;
+          colind.emplace_back(j);
+          nzval.emplace_back( h_el );
+        }
+      }
+      j++;
+    }
+
+    rowptr.push_back( rowptr.back() + nnz_col );
+    i++;
+  }
+#endif
 
 
   // Move resources into CSR matrix
@@ -401,6 +424,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   rowptr.reserve( ndets_bra + 1 );
   rowptr.push_back(0);
 
+#if 0
   index_t i = 0;
   for( auto bra_it = bra_begin; bra_it != bra_end; ++bra_it ) {
     
@@ -458,6 +482,30 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
     rowptr.push_back( rowptr.back() + nnz_col );
 
   } // End loop over all determinants 
+#else
+
+  index_t i = 0;
+  for( auto bra_it = bra_begin; bra_it != bra_end; ++bra_it ) {
+    const auto& bra = *bra_it;
+    size_t nnz_col = 0;
+    index_t j = 0;
+    for( auto ket_it = ket_begin; ket_it != ket_end; ++ket_it ) {
+      const auto& ket = *ket_it;
+      if( std::popcount( bra.GetState() ^ ket.GetState() ) <= 4 ) {
+        const auto h_el = Hop.GetHmatel( bra, ket );
+        if( std::abs(h_el) > H_thresh ) {
+          nnz_col++;
+          colind.emplace_back(j);
+          nzval.emplace_back( h_el );
+        }
+      }
+      j++;
+    }
+    rowptr.push_back( rowptr.back() + nnz_col );
+    i++;
+  }
+
+#endif
 
   // Move resources into CSR matrix
   const auto nnz = colind.size();

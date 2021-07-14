@@ -37,12 +37,12 @@ namespace cmz
         /**
          * @brief Return number of orbitals in the Hamitlonian.
          *
-         * @returns unsigned short: Nr. of orbitals.
+         * @returns uint64_t: Nr. of orbitals.
          *
          * @author Carlos Mejuto Zaera
          * @date 05/05/2021
          */
-        unsigned short GetNorbs( ) const { return pints->norbitals; }
+        uint64_t GetNorbs( ) const { return pints->norbitals; }
         /**
          * @brief Evaluate Hamiltonian matrix element between two
          *        Slater determinants. 

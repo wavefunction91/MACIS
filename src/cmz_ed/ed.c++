@@ -8,9 +8,9 @@ namespace cmz
     void RunED( const Input_t &input, const intgrls::integrals &ints, double &E0, std::vector<double> &rdm1, std::vector<double> &rdm2 )
     {
       // Performs simple ED calculation
-      unsigned short Norbs = getParam<int>( input, "norbs" );
-      unsigned short Nups  = getParam<int>( input, "nups"  );
-      unsigned short Ndos  = getParam<int>( input, "ndos"  );
+      uint64_t Norbs = getParam<int>( input, "norbs" );
+      uint64_t Nups  = getParam<int>( input, "nups"  );
+      uint64_t Ndos  = getParam<int>( input, "ndos"  );
       bool print;
       try{ print = getParam<bool>( input, "print" );} catch (...) { print = false; }
     

@@ -20,19 +20,19 @@ namespace cmz
       // Copy Slater dets, for manipulations
       slater_det bra(L_st), ket(R_st);
       // Store occupied orbitals by spin
-      std::vector<unsigned short> occs_up = ket.GetOccOrbsUp();
-      std::vector<unsigned short> occs_do = ket.GetOccOrbsDo();
+      std::vector<uint64_t> occs_up = ket.GetOccOrbsUp();
+      std::vector<uint64_t> occs_do = ket.GetOccOrbsDo();
       // First, determine number of excitations between both determinants.
-      unsigned short exc_up = bra.CountExcUp( ket );
-      unsigned short exc_do = bra.CountExcDo( ket );
+      uint64_t exc_up = bra.CountExcUp( ket );
+      uint64_t exc_do = bra.CountExcDo( ket );
       // Double up excitation
       if( exc_up == 4 && exc_do == 0 )
       {
-        unsigned short o1 = ket.GetFlippedOccIndx( bra );
-        unsigned short v1 = bra.GetFlippedOccIndx( ket );
+        uint64_t o1 = ket.GetFlippedOccIndx( bra );
+        uint64_t v1 = bra.GetFlippedOccIndx( ket );
         double sign = ket.SingleExcUp( v1, o1 );
-        unsigned short o2 = ket.GetFlippedOccIndx( bra );
-        unsigned short v2 = bra.GetFlippedOccIndx( ket );
+        uint64_t o2 = ket.GetFlippedOccIndx( bra );
+        uint64_t v2 = bra.GetFlippedOccIndx( ket );
         sign *= ket.SingleExcUp( v2, o2 );
         res = sign * (pints->getChem(v1,o1,v2,o2) 
                       - pints->getChem(v1,o2,v2,o1));
@@ -40,11 +40,11 @@ namespace cmz
       // Double down excitation
       else if( exc_up == 0 && exc_do == 4 )
       {
-        unsigned short o1 = ket.GetFlippedOccIndx( bra );
-        unsigned short v1 = bra.GetFlippedOccIndx( ket );
+        uint64_t o1 = ket.GetFlippedOccIndx( bra );
+        uint64_t v1 = bra.GetFlippedOccIndx( ket );
         double sign = ket.SingleExcDo( v1, o1 );
-        unsigned short o2 = ket.GetFlippedOccIndx( bra );
-        unsigned short v2 = bra.GetFlippedOccIndx( ket );
+        uint64_t o2 = ket.GetFlippedOccIndx( bra );
+        uint64_t v2 = bra.GetFlippedOccIndx( ket );
         sign *= ket.SingleExcDo( v2, o2 );
         res = sign * (pints->getChem(v1,o1,v2,o2) 
                       - pints->getChem(v1,o2,v2,o1));
@@ -52,19 +52,19 @@ namespace cmz
       // Mixed double excitation
       else if( exc_up == 2 && exc_do == 2 )
       {
-        unsigned short oup = ket.GetFlippedOccIndxUp( bra );
-        unsigned short vup = bra.GetFlippedOccIndxUp( ket );
+        uint64_t oup = ket.GetFlippedOccIndxUp( bra );
+        uint64_t vup = bra.GetFlippedOccIndxUp( ket );
         double sign = ket.SingleExcUp( vup, oup );
-        unsigned short odo = ket.GetFlippedOccIndxDo( bra );
-        unsigned short vdo = bra.GetFlippedOccIndxDo( ket );
+        uint64_t odo = ket.GetFlippedOccIndxDo( bra );
+        uint64_t vdo = bra.GetFlippedOccIndxDo( ket );
         sign *= ket.SingleExcDo( vdo, odo );
         res = sign * pints->getChem(vup,oup,vdo,odo);
       }
       // Single up excitation
       else if( exc_up == 2 && exc_do == 0)
       {
-        unsigned short o1 = ket.GetFlippedOccIndx( bra );
-        unsigned short v1 = bra.GetFlippedOccIndx( ket );
+        uint64_t o1 = ket.GetFlippedOccIndx( bra );
+        uint64_t v1 = bra.GetFlippedOccIndx( ket );
         double sign = ket.SingleExcUp( v1, o1 );
 
         res = pints->get(v1, o1);
@@ -78,8 +78,8 @@ namespace cmz
       // Single do excitation
       else if( exc_up == 0 && exc_do == 2 )
       {
-        unsigned short o1 = ket.GetFlippedOccIndx( bra );
-        unsigned short v1 = bra.GetFlippedOccIndx( ket );
+        uint64_t o1 = ket.GetFlippedOccIndx( bra );
+        uint64_t v1 = bra.GetFlippedOccIndx( ket );
         double sign = ket.SingleExcDo( v1, o1 );
 
         res = pints->get(v1, o1);

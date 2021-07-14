@@ -5,36 +5,36 @@ namespace cmz
   namespace ed
   {
 
-    double slater_det::SingleExcUp( unsigned short i, unsigned short a ) 
+    double slater_det::SingleExcUp( uint64_t i, uint64_t a ) 
     { 
-      unsigned short omax = std::max(i,a);
-      unsigned short omin = std::min(i,a);
+      uint64_t omax = std::max(i,a);
+      uint64_t omin = std::min(i,a);
       // Bitmask to check for Fermionic sign change.
-      unsigned long mask = ((1<<omax) - 1) ^ ((1<<omin+1) - 1);
+      uint64_t mask = ((1<<omax) - 1) ^ ((1<<omin+1) - 1);
       mask = state & mask;
       Flip(i); Flip(a);
       return (std::popcount(mask) % 2) == 1 ? -1. : 1.; 
     }
 
-    double slater_det::SingleExcDo( unsigned short i, unsigned short a ) 
+    double slater_det::SingleExcDo( uint64_t i, uint64_t a ) 
     { 
-      unsigned short omax = std::max(i,a) + Norbs;
-      unsigned short omin = std::min(i,a) + Norbs;
+      uint64_t omax = std::max(i,a) + Norbs;
+      uint64_t omin = std::min(i,a) + Norbs;
       // Bitmask to check for Fermionic sign change.
-      unsigned long mask = ((1<<omax) - 1) ^ ((1<<omin+1) - 1);
+      uint64_t mask = ((1<<omax) - 1) ^ ((1<<omin+1) - 1);
       mask = state & mask;
       Flip(i+Norbs); Flip(a+Norbs);
       return (std::popcount(mask) % 2) == 1 ? -1. : 1.; 
     }
 
-    slater_det slater_det::GetSingExUpSt( unsigned short i, unsigned short a, double &sign ) const
+    slater_det slater_det::GetSingExUpSt( uint64_t i, uint64_t a, double &sign ) const
     {
       slater_det cp(*this);
       sign = cp.SingleExcUp( i, a );
       return cp;
     }
 
-    slater_det slater_det::GetSingExDoSt( unsigned short i, unsigned short a, double &sign ) const
+    slater_det slater_det::GetSingExDoSt( uint64_t i, uint64_t a, double &sign ) const
     {
       slater_det cp(*this);
       sign = cp.SingleExcDo( i, a );
@@ -81,11 +81,11 @@ namespace cmz
       return str;
     }
 
-    std::vector<unsigned short> slater_det::GetOccOrbsUp() const
+    std::vector<uint64_t> slater_det::GetOccOrbsUp() const
     {
-      std::vector<unsigned short> occs_up(Nup, 0);
-      unsigned short indx = 0;
-      for(unsigned short i = 0; i < Norbs; i++)
+      std::vector<uint64_t> occs_up(Nup, 0);
+      uint64_t indx = 0;
+      for(uint64_t i = 0; i < Norbs; i++)
         if( IsOccUp(i) )
         {
           occs_up[indx] = i; indx++;
@@ -93,11 +93,11 @@ namespace cmz
       return occs_up;
     }
 
-    std::vector<unsigned short> slater_det::GetOccOrbsDo() const
+    std::vector<uint64_t> slater_det::GetOccOrbsDo() const
     {
-      std::vector<unsigned short> occs_do(Ndo, 0);
-      unsigned short indx = 0;
-      for(unsigned short i = 0; i < Norbs; i++)
+      std::vector<uint64_t> occs_do(Ndo, 0);
+      uint64_t indx = 0;
+      for(uint64_t i = 0; i < Norbs; i++)
         if( IsOccDo(i) )
         {
           occs_do[indx] = i; indx++;
@@ -105,11 +105,11 @@ namespace cmz
       return occs_do;
     }
 
-    void slater_det::GetOccsAndVirtsUp( std::vector<unsigned short> &occs, std::vector<unsigned short> &virts ) const
+    void slater_det::GetOccsAndVirtsUp( std::vector<uint64_t> &occs, std::vector<uint64_t> &virts ) const
     {
       occs.resize(Nup, 0); virts.resize(Norbs - Nup, 0);
-      unsigned short iocc = 0, ivirt = 0;
-      for(unsigned short i = 0; i < Norbs; i++)
+      uint64_t iocc = 0, ivirt = 0;
+      for(uint64_t i = 0; i < Norbs; i++)
       {
         if( IsOccUp(i) )
         {
@@ -122,11 +122,11 @@ namespace cmz
       }
     }
 
-    void slater_det::GetOccsAndVirtsDo( std::vector<unsigned short> &occs, std::vector<unsigned short> &virts ) const
+    void slater_det::GetOccsAndVirtsDo( std::vector<uint64_t> &occs, std::vector<uint64_t> &virts ) const
     {
       occs.resize(Ndo, 0); virts.resize(Norbs - Ndo, 0);
-      unsigned short iocc = 0, ivirt = 0;
-      for(unsigned short i = 0; i < Norbs; i++)
+      uint64_t iocc = 0, ivirt = 0;
+      for(uint64_t i = 0; i < Norbs; i++)
       {
         if( IsOccDo(i) )
         {
@@ -143,8 +143,8 @@ namespace cmz
     {
       std::vector<slater_det> excs;
       // Store occupied and empty orbitals of each spin
-      std::vector<unsigned short> occs_up, occs_do;
-      std::vector<unsigned short> virts_up, virts_do;
+      std::vector<uint64_t> occs_up, occs_do;
+      std::vector<uint64_t> virts_up, virts_do;
       GetOccsAndVirtsUp( occs_up, virts_up ); 
       GetOccsAndVirtsDo( occs_do, virts_do ); 
 
@@ -201,8 +201,8 @@ namespace cmz
     {
       std::vector<slater_det> excs;
       // Store occupied and empty orbitals of each spin
-      std::vector<unsigned short> occs_up, occs_do;
-      std::vector<unsigned short> virts_up, virts_do;
+      std::vector<uint64_t> occs_up, occs_do;
+      std::vector<uint64_t> virts_up, virts_do;
       GetOccsAndVirtsUp( occs_up, virts_up ); 
       GetOccsAndVirtsDo( occs_do, virts_do ); 
   
@@ -264,7 +264,7 @@ namespace cmz
       return excs;
     }
 
-    SetSlaterDets BuildFullHilbertSpace( unsigned short Norbs, unsigned short Nups, unsigned short Ndos )
+    SetSlaterDets BuildFullHilbertSpace( uint64_t Norbs, uint64_t Nups, uint64_t Ndos )
     {
       // Builds full Hilbert space for a system of Norbs
       // orbitals, Nups up electrons and Ndos down electrons.
@@ -273,14 +273,14 @@ namespace cmz
      
       // Make all possible states of Norbs with Nups and Ndos
       // bits set.
-      std::vector<unsigned long> up_stts = BuildCombs( Norbs, Nups );
-      std::vector<unsigned long> do_stts = BuildCombs( Norbs, Ndos );
+      std::vector<uint64_t> up_stts = BuildCombs( Norbs, Nups );
+      std::vector<uint64_t> do_stts = BuildCombs( Norbs, Ndos );
 
       // Combine into possible Hilbert space
       for( size_t iup = 0; iup < up_stts.size(); iup++ )
         for( size_t ido = 0; ido < do_stts.size(); ido++ )
         {
-          unsigned long st = (do_stts[ido] << Norbs) + up_stts[iup];
+          uint64_t st = (do_stts[ido] << Norbs) + up_stts[iup];
           basis.insert( slater_det( st, Norbs, Nups, Ndos ) );
         }
 

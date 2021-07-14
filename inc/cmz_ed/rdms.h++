@@ -50,33 +50,33 @@ namespace cmz
        * @date 05/04/2021
        */
       class indexer{
-        int norbitals;
+        int64_t norbitals;
         public:
          
           /**
            * @brief Constructor.
            *
-           * @param [in] int norbs: Nr. of orbitals in the system.
+           * @param [in] int64_t norbs: Nr. of orbitals in the system.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          indexer(int norbs) : norbitals(norbs) {}
+          indexer(int64_t norbs) : norbitals(norbs) {}
       
           /**
            * @brief Transform from 2 index to single index 
            *        (i;a) -> i + norbitals * a. Considers only
            *        spin up orbitals, by making e.g. i -> i % norbitals.
            *
-           * @param [in] int i: Virtual index.
-           * @param [in] int a: Occupied index.
+           * @param [in] int64_t i: Virtual index.
+           * @param [in] int64_t a: Occupied index.
            *
            * @return int: Composite single index.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          int operator()(int i, int a) const
+          int64_t operator()(int64_t i, int64_t a) const
           {
             i %= norbitals; a %= norbitals; //Assuming equal terms for both spins, and diagonal rdms
             return i + norbitals * a;
@@ -88,17 +88,17 @@ namespace cmz
            *        + norbitals^3 * b. Considers only
            *        spin up orbitals, by making e.g. i -> i % norbitals.
            *
-           * @param [in] int i: Virtual index 1.
-           * @param [in] int j: Virtual index 2.
-           * @param [in] int a: Occupied index 1.
-           * @param [in] int b: Occupied index 2.
+           * @param [in] int64_t i: Virtual index 1.
+           * @param [in] int64_t j: Virtual index 2.
+           * @param [in] int64_t a: Occupied index 1.
+           * @param [in] int64_t b: Occupied index 2.
            *
            * @return int: Composite single index.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          int operator()(int i, int j, int a, int b) const
+          int64_t operator()(int64_t i, int64_t j, int64_t a, int64_t b) const
           {
             i %= norbitals; a %= norbitals; //Assuming equal terms for both spins, and diagonal rdms
             j %= norbitals; b %= norbitals;
@@ -109,8 +109,8 @@ namespace cmz
            * @brief Checks if two orbital indices correspond to
            *        same spin spin orbitals. 
            *
-           * @param [in] int i: Orbital index 1.
-           * @param [in] int a: Orbital index 2.
+           * @param [in] int64_t i: Orbital index 1.
+           * @param [in] int64_t a: Orbital index 2.
            *
            * @return bool: True if both indices correspond to spin orbitals
            *         of the same spin.
@@ -118,7 +118,7 @@ namespace cmz
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          bool same_spin(int i, int a) const
+          bool same_spin(int64_t i, int64_t a) const
           {
             return (i < norbitals && a < norbitals) || (i >= norbitals && a >= norbitals);
           }
@@ -140,7 +140,7 @@ namespace cmz
        */
       class rdms{
         public:
-          int norbitals;
+          int64_t norbitals;
           rdm::indexer indexer;
     
           //1- and 2-RDMs stored as vectors
@@ -150,12 +150,12 @@ namespace cmz
            * @brief Basic constructor, initializes the RDMs
            *        as zero vectors of the right size.
            * 
-           * @param [in] int norbitals: Nr of orbitals in the system.
+           * @param [in] int64_t norbitals: Nr of orbitals in the system.
            *
            * @author Carlos Mejuto Zaera
            * @date 05/04/2021
            */
-          rdms( int norbitals ): norbitals(norbitals), indexer( norbitals ) 
+          rdms( int64_t norbitals ): norbitals(norbitals), indexer( norbitals ) 
           {
             rdm1.resize( int(pow( norbitals,2 )) );
             rdm2.resize( int(pow( norbitals,4 )) );
@@ -167,13 +167,13 @@ namespace cmz
            * @brief Constructor, reads the RDMs
            *        from binary file. 
            * 
-           * @param [in] int norbitals: Nr of orbitals in the system.
+           * @param [in] int64_t norbitals: Nr of orbitals in the system.
            * @param [in] const string &file: Binary file to read RDM's from. 
            *
            * @author Carlos Mejuto Zaera
            * @date 05/04/2021
            */
-          rdms( int norbitals, const string &file): rdms(norbitals)
+          rdms( int64_t norbitals, const string &file): rdms(norbitals)
           {
             read_RDMs(file);
           }
@@ -182,7 +182,7 @@ namespace cmz
            * @brief Constructor, reads the RDMs
            *        from iterable vectors. 
            * 
-           * @param [in] int norbitals: Nr of orbitals in the system.
+           * @param [in] int64_t norbitals: Nr of orbitals in the system.
            * @param [in] const iterable &rdm1_in: 1-RDM iterable.
            * @param [in] const iterable &rdm2_in: 2-RDM iterable.
            *
@@ -190,7 +190,7 @@ namespace cmz
            * @date 05/04/2021
            */
           template<class iterable>
-          rdms(int norbitals, const iterable &rdm1_in, const iterable &rdm2_in) : rdms(norbitals)
+          rdms(int64_t norbitals, const iterable &rdm1_in, const iterable &rdm2_in) : rdms(norbitals)
           {
             buildFromIterables(rdm1_in, rdm2_in);
           }
@@ -198,7 +198,7 @@ namespace cmz
           /**
            * @ Constructor using a many-body state.
            *
-           * @param [in] int norbitals: Nr. of orbitals.
+           * @param [in] int64_t norbitals: Nr. of orbitals.
            * @param [in] const Eigen::VectorXd &vec: Many-body state, coefficient vector.
            * @param [in] const SetSlaterDets &stts: List of Slater determinants,
            *             defining the many-body state. 
@@ -208,7 +208,7 @@ namespace cmz
            * @author Carlos Mejuto Zaera
            * @date 05/07/2021
            */
-          rdms( int norbitals, const VectorXd &vec, const SetSlaterDets &stts );
+          rdms( int64_t norbitals, const VectorXd &vec, const SetSlaterDets &stts );
 
           /**
            * @brief Copy constructor.
@@ -228,51 +228,51 @@ namespace cmz
           /**
            * @brief Check if spin orbital index i corresponds to spin up.
            * 
-           * @param [in] int i: Spin orbital index. 
+           * @param [in] int64_t i: Spin orbital index. 
            *
            * @returns bool: True if spin orbital corresponds to spin up.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          bool isup(int i) const {return i < norbitals;}
+          bool isup(int64_t i) const {return i < norbitals;}
           /**
            * @brief Check if spin orbital index i corresponds to spin down.
            * 
-           * @param [in] int i: Spin orbital index. 
+           * @param [in] int64_t i: Spin orbital index. 
            *
            * @returns bool: True if spin orbital corresponds to spin down.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          bool isdo(int i) const {return !isup(i);}
+          bool isdo(int64_t i) const {return !isup(i);}
           /**
            * @brief Check if two spin orbital indices correspond to the
            *        same spin.
            * 
-           * @param [in] int i: Spin orbital index 1. 
-           * @param [in] int a: Spin orbital index 2. 
+           * @param [in] int64_t i: Spin orbital index 1. 
+           * @param [in] int64_t a: Spin orbital index 2. 
            *
            * @returns bool: True if spin orbitals have the same spin.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          bool same_spin(int i, int a) const {return (isup(i) && isup(a)) || (isdo(i) && isdo(a));}
+          bool same_spin(int64_t i, int64_t a) const {return (isup(i) && isup(a)) || (isdo(i) && isdo(a));}
     
           /**
            * @brief Get (i;a) element of the 1-RDM. 
            * 
-           * @param [in] int i: Virtual orbital index. 
-           * @param [in] int a: Occupied orbital index. 
+           * @param [in] int64_t i: Virtual orbital index. 
+           * @param [in] int64_t a: Occupied orbital index. 
            *
            * @returns double: (i;a) element of 1-RDM.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          double get(int i, int a) const
+          double get(int64_t i, int64_t a) const
           {
             if(!same_spin(i,a)) return 0.;
             return rdm1[ indexer(i,a) ];
@@ -282,17 +282,17 @@ namespace cmz
            * @brief Get (i,j;a,b) element of the 2-RDM, in 
            *        physics notation, i.e. <ij|ab>. 
            * 
-           * @param [in] int i: Virtual orbital index 1. 
-           * @param [in] int j: Virtual orbital index 2. 
-           * @param [in] int a: Occupied orbital index 1. 
-           * @param [in] int b: Occupied orbital index 2. 
+           * @param [in] int64_t i: Virtual orbital index 1. 
+           * @param [in] int64_t j: Virtual orbital index 2. 
+           * @param [in] int64_t a: Occupied orbital index 1. 
+           * @param [in] int64_t b: Occupied orbital index 2. 
            *
            * @returns double: <ij|ab> element of 2-RDM.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          double getPhys(int i, int j, int a, int b) const
+          double getPhys(int64_t i, int64_t j, int64_t a, int64_t b) const
           {
             if(!same_spin(i,a) || !same_spin(j,b)) return 0.;
             return rdm2[ indexer(i, j, a, b) ];
@@ -302,17 +302,17 @@ namespace cmz
            * @brief Get (i,j;a,b) element of the 2-RDM, in 
            *        chemists notation, i.e. (ia|jb). 
            * 
-           * @param [in] int i: Virtual orbital index 1. 
-           * @param [in] int a: Occupied orbital index 1. 
-           * @param [in] int j: Virtual orbital index 2. 
-           * @param [in] int b: Occupied orbital index 2. 
+           * @param [in] int64_t i: Virtual orbital index 1. 
+           * @param [in] int64_t a: Occupied orbital index 1. 
+           * @param [in] int64_t j: Virtual orbital index 2. 
+           * @param [in] int64_t b: Occupied orbital index 2. 
            *
            * @returns double: (ia|jb) element of 2-RDM.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          double getChem(int i, int a, int j, int b) const
+          double getChem(int64_t i, int64_t a, int64_t j, int64_t b) const
           {
             if(!same_spin(i,a) || !same_spin(j,b)) return 0.;
             return rdm2[ indexer(i, j, a, b) ];
@@ -321,14 +321,14 @@ namespace cmz
           /**
            * @brief Update (i;a) element of the 1-RDM. 
            * 
-           * @param [in] int i: Virtual orbital index. 
-           * @param [in] int a: Occupied orbital index. 
+           * @param [in] int64_t i: Virtual orbital index. 
+           * @param [in] int64_t a: Occupied orbital index. 
            * @param [in] double val: New value for (i;a) element of 1-RDM. 
            *
            * @author Carlos Mejuto Zaera 
            * @date 05/04/2021
            */
-          void update(int i, int a, double val)
+          void update(int64_t i, int64_t a, double val)
           {
             if(!same_spin(i,a)) return;
             rdm1[ indexer(i,a) ] = val;
@@ -338,16 +338,16 @@ namespace cmz
            * @brief Update (i,j;a,b) element of the 2-RDM. 
            *        Uses physics notation, i.e. <ij|ab>
            * 
-           * @param [in] int i: Virtual orbital index 1. 
-           * @param [in] int j: Virtual orbital index 2. 
-           * @param [in] int a: Occupied orbital index 1. 
-           * @param [in] int b: Occupied orbital index 2. 
+           * @param [in] int64_t i: Virtual orbital index 1. 
+           * @param [in] int64_t j: Virtual orbital index 2. 
+           * @param [in] int64_t a: Occupied orbital index 1. 
+           * @param [in] int64_t b: Occupied orbital index 2. 
            * @param [in] double val: New value for <ij|ab> element of 2-RDM. 
            *
            * @author Carlos Mejuto Zaera 
            * @date 05/04/2021
            */
-          void update(int i, int j, int a, int b, double val)
+          void update(int64_t i, int64_t j, int64_t a, int64_t b, double val)
           {
             if(!same_spin(i,a) || !same_spin(j,b)) return;
             rdm2[ indexer(i, j, a, b) ] = val;
@@ -409,11 +409,11 @@ namespace cmz
           VecD rotate1( const eigMatD &V, const VecD &A ) const
           {
             VecD tmp(size_t(pow(norbitals,2)), 0.);
-            for( int i=0; i<norbitals; ++i )
+            for( int64_t i=0; i<norbitals; ++i )
             {
-              for( int a=0; a<norbitals; ++a )
-                for( int ii=0; ii<norbitals; ++ii )
-                  for( int aa=0; aa<norbitals; ++aa )
+              for( int64_t a=0; a<norbitals; ++a )
+                for( int64_t ii=0; ii<norbitals; ++ii )
+                  for( int64_t aa=0; aa<norbitals; ++aa )
                     tmp[ indexer( i,a ) ] += V(ii,i) * A[ indexer( ii,aa ) ] * V(aa,a);
             }
             return tmp;
@@ -433,21 +433,21 @@ namespace cmz
           VecD rotate2( const eigMatD &V, const VecD &A ) const
           {
             VecD tmp(size_t(pow(norbitals,4)), 0.);
-            for( int i=0; i<norbitals; ++i ) for( int j=0; j<norbitals; ++j )
+            for( int64_t i=0; i<norbitals; ++i ) for( int64_t j=0; j<norbitals; ++j )
             {
-              for( int a=0; a<norbitals; ++a ) for( int b=0; b<norbitals; ++b )
-                for( int ii=0; ii<norbitals; ++ii )
-                  for( int aa=0; aa<norbitals; ++aa )
+              for( int64_t a=0; a<norbitals; ++a ) for( int64_t b=0; b<norbitals; ++b )
+                for( int64_t ii=0; ii<norbitals; ++ii )
+                  for( int64_t aa=0; aa<norbitals; ++aa )
                     tmp[ indexer( i,j,a,b ) ] += V(ii,i) * A[ indexer( ii,j,aa,b ) ] * V(aa,a);
             }
     
             VecD another_tmp = tmp;
             std::fill(tmp.begin(), tmp.end(), 0.);
-            for( int i=0; i<norbitals; ++i ) for( int j=0; j<norbitals; ++j )
+            for( int64_t i=0; i<norbitals; ++i ) for( int64_t j=0; j<norbitals; ++j )
             {
-              for( int a=0; a<norbitals; ++a ) for( int b=0; b<norbitals; ++b )
-                for( int jj=0; jj<norbitals; ++jj )
-                  for( int bb=0; bb<norbitals; ++bb )
+              for( int64_t a=0; a<norbitals; ++a ) for( int64_t b=0; b<norbitals; ++b )
+                for( int64_t jj=0; jj<norbitals; ++jj )
+                  for( int64_t bb=0; bb<norbitals; ++bb )
                     tmp[ indexer( i,j,a,b ) ] += V(jj,j) * another_tmp[ indexer( i,jj,a,bb ) ] * V(bb,b);
             }
     
@@ -487,7 +487,7 @@ namespace cmz
             if(!ifile)
               throw ("Could not open " + file);
     
-            int norbs;
+            int64_t norbs;
        
             ifile.read((char*) &norbs, sizeof(int));
     
@@ -521,35 +521,35 @@ namespace cmz
           {
             // Returns the rdms for the active space
             // defined in ints
-            int as_size = ints.aorbs.size();
+            int64_t as_size = ints.aorbs.size();
             VecD rdm1_as( int(pow( as_size, 2 )), 0. );
             VecD rdm2_as( int(pow( as_size, 4 )), 0. );
             rdm::indexer as_indxr( as_size );
     
             // 1-rdm
-            for( int p = 0; p < as_size; p++ )
+            for( int64_t p = 0; p < as_size; p++ )
             {
-              int t = ints.aorbs[p];
-              for( int q = 0;  q < as_size; q++ )
+              int64_t t = ints.aorbs[p];
+              for( int64_t q = 0;  q < as_size; q++ )
               {
-                int u = ints.aorbs[q];
+                int64_t u = ints.aorbs[q];
                 rdm1_as[ as_indxr(p,q) ] = get(t,u);
               }
             }
     
             // 2-rdm
-            for( int p = 0; p < as_size; p++ )
+            for( int64_t p = 0; p < as_size; p++ )
             {
-              int t = ints.aorbs[p];
-              for( int q = 0;  q < as_size; q++ )
+              int64_t t = ints.aorbs[p];
+              for( int64_t q = 0;  q < as_size; q++ )
               {
-                int u = ints.aorbs[q];
-                for( int r = 0; r < as_size; r++ )
+                int64_t u = ints.aorbs[q];
+                for( int64_t r = 0; r < as_size; r++ )
                 {
-                  int v = ints.aorbs[r];
-                  for( int s = 0; s < as_size; s++ )
+                  int64_t v = ints.aorbs[r];
+                  for( int64_t s = 0; s < as_size; s++ )
                   {
-                    int w = ints.aorbs[s];
+                    int64_t w = ints.aorbs[s];
                     rdm2_as[ as_indxr(p,q,r,s) ] = getPhys(t,u,v,w);
                   }
                 }
@@ -580,7 +580,7 @@ namespace cmz
             // Update the rdm's with the rdm's obtained from
             // an active space calculation. The active space
             // is defined by ints.
-            int as_size = ints.aorbs.size();
+            int64_t as_size = ints.aorbs.size();
             if( as_size * as_size != rdm1_as.size() )
               throw( "Error in UpdateFromAS! Active space in integrals does not match the input rdms!" );
             std::fill( rdm1.begin(), rdm1.end(), 0. );
@@ -589,12 +589,12 @@ namespace cmz
             // First, 1-rdm
             for( auto const &i: ints.iorbs )
               rdm1[ indexer(i,i) ] = 2.;
-            for( int ac1 = 0; ac1 < as_size; ac1++ )
+            for( int64_t ac1 = 0; ac1 < as_size; ac1++ )
             {
-              int t = ints.aorbs[ac1];
-              for( int ac2 = 0; ac2 < as_size; ac2++ )
+              int64_t t = ints.aorbs[ac1];
+              for( int64_t ac2 = 0; ac2 < as_size; ac2++ )
               {
-                int u = ints.aorbs[ac2];
+                int64_t u = ints.aorbs[ac2];
                 rdm1[ indexer(t,u) ] = rdm1_as[ as_indxr(ac1, ac2) ];
               }
             } 
@@ -606,12 +606,12 @@ namespace cmz
                 rdm2[ indexer(i,j,i,j) ] =  4.;
                 rdm2[ indexer(i,j,j,i) ] = -2.;
               }
-              for( int ac1 = 0; ac1 < as_size; ac1++ )
+              for( int64_t ac1 = 0; ac1 < as_size; ac1++ )
               {
-                int t = ints.aorbs[ac1];
-                for( int ac2 = 0; ac2 < as_size; ac2++ )
+                int64_t t = ints.aorbs[ac1];
+                for( int64_t ac2 = 0; ac2 < as_size; ac2++ )
                 {
-                  int u = ints.aorbs[ac2];
+                  int64_t u = ints.aorbs[ac2];
                   rdm2[ indexer(i,t,i,u) ] =  2. * rdm1_as[ as_indxr(ac1, ac2) ];
                   rdm2[ indexer(i,t,u,i) ] = -1. * rdm1_as[ as_indxr(ac1, ac2) ];
                   rdm2[ indexer(t,i,i,u) ] = -1. * rdm1_as[ as_indxr(ac1, ac2) ];
@@ -619,18 +619,18 @@ namespace cmz
                 }
               }
             }
-            for( int ac1 = 0; ac1 < as_size; ac1++ )
+            for( int64_t ac1 = 0; ac1 < as_size; ac1++ )
             {
-              int t = ints.aorbs[ac1];
-              for( int ac2 = 0; ac2 < as_size; ac2++ )
+              int64_t t = ints.aorbs[ac1];
+              for( int64_t ac2 = 0; ac2 < as_size; ac2++ )
               {
-                int u = ints.aorbs[ac2];
-                for( int ac3 = 0; ac3 < as_size; ac3++ )
+                int64_t u = ints.aorbs[ac2];
+                for( int64_t ac3 = 0; ac3 < as_size; ac3++ )
                 {
-                  int v = ints.aorbs[ac3];
-                  for( int ac4 = 0; ac4 < as_size; ac4++ )
+                  int64_t v = ints.aorbs[ac3];
+                  for( int64_t ac4 = 0; ac4 < as_size; ac4++ )
                   {
-                    int w = ints.aorbs[ac4];
+                    int64_t w = ints.aorbs[ac4];
                     rdm2[ indexer(t,u,v,w) ] = rdm2_as[ as_indxr(ac1,ac2,ac3,ac4) ];
                   }
                 }
