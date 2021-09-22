@@ -264,6 +264,32 @@ namespace cmz
       return excs;
     }
 
+
+    SetSlaterDets BuildShiftHilbertSpace( uint64_t Norbs,uint64_t Neff, uint64_t Nups, uint64_t Ndos )
+    {
+      // Builds full Hilbert space for a system of Norbs
+      // orbitals, Nups up electrons and Ndos down electrons.
+      // Returns corresponding set of Slater determinants
+      SetSlaterDets basis;
+     
+      // Make all possible states of Norbs with Nups and Ndos
+      // bits set.
+      std::vector<uint64_t> up_stts = BuildCombs( Neff, Nups );
+      std::vector<uint64_t> do_stts = BuildCombs( Neff, Ndos );
+
+      // Combine into possible Hilbert space
+      for( size_t iup = 0; iup < up_stts.size(); iup++ )
+        for( size_t ido = 0; ido < do_stts.size(); ido++ )
+        {
+          uint64_t st = (do_stts[ido] << Norbs) + up_stts[iup];
+//	  cout << "adding in " << st << endl;
+          basis.insert( slater_det( st, Norbs, Nups, Ndos ) );
+        }
+
+      return basis;
+    }
+
+
     SetSlaterDets BuildFullHilbertSpace( uint64_t Norbs, uint64_t Nups, uint64_t Ndos )
     {
       // Builds full Hilbert space for a system of Norbs

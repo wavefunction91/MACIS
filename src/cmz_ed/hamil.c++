@@ -118,12 +118,45 @@ namespace cmz
       
       return res;
     }
+ 
+
+    std::vector<std::pair<size_t, size_t> > FermionHamil::GetHpairs_dloop( const SetSlaterDets &stts ) const
+    {
+      // Returns a list of pairs of indices, indicating
+      // the pairs of states in stts that have
+      // non-vanishing Hamiltonian matrix elements.
+      std::vector<std::pair<size_t, size_t> > pairs;
+      cout << "In double loop gethpairs" << endl;
     
+      
+      // Iterate over set, and find possible pairs
+      for( SetSlaterDets_It curr1_it = stts.begin(); curr1_it != stts.end(); curr1_it++ )
+      {
+         for( SetSlaterDets_It curr2_it = stts.begin(); curr2_it != stts.end(); curr2_it++ )
+	    {  
+	     if(std::popcount((curr1_it->GetState() ^ curr2_it->GetState())) <= 4)	  
+	      {	      
+	       if(curr1_it != curr2_it)
+	       { 	       
+                size_t curr1_indx = std::distance( stts.cbegin(), curr1_it );
+                size_t curr2_indx = std::distance( stts.cbegin(), curr2_it );
+                pairs.push_back( std::pair<size_t, size_t>(curr1_indx, curr2_indx) );
+	      } 
+	      }  
+	    } 
+       }
+      return pairs;
+    }
+
+
+
+
     std::vector<std::pair<size_t, size_t> > FermionHamil::GetHpairs( const SetSlaterDets &stts ) const
     {
       // Returns a list of pairs of indices, indicating
       // the pairs of states in stts that have
       // non-vanishing Hamiltonian matrix elements.
+      cout << "In standard get Hpairs" << endl;
       std::vector<std::pair<size_t, size_t> > pairs;
     
       // Iterate over set, and find possible pairs
@@ -152,12 +185,14 @@ namespace cmz
       // Return sparse matrix of fermionic Hamiltonian in
       // the basis of the states stored in stts.
       size_t nelems = stts.size();
+      cout << "Number of elements in GetHmat " << nelems << endl;
       SpMatD Hmat( nelems, nelems );
     
       // Find pairs of states with non-vanishing 
       // matrix elements.
       std::vector<std::pair<size_t, size_t> > pairs;
-      pairs = H->GetHpairs( stts );
+      pairs = H->GetHpairs( stts );  //dloop
+     // pairs = H->GetHpairs_dloop( stts );  //dloop
      
       if( print )
         std::cout << "Possible NNZ pairs: " << pairs.size() + nelems << ", worst sparsity : " << double(pairs.size() + nelems) / double(nelems * nelems) * 100. << "%" << std::endl;
@@ -192,6 +227,7 @@ namespace cmz
       {
         SetSlaterDets_It it = std::next( stts.begin(), ist );
         double Hmatel = H->GetHmatel( *it, *it );
+//	cout << 'cur mat element is ' << Hmatel+ 13.4158 << endl;
         tripletList[ ist + n_off_diags ] = T(ist, ist, Hmatel);
       }
       // Prune list from matrix elements below

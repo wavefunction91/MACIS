@@ -72,6 +72,7 @@ namespace cmz
          * @date 05/05/2021
          */
         std::vector<std::pair<size_t, size_t> > GetHpairs( const SetSlaterDets &stts ) const;
+        std::vector<std::pair<size_t, size_t> > GetHpairs_dloop( const SetSlaterDets &stts ) const;
       
     };
     

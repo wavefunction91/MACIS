@@ -42,7 +42,7 @@ namespace cmz
         slater_det( 
                   uint64_t st_, uint64_t Norbs_, 
                   uint64_t Nup_, uint64_t Ndo_ 
-                ) : state(st_), Norbs(Norbs_), Nup(Nup_), Ndo(Ndo_) { assert(Norbs_ <= 16); } ;
+                ) : state(st_), Norbs(Norbs_), Nup(Nup_), Ndo(Ndo_) { assert(Norbs_ <= 512); } ;
         slater_det() : state(0), Norbs(0), Nup(0), Ndo(0) { } ;
         /**
          * @brief Returns occupation bitstring of Slater determinant. 
@@ -385,6 +385,7 @@ namespace cmz
      * @date   05/04/2021
      */
     SetSlaterDets BuildFullHilbertSpace( uint64_t Norbs, uint64_t Nups, uint64_t Ndos );
+    SetSlaterDets BuildShiftHilbertSpace( uint64_t Norbs,uint64_t Neff, uint64_t Nups, uint64_t Ndos );
     /**
      * @brief Determine list of Slater determinant pairs
      *        connected by either a single or double excitation.. 

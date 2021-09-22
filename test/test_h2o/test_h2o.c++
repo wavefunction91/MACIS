@@ -35,19 +35,39 @@ int main( int argn, char* argv[] )
     uint64_t Norbs = getParam<int>( input, "norbs" );
     uint64_t Nups  = getParam<int>( input, "nups"  );
     uint64_t Ndos  = getParam<int>( input, "ndos"  );
+    uint64_t Norbseff  = getParam<int>( input, "norbseff"  );
     bool print = true;
     string fcidump = getParam<string>( input, "fcidump_file" );
 
-    if( Norbs > 16 )
-      throw( "cmz::ed is not ready for more than 16 orbitals!" );
-    if( Nups > Norbs || Ndos > Norbs )
-      throw( "Nups or Ndos cannot be larger than Norbs!" );
-
-    SetSlaterDets stts = BuildFullHilbertSpace( Norbs, Nups, Ndos );
+//    if( Norbs > 16 )
+//      throw( "cmz::ed is not ready for more than 16 orbitals!" );
+ //   if( Nups > Norbs || Ndos > Norbs )
+ //     throw( "Nups or Ndos cannot be larger than Norbs!" );
+    if(Norbseff < Nups) Norbseff = Nups;
+    if(Norbseff < Ndos) Norbseff = Ndos;
+    cout << "Using effective norbs space " << Norbseff << endl; 
 
     intgrls::integrals ints(Norbs, fcidump);
 
     FermionHamil Hop(ints);
+    //Lets test hartree-fock
+    uint32_t u1 = 37793167;
+    uint32_t d1 = 37793167;
+    u1 = (1 << Nups)-1;
+    d1 = (1 << Ndos)-1;
+    uint64_t st = (d1 << Norbs) + u1;
+    slater_det hello =  slater_det( st, Norbs, Nups, Ndos ) ;
+    double nE =  Hop.GetHmatel(hello,hello);
+    cout << "norm here" <<endl;
+    cout << std::setprecision(16) << "E0 = " << nE + ints.core_energy << endl;
+    //exit(0);
+
+    //SetSlaterDets stts = BuildFullHilbertSpace( Norbs, Nups, Ndos );
+
+
+
+
+    SetSlaterDets stts = BuildShiftHilbertSpace( Norbs, Norbseff, Nups, Ndos );
 
     cout << "Building Hamiltonian matrix" << endl;
     SpMatD Hmat = GetHmat( &Hop, stts, print );
