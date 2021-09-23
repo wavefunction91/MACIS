@@ -9,16 +9,17 @@ namespace cmz
     {
       // Returns all bitstrings of Nbits bits with
       // Nset bits set.
-      if( Nbits > 16 )
-        throw("cmz::ed code is not ready for more than 16 orbitals!!");
+//      if( Nbits > 16 )
+ //       throw("cmz::ed code is not ready for more than 16 orbitals!!");
       // lookup table
       vector<uint64_t> DP[Nbits+1][Nbits+1];
   
       // DP[k][0] will store all k-bit numbers  
       // with 0 bits set (All bits are 0's)
       for (int64_t len = 0; len <= Nbits; len++) 
+      {	      
           DP[len][0].push_back(0);
-        
+      } 
       // fill DP lookup table in bottom-up manner
       // DP[k][n] will store all k-bit numbers  
       // with n-bits set

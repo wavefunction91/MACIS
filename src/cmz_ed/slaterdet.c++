@@ -274,9 +274,11 @@ namespace cmz
      
       // Make all possible states of Norbs with Nups and Ndos
       // bits set.
+      cout << "Starting Build Shift Hamiltonian up with Neff "<< Neff  << endl;
       std::vector<uint64_t> up_stts = BuildCombs( Neff, Nups );
+      cout << "Starting Build Shift Hamiltonian down with Neff "<< Neff  << endl;
       std::vector<uint64_t> do_stts = BuildCombs( Neff, Ndos );
-
+      cout << "Built spin sectors " << endl;
       // Combine into possible Hilbert space
       for( size_t iup = 0; iup < up_stts.size(); iup++ )
         for( size_t ido = 0; ido < do_stts.size(); ido++ )
