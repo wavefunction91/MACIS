@@ -1,0 +1,12 @@
+#FCIDUMP FILE
+fcidump_file @PATH_TO_TEST@/test_c2/FCIDUMP.dat
+#NR OF ORBITALS
+norbs 10
+#NR OF SPIN UP ELECTRONS
+nups 6
+#NR OF SPIN DOWN ELECTRONS
+ndos 6
+#PRINT INFO
+print T
+#effective orbs
+norbseff 8
