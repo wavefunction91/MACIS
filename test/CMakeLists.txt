@@ -8,6 +8,7 @@ list( APPEND TEST_DIRECTORIES
       test_Hamil
       test_h2o
       test_ed
+      test_cr2_new
     )
 foreach( testdir ${TEST_DIRECTORIES} )
     # add executable

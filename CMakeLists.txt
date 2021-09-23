@@ -38,9 +38,7 @@ add_subdirectory(external/sparsexx)
 add_subdirectory(inc)
 add_subdirectory(src)
 add_subdirectory(main)
-if(BUILD_TESTS)
   add_subdirectory(test)
-endif()
 add_subdirectory(docs)
 
 # testing
