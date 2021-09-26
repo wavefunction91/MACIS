@@ -51,14 +51,13 @@ int main( int argn, char* argv[] )
 
     FermionHamil Hop(ints);
     //Lets test hartree-fock
-    uint32_t u1 = 37793167;
-    uint32_t d1 = 37793167;
+    uint64_t u1 = 37793167;
+    uint64_t d1 = 37793167;
     u1 = (1 << Nups)-1;
     d1 = (1 << Ndos)-1;
-    uint64_t st = (d1 << Norbs) + u1;
+    uint64_t st =   (d1 << Norbs) + u1;
     slater_det hello =  slater_det( st, Norbs, Nups, Ndos ) ;
     double nE =  Hop.GetHmatel(hello,hello);
-    cout << "norm here" <<endl;
     cout << std::setprecision(16) << "E0 = " << nE + ints.core_energy << endl;
     //exit(0);
 

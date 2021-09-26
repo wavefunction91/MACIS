@@ -88,6 +88,7 @@ namespace cmz
       for(uint64_t i = 0; i < Norbs; i++)
         if( IsOccUp(i) )
         {
+//	  std::cout << 'checking up indx ' << indx << std::endl;
           occs_up[indx] = i; indx++;
         }
       return occs_up;
@@ -98,10 +99,14 @@ namespace cmz
       std::vector<uint64_t> occs_do(Ndo, 0);
       uint64_t indx = 0;
       for(uint64_t i = 0; i < Norbs; i++)
+      {
+//	std::cout << 'checking down ' << i << std::endl;
         if( IsOccDo(i) )
         {
+//	  std::cout << 'checking indx ' << indx << std::endl;
           occs_do[indx] = i; indx++;
         }
+      }
       return occs_do;
     }
 
@@ -274,11 +279,8 @@ namespace cmz
      
       // Make all possible states of Norbs with Nups and Ndos
       // bits set.
-      cout << "Starting Build Shift Hamiltonian up with Neff "<< Neff  << endl;
       std::vector<uint64_t> up_stts = BuildCombs( Neff, Nups );
-      cout << "Starting Build Shift Hamiltonian down with Neff "<< Neff  << endl;
       std::vector<uint64_t> do_stts = BuildCombs( Neff, Ndos );
-      cout << "Built spin sectors " << endl;
       // Combine into possible Hilbert space
       for( size_t iup = 0; iup < up_stts.size(); iup++ )
         for( size_t ido = 0; ido < do_stts.size(); ido++ )

@@ -90,7 +90,7 @@ namespace cmz
          * @author Carlos Mejuto Zaera
          * @date   05/04/2021
          */
-        bool IsOccUp( uint64_t i ) const { return state & (1 << i); }
+        bool IsOccUp( uint64_t i ) const { return state & (1LL << i); }
         /**
          * @brief Check if spin down orbital is occupied. 
          *
@@ -101,7 +101,7 @@ namespace cmz
          * @author Carlos Mejuto Zaera
          * @date   05/04/2021
          */
-        bool IsOccDo( uint64_t i ) const { return state & (1 << (i + Norbs)); }
+        bool IsOccDo( uint64_t i ) const { return state & (1LL << (i + Norbs)); }
         /**
          * @brief Flips bit in occupation bitstring.
          *        Corresponds to creation/annihilation operator. 
@@ -114,7 +114,7 @@ namespace cmz
          * @author Carlos Mejuto Zaera
          * @date   05/04/2021
          */
-        void Flip( uint64_t i ) { state ^= (1 << i); }
+        void Flip( uint64_t i ) { state ^= (1LL << i); }
         /**
          * @brief Performs single excitation of spin up electron between orbitals a-->i.
          *        The excitation is assumed to be valid, this should be checked beforehand.
@@ -192,7 +192,7 @@ namespace cmz
          * @author Carlos Mejuto Zaera
          * @date   05/04/2021
          */
-        uint64_t CountExcUp( const slater_det &st ) const { return std::popcount( (state ^ st.GetState() ) & ((1 << Norbs) - 1) ); };
+        uint64_t CountExcUp( const slater_det &st ) const { return std::popcount( (state ^ st.GetState() ) & ((1LL << Norbs) - 1LL) ); };
         /**
          * @brief Counts different bits between *this and an input Slater determinant
          *        only in spin down region.. 
@@ -220,7 +220,7 @@ namespace cmz
          */
         uint64_t GetFlippedOccIndx( const slater_det &st ) const 
         {
-          return (ffs( state & (state ^ st.GetState() ) ) - 1) % Norbs; 
+          return (ffs( state & (state ^ st.GetState() ) ) - 1LL) % Norbs; 
         }
         /**
          * @brief Give position of first different bit/orbital between *this 
@@ -237,7 +237,7 @@ namespace cmz
          */
         uint64_t GetFlippedOccIndxUp( const slater_det &st ) const 
         { 
-          return (ffs( state & (state ^ st.GetState() ) & ((1 << Norbs) - 1) ) - 1) % Norbs; 
+          return (ffs( state & (state ^ st.GetState() ) & ((1LL << Norbs) - 1LL) ) - 1LL) % Norbs; 
         }
         /**
          * @brief Give position of first different bit/orbital between *this 
@@ -254,7 +254,7 @@ namespace cmz
          */
         uint64_t GetFlippedOccIndxDo( const slater_det &st ) const 
         { 
-          return (ffs( state & (state ^ st.GetState() ) & (~((1 << Norbs) - 1)) ) - 1) % Norbs; 
+          return (ffs( state & (state ^ st.GetState() ) & (~((1LL << Norbs) - 1LL)) ) - 1LL) % Norbs; 
         }
         /**
          * @brief Defines order among Slater determinants, for use in std::set. 

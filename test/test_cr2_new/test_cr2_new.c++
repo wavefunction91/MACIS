@@ -43,10 +43,10 @@ int main( int argn, char* argv[] )
    //SetSlaterDets stts = BuildFullHilbertSpace( Norbs, Nups, Ndos );
  
     SetSlaterDets stts;
-    uint32_t u1 = 37793167;
-    uint32_t d1 = 37793167;
-    u1 = (1 << Nups)-1;
-    d1 = (1 << Ndos)-1;
+    uint64_t u1 = 37793167;
+    uint64_t d1 = 37793167;
+    u1 = (1LL << Nups)-1;
+    d1 = (1LL << Ndos)-1;
     vector<uint64_t> alpha ;
     vector<uint64_t> beta ;
     std::vector<uint64_t> talph,tbeta;

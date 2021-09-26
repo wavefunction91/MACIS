@@ -7,10 +7,33 @@ namespace cmz
 
     std::vector<uint64_t> BuildCombs( uint64_t Nbits, uint64_t Nset )
     {
+     std::vector<bool> v(Nbits);
+     std::vector<uint64_t> store;
+     //Setup initial bitstring to permute
+     std::fill(v.begin(), v.begin()+Nset, true);
+
+     //From vector bool to uint 
+     do {
+           uint64_t temp = 0;
+           for (int i = 0; i < Nbits; ++i) {
+           if (v[i]) {
+               temp = temp + (1<< i);
+            }
+        }
+     //End: From vvector bool to uint
+        store.push_back(temp);
+      } while (std::prev_permutation(v.begin(), v.end()));
+      return store;
+    }
+
+
+	    /*
+    std::vector<uint64_t> BuildCombs( uint64_t Nbits, uint64_t Nset )
+    {
       // Returns all bitstrings of Nbits bits with
       // Nset bits set.
 //      if( Nbits > 16 )
- //       throw("cmz::ed code is not ready for more than 16 orbitals!!");
+ //       throw('cmz::ed code is not ready for more than 16 orbitals!!');
       // lookup table
       vector<uint64_t> DP[Nbits+1][Nbits+1];
   
@@ -41,6 +64,6 @@ namespace cmz
 
       return DP[Nbits][Nset];
     }
-
+*/
   }// namespace ed
 }// namespace cmz

@@ -115,7 +115,6 @@ namespace cmz
           for( auto o2 : occs_do )
             res += pints->getChem(o1,o1,o2,o2);
       }
-      
       return res;
     }
  
@@ -192,7 +191,7 @@ namespace cmz
       // matrix elements.
       std::vector<std::pair<size_t, size_t> > pairs;
       pairs = H->GetHpairs( stts );  //dloop
-     // pairs = H->GetHpairs_dloop( stts );  //dloop
+      //pairs = H->GetHpairs_dloop( stts );  //dloop
      
       if( print )
         std::cout << "Possible NNZ pairs: " << pairs.size() + nelems << ", worst sparsity : " << double(pairs.size() + nelems) / double(nelems * nelems) * 100. << "%" << std::endl;
@@ -227,7 +226,7 @@ namespace cmz
       {
         SetSlaterDets_It it = std::next( stts.begin(), ist );
         double Hmatel = H->GetHmatel( *it, *it );
-//	cout << 'cur mat element is ' << Hmatel+ 13.4158 << endl;
+//	std::cout << "cur mat element is " << Hmatel+ 13.4158 << endl;
         tripletList[ ist + n_off_diags ] = T(ist, ist, Hmatel);
       }
       // Prune list from matrix elements below
