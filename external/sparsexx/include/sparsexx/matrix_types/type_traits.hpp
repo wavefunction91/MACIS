@@ -9,6 +9,8 @@ namespace sparsexx::detail {
 template <typename SpMatType, typename = void>
 struct is_csr_matrix : public std::false_type {};
 template <typename SpMatType, typename = void>
+struct is_csc_matrix : public std::false_type {};
+template <typename SpMatType, typename = void>
 struct is_coo_matrix : public std::false_type {};
 
 template <typename SpMatType>
@@ -16,6 +18,16 @@ struct is_csr_matrix< SpMatType,
   std::enable_if_t< 
     std::is_base_of_v< 
       csr_matrix< typename SpMatType::value_type,
+                  typename SpMatType::index_type,
+                  typename SpMatType::allocator_type >, SpMatType >
+  >
+> : public std::true_type {};
+
+template <typename SpMatType>
+struct is_csc_matrix< SpMatType,
+  std::enable_if_t< 
+    std::is_base_of_v< 
+      csc_matrix< typename SpMatType::value_type,
                   typename SpMatType::index_type,
                   typename SpMatType::allocator_type >, SpMatType >
   >
@@ -35,11 +47,17 @@ struct is_coo_matrix< SpMatType,
 template <typename SpMatType>
 inline constexpr bool is_csr_matrix_v = is_csr_matrix<SpMatType>::value;
 template <typename SpMatType>
+inline constexpr bool is_csc_matrix_v = is_csc_matrix<SpMatType>::value;
+template <typename SpMatType>
 inline constexpr bool is_coo_matrix_v = is_coo_matrix<SpMatType>::value;
 
 template <typename SpMatType, typename U = void>
 struct enable_if_csr_matrix {
   using type = std::enable_if_t< is_csr_matrix_v<SpMatType>, U>;
+};
+template <typename SpMatType, typename U = void>
+struct enable_if_csc_matrix {
+  using type = std::enable_if_t< is_csc_matrix_v<SpMatType>, U>;
 };
 template <typename SpMatType, typename U = void>
 struct enable_if_coo_matrix {
@@ -48,6 +66,8 @@ struct enable_if_coo_matrix {
 
 template <typename SpMatType, typename U = void>
 using enable_if_csr_matrix_t = typename enable_if_csr_matrix<SpMatType,U>::type;
+template <typename SpMatType, typename U = void>
+using enable_if_csc_matrix_t = typename enable_if_csc_matrix<SpMatType,U>::type;
 template <typename SpMatType, typename U = void>
 using enable_if_coo_matrix_t = typename enable_if_coo_matrix<SpMatType,U>::type;
 

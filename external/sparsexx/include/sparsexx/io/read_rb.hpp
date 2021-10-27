@@ -1,6 +1,6 @@
 #pragma once
 
-#include <sparsexx/matrix_types/csr_matrix.hpp>
+#include <sparsexx/matrix_types/type_traits.hpp>
 #include <sparsexx/util/string.hpp>
 #include <fstream>
 #include <cassert>
@@ -10,12 +10,8 @@
 namespace sparsexx {
 
 
-template <
-  typename T,
-  typename index_t = int64_t,
-  typename Alloc   = std::allocator<T>
->
-csr_matrix<T,index_t,Alloc> read_rb( std::string fname ) {
+template <typename T, typename index_t, typename Alloc>
+csc_matrix<T,index_t,Alloc> read_rb_as_csc( std::string fname ) {
 
   std::ifstream f_in(fname);
 
@@ -46,14 +42,14 @@ csr_matrix<T,index_t,Alloc> read_rb( std::string fname ) {
   // Skip format line
   std::getline( f_in, line );
 
-  csr_matrix<T,index_t,Alloc> A( m, n, nnz );
+  csc_matrix<T,index_t,Alloc> A( m, n, nnz );
 
   int64_t curcount = 0;
   while( std::getline( f_in, line ) ) {
 
     auto tokens = tokenize( line );
     for( const auto& t : tokens )
-      A.rowptr()[curcount++] = std::stoi(t);
+      A.colptr()[curcount++] = std::stoi(t);
 
     if( curcount == (n+1) ) break;
 
@@ -64,7 +60,7 @@ csr_matrix<T,index_t,Alloc> read_rb( std::string fname ) {
 
     auto tokens = tokenize( line );
     for( const auto& t : tokens )
-      A.colind()[curcount++] = std::stoi(t);
+      A.rowind()[curcount++] = std::stoi(t);
 
     if( curcount == nnz ) break;
 
@@ -84,6 +80,20 @@ csr_matrix<T,index_t,Alloc> read_rb( std::string fname ) {
   assert( !std::getline(f_in,line) );
   return A;
 
+}
+
+template <typename SpMatType>
+SpMatType read_rb( std::string fname ) {
+
+  using value_t = detail::value_type_t<SpMatType>;
+  using index_t = detail::index_type_t<SpMatType>;
+  using allocator_t = detail::allocator_type_t<SpMatType>;
+
+  if constexpr ( detail::is_csc_matrix_v<SpMatType> )
+    return read_rb_as_csc<value_t,index_t,allocator_t>( fname );
+  else
+    return SpMatType( read_rb_as_csc<value_t,index_t,allocator_t>( fname ) );
+  abort();
 }
 
 }

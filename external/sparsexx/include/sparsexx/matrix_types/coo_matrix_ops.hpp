@@ -129,4 +129,55 @@ void coo_matrix<T,index_t,Alloc>::expand_from_triangle() {
 
 
 
+template <typename T, typename index_t, typename Alloc>
+void coo_matrix<T,index_t,Alloc>::sort_by_col_index() {
+
+#if SPARSEXX_ENABLE_RANGES_V3
+  auto coo_zip = ranges::views::zip( rowind_, colind_, nzval_ );
+
+  // Sort lex by row index
+  using coo_el = std::tuple<index_type, index_type, value_type>;
+  ranges::sort( coo_zip, []( const coo_el& el1, const coo_el& el2 ) {
+    const auto i1 = std::get<0>(el1);
+    const auto i2 = std::get<0>(el2);
+    const auto j1 = std::get<1>(el1);
+    const auto j2 = std::get<1>(el2);
+
+    if( j1 < j2 )      return true;
+    else if( j1 > j2 ) return false;
+    else               return i1 < i2;
+  });
+#else
+
+  std::vector<index_t> indx(nnz_);
+  std::iota( indx.begin(), indx.end(), 0 );
+
+  std::sort(indx.begin(), indx.end(),[&]( auto i, auto j ) {
+
+    if( colind_[i] < colind_[j] )      return true;
+    else if( colind_[j] < colind_[i] ) return false;
+    else                               return rowind_[i] < rowind_[j];
+
+  });
+
+  std::vector<index_t> new_rowind_(nnz_), new_colind_(nnz_);
+  std::vector<T>       new_nzval_(nnz_);
+
+  for( int64_t i = 0; i < nnz_; ++i ) {
+    new_rowind_[i] = rowind_[indx[i]];
+    new_colind_[i] = colind_[indx[i]];
+    new_nzval_[i]  = nzval_[indx[i]];
+  }
+
+  rowind_ = std::move( new_rowind_ );
+  colind_ = std::move( new_colind_ );
+  nzval_  = std::move( new_nzval_ );
+
+#endif
+
+
+}
+
+
+
 }

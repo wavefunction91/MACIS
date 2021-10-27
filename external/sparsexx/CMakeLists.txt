@@ -10,6 +10,23 @@ project( sparsexx VERSION 0.1.0 LANGUAGES C CXX )
 #list( APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
 #list( APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules/linalg-modules")
 
+
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  include( FetchContent )
+  FetchContent_Declare( linalg-cmake-modules
+    #GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
+    #GIT_TAG        89c82b78505f60657ef33b5bf38e5da059dff7f2
+    GIT_REPOSITORY https://github.com/ajaypanyala/linalg-cmake-modules.git
+    GIT_TAG        main
+  )
+  FetchContent_GetProperties( linalg-cmake-modules )
+  if( NOT linalg-cmake-modules_POPULATED )
+    FetchContent_Populate( linalg-cmake-modules )
+    list( APPEND CMAKE_MODULE_PATH ${linalg-cmake-modules_SOURCE_DIR} )
+  endif()
+endif()
+
+
 find_package( MPI      REQUIRED )
 find_package( OpenMP   REQUIRED )
 
@@ -103,5 +120,6 @@ target_include_directories( sparsexx INTERFACE ${PROJECT_SOURCE_DIR}/include )
 
 target_compile_options( sparsexx INTERFACE "-Wall" "-Wextra" "-Wpedantic" "-Wnon-virtual-dtor")
 
-add_subdirectory( examples )
+#add_subdirectory( examples )
+add_subdirectory( tests )
 

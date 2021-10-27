@@ -1,8 +1,6 @@
 #pragma once
 
-#include <algorithm>
 #include "type_fwd.hpp"
-
 
 #ifdef SPARSEXX_ENABLE_CEREAL
   #include <cereal/types/vector.hpp>
@@ -11,14 +9,14 @@
 namespace sparsexx {
 
 /**
- *  @brief A class to manipulate sparse matrices stored in coordiate (COO) format
+ *  @brief A class to manipulate sparse matrices stored in CSC format
  *
  *  @tparam T       Field over which the elements of the sparse matrix are defined
  *  @tparam index_t Integer type for the sparse indices
  *  @tparam Alloc   Allocator type for internal storage
  */
 template < typename T, typename index_t, typename Alloc >
-class coo_matrix {
+class csc_matrix {
 
 public:
 
@@ -43,53 +41,39 @@ protected:
   size_type indexing_;  ///< Indexing base (0 or 1)
 
   internal_storage< T >       nzval_;  ///< Storage of the non-zero values
-  internal_storage< index_t > colind_; ///< Storage of the column indices
+  internal_storage< index_t > colptr_; ///< Storage of the starting indices for each col of the sparse matrix
   internal_storage< index_t > rowind_; ///< Storage of the row indices
+    
 
 public:
 
-  coo_matrix() = default;
+  csc_matrix() = default;
 
   /**
-   *  @brief Construct a COO matrix.
+   *  @brief Construct a CSC matrix.
    *
    *  @param[in] m    Number of rows in the sparse matrix
    *  @param[in] n    Number of columns in the sparse matrix
    *  @param[in] nnz  Number of non-zeros in the sparse matrix
    *  @param[in] indexing Indexing base (default 1)
    */
-  coo_matrix( size_type m, size_type n, size_type nnz,
+  csc_matrix( size_type m, size_type n, size_type nnz,
     size_type indexing = 1) :
     m_(m), n_(n), nnz_(nnz), indexing_(indexing),
-    nzval_(nnz), colind_(nnz), rowind_(nnz)  { }
+    nzval_(nnz), rowind_(nnz), colptr_(n+1)  { }
 
-  coo_matrix( size_type m, size_type n,
-    std::vector<index_type>&& colind,
-    std::vector<index_type>&& rowind,
-    std::vector<value_type>&& nzval, 
-    size_type indexing = 1) :
-    m_(m), n_(n), nnz_(0), indexing_(indexing),
-    nzval_(std::move(nzval)), 
-    colind_(std::move(colind)),
-    rowind_(std::move(rowind)) {
+  csc_matrix( const csc_matrix& other )          = default;
+  csc_matrix( csc_matrix&& other      ) noexcept = default;
 
-    if( colind_.size() != rowind_.size() )
-      throw std::runtime_error("Incompatible Row/Col indices for COO");
-    if( nzval_.size() != rowind_.size() )
-      throw std::runtime_error("Incompatible NZVAL for COO");
-    nnz_ = nzval_.size();
+  csc_matrix& operator=( const csc_matrix& )          = default;
+  csc_matrix& operator=( csc_matrix&&      ) noexcept = default;
 
-  }
+  // Convert between sparse formats
+  csc_matrix( const coo_matrix<T, index_t, Alloc>& other );
 
 
-  coo_matrix( const coo_matrix& other )          = default;
-  coo_matrix( coo_matrix&& other      ) noexcept = default;
-
-  coo_matrix& operator=( const coo_matrix& )          = default;
-  coo_matrix& operator=( coo_matrix&&      ) noexcept = default;
 
 
-  coo_matrix( const csr_matrix<T, index_t, Alloc>& other ); 
 
   /**
    *  @brief Get the number of rows in the sparse matrix
@@ -121,104 +105,85 @@ public:
 
   /**
    *  @brief Access the non-zero values of the sparse matrix in 
-   *  COO format
+   *  CSC format
    *
    *  Non-const variant
    *
    *  @returns A non-const reference to the internal storage of the
-   *  non-zero elements of the sparse matrix in COO format
+   *  non-zero elements of the sparse matrix in CSC format
    */
   auto& nzval()  { return nzval_; };
 
   /**
-   *  @brief Access the column indices of the sparse matrix in 
-   *  COO format
-   *
-   *  Non-const variant
-   *
-   *  @returns A non-const reference to the internal storage of the
-   *  column indices of the sparse matrix in COO format
-   */
-  auto& colind() { return colind_; };
-
-  /**
    *  @brief Access the row indices of the sparse matrix in 
-   *  COO format
+   *  CSC format
    *
    *  Non-const variant
    *
    *  @returns A non-const reference to the internal storage of the
-   *  row indices of the sparse matrix in COO format
+   *  row indices of the sparse matrix in CSC format
    */
   auto& rowind() { return rowind_; };
 
   /**
+   *  @brief Access the column pointer indirection array of the sparse matrix in 
+   *  CSC format
+   *
+   *  Non-const variant
+   *
+   *  @returns A non-const reference to the internal storage of the
+   *  column pointer indirection array of the sparse matrix in CSC format
+   */
+  auto& colptr() { return colptr_; };
+
+  /**
    *  @brief Access the non-zero values of the sparse matrix in 
-   *  COO format
+   *  CSC format
    *
    *  Const variant
    *
    *  @returns A const reference to the internal storage of the
-   *  non-zero elements of the sparse matrix in COO format
+   *  non-zero elements of the sparse matrix in CSC format
    */
   const auto& nzval () const { return nzval_; };
 
   /**
-   *  @brief Access the column indices of the sparse matrix in 
-   *  COO format
-   *
-   *  Const variant
-   *
-   *  @returns A const reference to the internal storage of the
-   *  column indices of the sparse matrix in COO format
-   */
-  const auto& colind() const { return colind_; };
-
-  /**
    *  @brief Access the row indices of the sparse matrix in 
-   *  COO format
+   *  CSC format
    *
    *  Const variant
    *
    *  @returns A const reference to the internal storage of the
-   *  row indices of the sparse matrix in COO format
+   *  row indices of the sparse matrix in CSC format
    */
+
   const auto& rowind() const { return rowind_; };
+  /**
+   *  @brief Access the column pointer indirection array of the sparse matrix in 
+   *  CSC format
+   *
+   *  Const variant
+   *
+   *  @returns A const reference to the internal storage of the
+   *  column pointer indirection array of the sparse matrix in CSC format
+   */
+  const auto& colptr() const { return colptr_; };
 
 
 
-  void determine_indexing_from_adj() {
-    auto eq_zero = [](const auto x){ return x == 0; };
-    bool zero_based = std::any_of( rowind_.begin(), rowind_.end(), eq_zero ) or
-                      std::any_of( colind_.begin(), colind_.end(), eq_zero );
-    indexing_ = !zero_based;
-  }
-
-
-
-  void sort_by_row_index();
-  void sort_by_col_index();
-
-  bool is_sorted_by_row_index() const {
-    return std::is_sorted( rowind_.begin(), rowind_.end() );
-  }
-  bool is_sorted_by_col_index() const {
-    return std::is_sorted( colind_.begin(), colind_.end() );
-  }
-
-  void expand_from_triangle();
 
 #ifdef SPARSEXX_ENABLE_CEREAL
   template <class Archive>  
   void serialize( Archive& ar ) {
-    ar( m_, n_, nnz_, indexing_, rowind_, colind_, nzval_ );
+    ar( m_, n_, nnz_, indexing_, colptr_, rowind_, nzval_ );
   }
 #endif
 
-}; // coo_matrix
-
-}
 
 
-#include "coo_conversions.hpp"
-#include "coo_matrix_ops.hpp"
+
+}; // class csc_matrix
+
+} // namespace sparsexx
+
+#include "conversions.hpp"
