@@ -19,7 +19,7 @@ if( NOT Catch2_FOUND )
 
 endif()
 
-add_executable( sparsexx_test ut_main.cxx test_io.cxx test_util.cxx test_graph.cxx )
+add_executable( sparsexx_test ut_main.cxx test_io.cxx test_util.cxx test_graph.cxx test_spmbv.cxx )
 target_link_libraries( sparsexx_test PUBLIC sparsexx Catch2::Catch2 )
 target_compile_definitions( sparsexx_test PUBLIC
   "SPARSEXX_DATA_DIR=\"${CMAKE_CURRENT_LIST_DIR}\""
