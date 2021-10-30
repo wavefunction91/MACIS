@@ -1,229 +1,142 @@
+#include <sparsexx/util/mpi.hpp>
 #include <sparsexx/matrix_types/csr_matrix.hpp>
 #include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
-#include <sparsexx/matrix_types/type_traits.hpp>
-#include <sparsexx/matrix_types/dense_conversions.hpp>
-#include <sparsexx/spblas/spmbv.hpp>
-#include <sparsexx/spblas/pspmbv.hpp>
 #include <sparsexx/io/read_mm.hpp>
-#include <sparsexx/io/read_binary_triplets.hpp>
-#include <sparsexx/io/write_binary_triplets.hpp>
 
-#include <sparsexx/util/submatrix.hpp>
-#include <sparsexx/util/reorder.hpp>
+#include <sparsexx/spblas/spmbv.hpp>
 
-#include <iostream>
-#include <iterator>
-#include <iomanip>
-#include <random>
-#include <algorithm>
-#include <chrono>
-#include <omp.h>
-
-
-template <typename Op>
-double time_op( const Op& op ) {
-  MPI_Barrier( MPI_COMM_WORLD);
-  auto st = std::chrono::high_resolution_clock::now();
-
-  op();
-
-  MPI_Barrier( MPI_COMM_WORLD);
-  auto en = std::chrono::high_resolution_clock::now();
-
-  return std::chrono::duration<double,std::milli>(en - st).count();
-}
-
-int main( int argc, char** argv ) {
-
+int main(int argc, char** argv) {
   MPI_Init( &argc, &argv );
   auto world_size = sparsexx::detail::get_mpi_size( MPI_COMM_WORLD );
   auto world_rank = sparsexx::detail::get_mpi_rank( MPI_COMM_WORLD );
   {
-
   assert( argc == 2 );
   using spmat_type = sparsexx::csr_matrix<double, int32_t>;
-  //auto A = sparsexx::read_binary_triplet<spmat_type>( std::string( argv[1] ) );
+  #if 1
   auto A = sparsexx::read_mm<spmat_type>( std::string( argv[1] ) );
+  #else
+  // [ x x 0 0 x x 0 0 x ]
+  // [ x x 0 0 x x 0 0 x ]
+  // [ 0 0 x x 0 0 x x x ]
+  // [ 0 0 x x 0 0 x x x ]
+  // [ x x 0 0 x x 0 0 0 ]
+  // [ x x 0 0 x x 0 0 0 ]
+  // [ 0 0 x x 0 0 x x 0 ]
+  // [ 0 0 x x 0 0 x x 0 ]
+  // [ x x x x 0 0 0 0 x ]
+  spmat_type A(9,9,41,0);
+  A.rowptr() = { 0, 5, 10, 15, 20, 24, 28, 32, 36, 41 };
+  A.colind() = {
+    0, 1, 4, 5, 8,
+    0, 1, 4, 5, 8,
+    2, 3, 6, 7, 8,
+    2, 3, 6, 7, 8,
+    0, 1, 4, 5,
+    0, 1, 4, 5,
+    2, 3, 6, 7,
+    2, 3, 6, 7,
+    1, 2, 3, 4, 8 
+  };
+
+  //std::fill(A.nzval().begin(), A.nzval().end(), 1. );
+  std::iota(A.nzval().begin(), A.nzval().end(), 1. );
+  #endif
   const int N = A.m();
 
-  // Default tiling
-  int64_t nrow_per_rank = N / world_size;
-  using index_t = sparsexx::detail::index_type_t<decltype(A)>;
-  
-  std::vector< index_t > row_tiling(world_size + 1);
-  for( auto i = 0; i < world_size; ++i )
-    row_tiling[i] = i * nrow_per_rank;
-  row_tiling.back() = N;
+  sparsexx::dist_sparse_matrix<spmat_type> A_dist( MPI_COMM_WORLD, A );
+  auto spmv_info = A_dist.get_block_row_dist_info();
 
-  std::vector<index_t> col_tiling = { 0, N };
+  // Serial SPMV
+  std::vector<double> V(N), AV(N);
+  std::iota( V.begin(), V.end(), 0 );
+  for( auto& x : V ) x *= 0.01;
 
-  // Reordering
-  if( world_rank == 0 ) {
+  sparsexx::spblas::gespmbv(1, 1., A, V.data(), N, 0., AV.data(), N );
 
-    std::stringstream ss;
-    int64_t nparts = std::max(2l, world_size);
+  // Parallel SPMV
+  std::vector<double> V_dist ( A_dist.local_row_extent() ),
+                      AV_dist( A_dist.local_row_extent() );
+  std::iota( V_dist.begin(), V_dist.end(), A_dist.local_row_start() );
+  for( auto& x : V_dist ) x *= 0.01;
 
-    std::cout << "Partitioning..." << std::flush;
-    auto part_st = std::chrono::high_resolution_clock::now();
-    auto part = sparsexx::kway_partition( nparts, A );
-    auto part_en = std::chrono::high_resolution_clock::now();
-    std::cout << "Done!" << std::endl;
+  // **** Diagonal part ****
+  sparsexx::spblas::gespmbv(1, 1., A_dist.diagonal_tile(), V_dist.data(), N,
+    0., AV_dist.data(), N );
 
-    auto part_dur = std::chrono::duration<double,std::milli>( part_en - part_st ).count();
+  // **** Off diagonal part ****
 
-    ss << "Partition counts" << std::endl;
-    for( auto i = 0; i < nparts; ++i )
-      ss << "  Group " << i << " = " 
-         << std::count(part.begin(),part.end(), i)
-         << std::endl;
-
-    std::cout << "Forming Perm...";
-    auto fperm_st = std::chrono::high_resolution_clock::now();
-    auto [perm, partptr] = 
-      sparsexx::perm_from_part( nparts, part );
-    auto fperm_en = std::chrono::high_resolution_clock::now();
-    std::cout << "Done!" << std::endl;
-
-    auto fperm_dur = std::chrono::duration<double,std::milli>( fperm_en - fperm_st ).count();
-
-    for( auto ind : partptr )
-      ss << "  " << ind << std::endl;
-
-    //perm = {1, 3, 4, 2};
-    //perm.at(0) = 0;
-    //perm.at(1) = 2;
-    //perm.at(2) = 3;
-    //perm.at(3) = 1;
-
-    std::cout << "Permuting...";
-    auto perm_st = std::chrono::high_resolution_clock::now();
-    auto Ap = sparsexx::permute_rows( A, perm );
-    auto perm_en = std::chrono::high_resolution_clock::now();
-    auto perm_dur = std::chrono::duration<double,std::milli>( perm_en - perm_st ).count();
-    std::cout << "Done!" << std::endl;
-
-    ss << std::scientific << std::setprecision(5);
-    ss << "METIS DUR     = " << part_dur  << " ms" << std::endl;
-    ss << "Form PERM DUR = " << fperm_dur << " ms" << std::endl;
-    ss << "PERM DUR      = " << perm_dur  << " ms" << std::endl;
-
-    std::cout << ss.str();
-
-
-    //A = std::move(Ap);
-    //row_tiling = std::move(partptr); 
-  }
-
-  if( world_size > 1 ) {
-    MPI_Bcast( A.rowptr().data(), A.rowptr().size(), MPI_INT32_T, 0, MPI_COMM_WORLD );
-    MPI_Bcast( A.colind().data(), A.colind().size(), MPI_INT32_T, 0, MPI_COMM_WORLD );
-    MPI_Bcast( A.nzval().data(), A.nzval().size(), MPI_DOUBLE, 0, MPI_COMM_WORLD );
-    MPI_Bcast( row_tiling.data(), row_tiling.size(), MPI_INT32_T, 0, MPI_COMM_WORLD );
-    MPI_Bcast( col_tiling.data(), col_tiling.size(), MPI_INT32_T, 0, MPI_COMM_WORLD );
-  }
-
-
-  sparsexx::dist_csr_matrix<double,int32_t> dist_A( MPI_COMM_WORLD, N, N,
-    row_tiling, col_tiling );
-
-  sparsexx::dist_coo_matrix<double,int32_t> dist_coo( MPI_COMM_WORLD, N, N,
-    row_tiling, col_tiling );
-
-
-  if(world_rank == 0) std::cout << "GLOBAL NNZ = " << A.nnz() << std::endl;
-  for( auto& [tile_index, local_tile] : dist_A ) {
-    std::stringstream ss;
-    ss << world_rank << ": "  
-              << "("
-              << tile_index.first << ", " << tile_index.second 
-              << ") -> ["
-              << local_tile.global_row_extent.first << ", " 
-              << local_tile.global_row_extent.second << ") ";
-
-    local_tile.local_matrix = extract_submatrix( A,
-      {local_tile.global_row_extent.first, local_tile.global_col_extent.first},
-      {local_tile.global_row_extent.second, local_tile.global_col_extent.second}
-    );
-
-    ss << "Local NNZ = " << local_tile.local_matrix.nnz() << std::endl;
-
-    //std::vector<double> local_dense( local_tile.local_matrix.m() * local_tile.local_matrix.n() );
-    //sparsexx::convert_to_dense( local_tile.local_matrix, local_dense.data(), local_tile.local_matrix.m() );
-
-    std::cout << ss.str();
-
-  }
-
-
-
-
-
-  const int64_t K = 2;
-  std::vector<double> V( N*K ), AV_serial( N*K, 0. ), AV_dist( N*K, 0. );
-
-  if( not world_rank ) {
-    std::vector< std::default_random_engine > gen;
-    std::vector< std::normal_distribution<> > dist;
-    for( auto it = 0; it < omp_get_max_threads(); ++it ) {
-      gen.emplace_back(it);
-      dist.emplace_back( 0., 1. );
+  // Post recv for data needed
+  std::vector<std::vector<double>> V_recv( world_size );
+  std::vector<MPI_Request> recv_reqs;
+  for( auto i = 0; i < world_size; ++i ) 
+  if( i != world_rank ) {
+    const auto& indices = spmv_info.recv_indices[i];
+    auto pack_sz = indices.size();
+    if(pack_sz) {
+      recv_reqs.emplace_back();
+      V_recv[i].resize( pack_sz );
+      MPI_Irecv( V_recv[i].data(), pack_sz, MPI_DOUBLE, i, 0,
+        MPI_COMM_WORLD, &recv_reqs.back() );
     }
-
-    auto rand_gen = [&]() {
-      auto tid = omp_get_thread_num();
-      auto g = gen.at( tid );
-      auto d = dist.at( tid );
-      return d(g);
-    };
-
-    #pragma omp parallel for
-    for( auto i = 0ul; i < V.size(); ++i ) V[i] = rand_gen();
   }
 
-  MPI_Bcast( V.data(), V.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD );
+  // Pack data to send
+  std::vector<std::vector<double>> V_pack( world_size );
+  for( auto i = 0; i < world_size; ++i )
+  if( i != world_rank ) {
+    const auto& indices = spmv_info.send_indices[i];
+    auto pack_sz = indices.size();
+    if( pack_sz ) {
+      V_pack[i].resize( pack_sz );
+      for( auto j = 0; j < pack_sz; ++j ) {
+        V_pack[i][j] = V_dist[ indices[j] - A_dist.local_row_start() ];
+      }
+      MPI_Request req;
+      MPI_Isend( V_pack[i].data(), pack_sz, MPI_DOUBLE, i, 0,
+        MPI_COMM_WORLD, &req );
+      MPI_Request_free(&req);
+    }
+  }
 
-  std::stringstream ss;
+  // Wait for recvs to be satisfied
+  MPI_Waitall( recv_reqs.size(), recv_reqs.data(), MPI_STATUSES_IGNORE );
 
-  //ss << std::endl;
-  //ss << "V " << world_rank << std::endl;
-  //for( auto i = 0; i < N; ++i ) {
-  //  for( auto k = 0; k < K; ++k ) 
-  //    ss << V[i + k*N] << " ";
-  //  ss << std::endl;
-  //}
+  // Unpack into long vector
+  std::vector<double> V_offdiag(N);
+  for( auto i = 0; i < world_size; ++i )
+  if( i != world_rank ) {
+    const auto& indices = spmv_info.recv_indices[i];
+    auto pack_sz = indices.size();
+    for( auto j = 0; j < pack_sz; ++j ) {
+      V_offdiag[ indices[j] ] = V_recv[i][j];
+    }
+  }
 
+  sparsexx::spblas::gespmbv(1, 1., A_dist.off_diagonal_tile(), V_offdiag.data(), N,
+    1., AV_dist.data(), N );
+
+
+
+  std::vector<double> AV_dist_combine(N);
+  size_t n_per_rank = N / world_size;
+  MPI_Allgather( AV_dist.data(), n_per_rank, MPI_DOUBLE, AV_dist_combine.data(),
+    n_per_rank, MPI_DOUBLE, MPI_COMM_WORLD );
+  if( N % world_size and world_size > 1 ) {
+    if( world_rank == (world_size-1) ) {
+      std::copy_n( AV_dist.data() + n_per_rank, N % world_size, 
+        AV_dist_combine.data() + world_size*n_per_rank );
+    }
+    MPI_Bcast( AV_dist_combine.data() + world_size*n_per_rank, N%world_size,
+      MPI_DOUBLE, world_size-1, MPI_COMM_WORLD );
+  }
+
+  double max_diff = 0.;
+  for( auto i = 0; i < N; ++i ) {
+    max_diff = std::max( max_diff, std::abs(AV_dist_combine[i] - AV[i]) );
+  }
+  std::cout << "MAX DIFF = " << max_diff << std::endl;
   
-  sparsexx::spblas::gespmbv( K, 1., A, V.data(), N, 0., AV_serial.data(), N );
 
-  auto pspbmv_dur = time_op( [&]() {
-    sparsexx::spblas::pgespmbv_grv( K, 1., dist_A, V.data(), N, 0., AV_dist.data(), N );
-  });
-
-
-  #if 0
-  ss << "SPMBV DIFF " << world_rank << " = " 
-    << *std::max_element(V.begin(), V.end() ) << " "
-    << *std::max_element(AV_serial.begin(), AV_serial.end() );
-  for( auto i = 0ul; i < N*K; ++i )
-    AV_serial[i] = std::abs( AV_serial[i] - AV_dist[i] );
-  ss << " "  <<*std::max_element(AV_serial.begin(), AV_serial.end() ) << std::endl;;
-  #endif
-  std::cout << ss.str();
-
-
-  if( !world_rank ) {
-    std::vector<int64_t> dist_nnz( world_size );
-    for( int i = 0; i < world_size; ++i )
-      dist_nnz[i] = A.rowptr()[row_tiling[i+1]] - A.rowptr()[row_tiling[i]];
-
-    double max_load = *std::max_element( dist_nnz.begin(), dist_nnz.end() );
-    double avg_load = A.nnz() / double(world_size); 
-    std::cout << "PSPMBV MAX = " << max_load << std::endl;
-    std::cout << "PSPMBV AVG = " << avg_load << std::endl;
-    std::cout << "PSPMBV IMB = " << (avg_load / max_load) << std::endl;
-    std::cout << "PSPMBV DUR = " << pspbmv_dur << " ms" << std::endl;
-  }
   }
   MPI_Finalize();
-  return 0;
 }

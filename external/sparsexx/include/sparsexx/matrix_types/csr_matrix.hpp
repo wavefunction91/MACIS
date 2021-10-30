@@ -172,6 +172,12 @@ public:
   const auto& rowptr() const { return rowptr_; };
 
 
+  inline void set_indexing( index_type idx ) {
+    if( idx == indexing_ ) return;
+    for( auto& i : colind_ ) i -= (indexing_ - idx);
+    for( auto& i : rowptr_ ) i -= (indexing_ - idx);
+    indexing_ = idx;
+  }
 
 
 #ifdef SPARSEXX_ENABLE_CEREAL

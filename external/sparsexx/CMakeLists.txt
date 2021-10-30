@@ -120,6 +120,6 @@ target_include_directories( sparsexx INTERFACE ${PROJECT_SOURCE_DIR}/include )
 
 target_compile_options( sparsexx INTERFACE "-Wall" "-Wextra" "-Wpedantic" "-Wnon-virtual-dtor")
 
-#add_subdirectory( examples )
+add_subdirectory( examples )
 add_subdirectory( tests )
 
