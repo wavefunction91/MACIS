@@ -5,6 +5,8 @@
 #include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
 #include <sparsexx/spblas/spmbv.hpp>
 
+#include <sparsexx/util/permute.hpp>
+
 namespace sparsexx::spblas {
 
 template <typename IndexType>
@@ -23,6 +25,32 @@ struct spmv_info {
   std::vector< size_t > recv_offsets;
   std::vector< size_t > send_counts;
   std::vector< size_t > recv_counts;
+
+  template <typename T>
+  std::vector<MPI_Request> post_remote_recv( T* X ) const {
+    std::vector<MPI_Request> reqs;
+    int comm_size = recv_offsets.size();
+    for( int i = 0; i < comm_size; ++i ) 
+    if( recv_counts[i] ) {
+      auto& req = reqs.emplace_back();
+      MPI_Irecv( X + recv_offsets[i], recv_counts[i] * sizeof(T), MPI_BYTE,
+        i, 0, comm, &req );
+    }
+    return reqs;
+  }
+
+  template <typename T>
+  std::vector<MPI_Request> post_remote_send( const T* X ) const {
+    std::vector<MPI_Request> reqs;
+    int comm_size = send_offsets.size();
+    for( int i = 0; i < comm_size; ++i ) 
+    if( send_counts[i] ) {
+      auto& req = reqs.emplace_back();
+      MPI_Isend( X + send_offsets[i], send_counts[i] * sizeof(T), MPI_BYTE,
+        i, 0, comm, &req );
+    }
+    return reqs;
+  }
 
 };
 
@@ -144,16 +172,20 @@ auto generate_spmv_comm_info( const DistSpMatrixType& A ) {
       recv_indices_by_rank[i].end() );
   }
 
-    spmv_info<index_type> info;
-    info.comm = comm;
-    info.send_indices = std::move(send_indices);
-    info.recv_indices = std::move(recv_indices);
-    info.recv_offsets = std::move(recv_offsets);
-    info.recv_counts  = std::move(recv_counts);
-    info.send_offsets = std::move(send_offsets);
-    info.send_counts  = std::move(send_counts);
+  // Correct send indices to be relative to local row start
+  const auto lrs = A.local_row_start();
+  for( auto& i : send_indices ) i -= lrs;
 
-    return info;
+  spmv_info<index_type> info;
+  info.comm = comm;
+  info.send_indices = std::move(send_indices);
+  info.recv_indices = std::move(recv_indices);
+  info.recv_offsets = std::move(recv_offsets);
+  info.recv_counts  = std::move(recv_counts);
+  info.send_offsets = std::move(send_offsets);
+  info.send_counts  = std::move(send_counts);
+
+  return info;
 
 
 }
@@ -181,65 +213,42 @@ void pgespmv( detail::type_identity_t<ScalarType> ALPHA, const DistSpMatType& A,
   auto comm_size = detail::get_mpi_size(comm);
   auto comm_rank = detail::get_mpi_rank(comm);
 
-  const auto& recv_counts  = spmv_info.recv_counts;
-  const auto& recv_offsets = spmv_info.recv_offsets;
   const auto& recv_indices = spmv_info.recv_indices;
-
-  const auto& send_counts  = spmv_info.send_counts;
-  const auto& send_offsets = spmv_info.send_offsets;
   const auto& send_indices = spmv_info.send_indices;
-
-
 
   /***** Initial Communication Part *****/
 
-  // Allocate buffer to receive packed data from remote processes
+  // Allocated packed buffers
   size_t nrecv_pack = recv_indices.size();
+  size_t nsend_pack = send_indices.size();
   std::vector<value_type> V_recv_pack(nrecv_pack);
+  std::vector<value_type> V_send_pack(nsend_pack);
 
-  // Post async receives
-  std::vector<MPI_Request> recv_reqs;
-  for( auto i = 0; i < comm_size; ++i ) 
-  if( recv_counts[i] ) {
-    recv_reqs.emplace_back();
-    MPI_Irecv( V_recv_pack.data() + recv_offsets[i],
-               recv_counts[i] * sizeof(value_type), MPI_BYTE, i, 0,
-               comm, &recv_reqs.back() );
-  }
+  // Buffer for offdiagonal matvec
+  std::vector<value_type> V_remote( N );
 
+  // Post async recv's for remote data required for offdiagonal
+  // matvec
+  auto recv_reqs = spmv_info.post_remote_recv( V_recv_pack.data() );
 
   // Pack data to send to remote processes
-  size_t nsend_pack = send_indices.size();
-  std::vector<value_type> V_send_pack(nsend_pack);
-  for( size_t i = 0; i < nsend_pack; ++i ) {
-    V_send_pack[i] = V[ send_indices[i] - A.local_row_start() ];
-  }
+  sparsexx::permute_vector( nsend_pack, V, send_indices.data(), 
+    V_send_pack.data(), sparsexx::PermuteDirection::Backward );
 
-  // Send data to remote processes (fire and forget)
-  std::vector<MPI_Request> send_reqs;
-  for( auto i = 0; i < comm_size; ++i ) 
-  if( send_counts[i] ) {
-    send_reqs.emplace_back();
-    MPI_Isend( V_send_pack.data() + send_offsets[i],
-               send_counts[i] * sizeof(value_type), MPI_BYTE, i, 0,
-               comm, &send_reqs.back() );
-  }
+  // Send data (async) to remote processes
+  auto send_reqs = spmv_info.post_remote_send( V_send_pack.data() );
 
 
 
   /***** Diagonal Matvec *****/
   gespmbv( 1, ALPHA, A.diagonal_tile(), V, N, BETA, AV, N );
 
-  // Allocate memory for unpacked remote data
-  std::vector<value_type> V_remote( N );
-
   // Wait for receives to complete 
   MPI_Waitall( recv_reqs.size(), recv_reqs.data(), MPI_STATUSES_IGNORE );
 
   // Unpack data into contiguous buffer 
-  for( size_t i = 0; i < nrecv_pack; ++i ) {
-    V_remote[recv_indices[i]] = V_recv_pack[i];
-  }
+  sparsexx::permute_vector( nrecv_pack, V_recv_pack.data(), recv_indices.data(),
+    V_remote.data(), sparsexx::PermuteDirection::Forward );
 
 
   /***** Off-diagonal Matvec *****/
