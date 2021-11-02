@@ -4,6 +4,7 @@
 #include <sparsexx/io/read_mm.hpp>
 
 #include <sparsexx/spblas/spmbv.hpp>
+#include <sparsexx/spblas/pspmbv.hpp>
 
 int main(int argc, char** argv) {
   MPI_Init( &argc, &argv );
@@ -44,7 +45,8 @@ int main(int argc, char** argv) {
   const int N = A.m();
 
   sparsexx::dist_sparse_matrix<spmat_type> A_dist( MPI_COMM_WORLD, A );
-  auto spmv_info = A_dist.get_block_row_dist_info();
+  //auto spmv_info = A_dist.get_spmv_info();
+  auto spmv_info = generate_spmv_comm_info( A_dist );
 
   // Serial SPMV
   std::vector<double> V(N), AV(N);
@@ -59,6 +61,7 @@ int main(int argc, char** argv) {
   std::iota( V_dist.begin(), V_dist.end(), A_dist.local_row_start() );
   for( auto& x : V_dist ) x *= 0.01;
 
+#if 0
   // **** Diagonal part ****
   sparsexx::spblas::gespmbv(1, 1., A_dist.diagonal_tile(), V_dist.data(), N,
     0., AV_dist.data(), N );
@@ -66,8 +69,9 @@ int main(int argc, char** argv) {
   // **** Off diagonal part ****
 
   // Post recv for data needed
-  std::vector<std::vector<double>> V_recv( world_size );
   std::vector<MPI_Request> recv_reqs;
+  #if 0
+  std::vector<std::vector<double>> V_recv( world_size );
   for( auto i = 0; i < world_size; ++i ) 
   if( i != world_rank ) {
     const auto& indices = spmv_info.recv_indices[i];
@@ -79,8 +83,21 @@ int main(int argc, char** argv) {
         MPI_COMM_WORLD, &recv_reqs.back() );
     }
   }
+  #else
+  size_t nrecv_pack = std::accumulate( spmv_info.recv_counts.begin(),
+                                       spmv_info.recv_counts.end(), 0ul );
+  std::vector<double> V_recv_pack(nrecv_pack);
+  for( auto i = 0; i < world_size; ++i ) 
+  if( i != world_rank and spmv_info.recv_counts[i] ) {
+    recv_reqs.emplace_back();
+    MPI_Irecv( V_recv_pack.data() + spmv_info.recv_offsets[i],
+               spmv_info.recv_counts[i], MPI_DOUBLE, i, 0,
+               MPI_COMM_WORLD, &recv_reqs.back() );
+  }
+  #endif
 
   // Pack data to send
+  #if 0
   std::vector<std::vector<double>> V_pack( world_size );
   for( auto i = 0; i < world_size; ++i )
   if( i != world_rank ) {
@@ -97,12 +114,33 @@ int main(int argc, char** argv) {
       MPI_Request_free(&req);
     }
   }
+  #else
+  size_t nsend_pack = std::accumulate( spmv_info.send_counts.begin(),
+                                       spmv_info.send_counts.end(), 0ul );
+  std::vector<double> V_send_pack(nsend_pack);
+
+  // Pack data
+  for( auto i = 0; i < nsend_pack; ++i ) {
+    V_send_pack[i] = V_dist[ spmv_info.send_indices[i] - A_dist.local_row_start() ]; 
+  }
+
+  // Send data
+  for( auto i = 0; i < world_size; ++i ) 
+  if( i != world_rank and spmv_info.send_counts[i] ) {
+    MPI_Request req;
+    MPI_Isend( V_send_pack.data() + spmv_info.send_offsets[i],
+               spmv_info.send_counts[i], MPI_DOUBLE, i, 0,
+               MPI_COMM_WORLD, &req );
+    MPI_Request_free(&req);
+  }
+  #endif
 
   // Wait for recvs to be satisfied
   MPI_Waitall( recv_reqs.size(), recv_reqs.data(), MPI_STATUSES_IGNORE );
 
   // Unpack into long vector
   std::vector<double> V_offdiag(N);
+  #if 0
   for( auto i = 0; i < world_size; ++i )
   if( i != world_rank ) {
     const auto& indices = spmv_info.recv_indices[i];
@@ -111,9 +149,21 @@ int main(int argc, char** argv) {
       V_offdiag[ indices[j] ] = V_recv[i][j];
     }
   }
+  #else
+  for( auto i = 0; i < nrecv_pack; ++i ) {
+    V_offdiag[ spmv_info.recv_indices[i] ] = 
+    V_recv_pack[i];
+  }
+  #endif
 
   sparsexx::spblas::gespmbv(1, 1., A_dist.off_diagonal_tile(), V_offdiag.data(), N,
     1., AV_dist.data(), N );
+#else
+
+  sparsexx::spblas::pgespmv( 1., A_dist, V_dist.data(), 0., AV_dist.data(), 
+    spmv_info );
+
+#endif
 
 
 
