@@ -119,10 +119,14 @@ auto generate_spmv_comm_info( const DistSpMatrixType& A ) {
   // Gather recv counts to remote ranks
   // This tells each rank the number of elements each remote process
   // expects to receive from the local process
+  #if 0
   std::vector<size_t> recv_counts_gathered( comm_size * comm_size );
   MPI_Allgather( recv_counts.data(), sizeof(size_t)*comm_size, 
     MPI_BYTE, recv_counts_gathered.data(), sizeof(size_t)*comm_size,
     MPI_BYTE, comm );
+  #else
+  auto recv_counts_gathered = detail::mpi_allgather( recv_counts, comm );
+  #endif
 
   
   // Allocate memory to store the remote indices each remote process
@@ -135,9 +139,15 @@ auto generate_spmv_comm_info( const DistSpMatrixType& A ) {
     auto nremote = recv_counts_gathered[ comm_rank + i*comm_size ];
     if( nremote ) {
       send_indices_by_rank[i].resize( nremote );
+      #if 0
       auto& req = recv_reqs.emplace_back();
       MPI_Irecv( send_indices_by_rank[i].data(), nremote * sizeof(index_type),
         MPI_BYTE, i, 0, comm, &req );
+      #else
+      recv_reqs.emplace_back( 
+        detail::mpi_irecv( send_indices_by_rank[i], i, 0, comm )
+      );
+      #endif
     }
   }
 
@@ -146,13 +156,23 @@ auto generate_spmv_comm_info( const DistSpMatrixType& A ) {
   std::vector< MPI_Request > send_reqs;
   for( auto i = 0; i < comm_size; ++i ) 
   if( recv_counts[i] ) {
+  #if 0
     auto& req = send_reqs.emplace_back();
     MPI_Isend( recv_indices_by_rank[i].data(), recv_counts[i]*sizeof(index_type),
       MPI_BYTE, i, 0, comm, &req );
+  #else
+    send_reqs.emplace_back( 
+      detail::mpi_isend( recv_indices_by_rank[i], i, 0, comm )
+    );
+  #endif
   }
 
   // Wait on receives to complete
+  #if 0
   MPI_Waitall( recv_reqs.size(), recv_reqs.data(), MPI_STATUSES_IGNORE );
+  #else
+  detail::mpi_waitall_ignore_status( recv_reqs );
+  #endif
 
 
   // Calculate element counts that will be sent to each remote processes
@@ -190,6 +210,12 @@ auto generate_spmv_comm_info( const DistSpMatrixType& A ) {
   const auto lrs = A.local_row_start();
   for( auto& i : send_indices ) i -= lrs;
 
+  #if 0
+  MPI_Waitall( send_reqs.size(), send_reqs.data(), MPI_STATUSES_IGNORE );
+  #else
+  detail::mpi_waitall_ignore_status( send_reqs );
+  #endif
+
   spmv_info<index_type> info;
   info.comm = comm;
   info.send_indices = std::move(send_indices);
@@ -199,7 +225,6 @@ auto generate_spmv_comm_info( const DistSpMatrixType& A ) {
   info.send_offsets = std::move(send_offsets);
   info.send_counts  = std::move(send_counts);
 
-  MPI_Waitall( send_reqs.size(), send_reqs.data(), MPI_STATUSES_IGNORE );
 
   return info;
 
