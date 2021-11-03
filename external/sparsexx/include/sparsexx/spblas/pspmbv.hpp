@@ -9,6 +9,11 @@
 
 namespace sparsexx::spblas {
 
+namespace detail {
+  using namespace sparsexx::detail;
+}
+
+
 template <typename IndexType>
 struct spmv_info {
 
@@ -25,6 +30,15 @@ struct spmv_info {
   std::vector< size_t > recv_offsets;
   std::vector< size_t > send_counts;
   std::vector< size_t > recv_counts;
+
+
+  inline size_t communication_volume() {
+    size_t local_comm_vol = (send_indices.size() + recv_indices.size())/2;
+    size_t comm_vol = 0;
+    MPI_Allreduce( &local_comm_vol, &comm_vol, 1, MPI_UINT64_T, MPI_SUM, comm );
+    return comm_vol;
+  }
+
 
   template <typename T>
   std::vector<MPI_Request> post_remote_recv( T* X ) const {
@@ -57,10 +71,10 @@ struct spmv_info {
 template <typename DistSpMatrixType>
 auto generate_spmv_comm_info( const DistSpMatrixType& A ) {
 
-  using index_type = detail::index_type_t<DistSpMatrixType>;
+  using index_type = sparsexx::detail::index_type_t<DistSpMatrixType>;
   auto comm = A.comm();
-  auto comm_size = detail::get_mpi_size(comm);
-  auto comm_rank = detail::get_mpi_rank(comm);
+  auto comm_size = sparsexx::detail::get_mpi_size(comm);
+  auto comm_rank = sparsexx::detail::get_mpi_rank(comm);
 
   // Get unique column indices for local rows of A
   // excluding locally owned elements (i.e. off-diagonal col indices)
@@ -129,12 +143,12 @@ auto generate_spmv_comm_info( const DistSpMatrixType& A ) {
 
   // Send to each remote process the indices it needs to send to the
   // current process
+  std::vector< MPI_Request > send_reqs;
   for( auto i = 0; i < comm_size; ++i ) 
   if( recv_counts[i] ) {
-    MPI_Request req;
+    auto& req = send_reqs.emplace_back();
     MPI_Isend( recv_indices_by_rank[i].data(), recv_counts[i]*sizeof(index_type),
       MPI_BYTE, i, 0, comm, &req );
-    MPI_Request_free(&req);
   }
 
   // Wait on receives to complete
@@ -185,13 +199,11 @@ auto generate_spmv_comm_info( const DistSpMatrixType& A ) {
   info.send_offsets = std::move(send_offsets);
   info.send_counts  = std::move(send_counts);
 
+  MPI_Waitall( send_reqs.size(), send_reqs.data(), MPI_STATUSES_IGNORE );
+
   return info;
 
 
-}
-
-namespace detail {
-  using namespace sparsexx::detail;
 }
 
 template <typename DistSpMatType, 

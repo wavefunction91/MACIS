@@ -7,9 +7,49 @@
 
 #include <sparsexx/spblas/spmbv.hpp>
 #include <sparsexx/spblas/pspmbv.hpp>
+#include <random>
+
+template <typename T>
+auto operator-(const std::vector<T>& a, const std::vector<T>& b ) {
+  if( a.size() != b.size() ) throw std::runtime_error("");
+  std::vector<T> c(a.size());
+  for( auto i = 0; i < a.size(); ++i ) {
+    c[i] = std::abs(a[i] - b[i]);
+  }
+  return c;
+}
 
 #include <chrono>
 using clock_type = std::chrono::high_resolution_clock;
+using duration_type = std::chrono::duration<double, std::milli>;
+
+#include <functional>
+
+template <typename T>
+std::size_t hash_combine( std::size_t seed, const T& x ) {
+  return seed ^ (std::hash<T>{}(x) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+}
+
+template <typename T, typename... Args>
+std::size_t hash_combine( std::size_t seed, const T& x, Args&&... args ) {
+  return hash_combine( hash_combine(seed,x), std::forward<Args>(args)... );
+}
+
+template <typename T>
+struct std::hash<std::vector<T>> {
+  std::size_t operator()( const std::vector<T>& v ) const noexcept {
+    std::size_t seed = v.size();
+    for( auto i : v ) seed = hash_combine(seed, i); 
+    return seed;
+  }
+};
+
+template <typename T, typename I>
+struct std::hash< sparsexx::csr_matrix<T,I> > {
+  std::size_t operator()( const sparsexx::csr_matrix<T,I>& A ) const noexcept {
+    return hash_combine( A.m(), A.n(), A.nnz(), A.rowptr(), A.colind(), A.nzval() );
+  };
+};
 
 
 int main(int argc, char** argv) {
@@ -20,7 +60,9 @@ int main(int argc, char** argv) {
   assert( argc == 2 );
   using spmat_type = sparsexx::csr_matrix<double, int32_t>;
   #if 1
+  if(world_rank == 0) std::cout << "READING MATRIX" << std::endl;
   auto A = sparsexx::read_mm<spmat_type>( std::string( argv[1] ) );
+  if(world_rank == 0) std::cout << "DONE READING MATRIX" << std::endl;
   #else
   // [ x x 0 0 x x 0 0 x ]
   // [ x x 0 0 x x 0 0 x ]
@@ -84,10 +126,8 @@ int main(int argc, char** argv) {
       A = sparsexx::permute_rows_cols( A, mat_perm, mat_perm );
       auto permute_end = clock_type::now(); 
 
-      std::chrono::duration<double, std::milli> kway_part_dur = 
-        kway_part_end - kway_part_begin;
-      std::chrono::duration<double, std::milli> permute_dur = 
-        permute_end - permute_begin;
+      duration_type kway_part_dur = kway_part_end - kway_part_begin;
+      duration_type permute_dur   = permute_end - permute_begin;
 
       std::cout << "KWAY PART DUR = " << kway_part_dur.count() << std::endl;
       std::cout << "PERMUTE DUR   = " << permute_dur.count() << std::endl;
@@ -115,40 +155,27 @@ int main(int argc, char** argv) {
   sparsexx::dist_sparse_matrix<spmat_type> A_dist( MPI_COMM_WORLD, A );
   auto spmv_info = sparsexx::spblas::generate_spmv_comm_info( A_dist );
 
-  {
-  std::stringstream ss;
-  ss << "MAT DIST RANK " << world_rank 
-     << ": DIAGONAL NNZ = " << (A_dist.diagonal_tile().nnz()) 
-     << ": OFF-DIAGONAL NNZ = " << (A_dist.off_diagonal_tile().nnz())
-     << ": SEND COUNT = " << (spmv_info.send_indices.size()) 
-     << ": RECV COUNT = " << (spmv_info.recv_indices.size()) 
-     << std::endl;
-
-  //std::cout << ss.str();
-  }
-
-  {
-  size_t local_comm_volume = spmv_info.send_indices.size() + 
-                             spmv_info.recv_indices.size();
-  size_t comm_volume = 0;
-  MPI_Reduce( &local_comm_volume, &comm_volume, 1, MPI_UINT64_T, MPI_SUM, 
-    0, MPI_COMM_WORLD );
-  if( world_rank == 0 ) std::cout << "COMM VOLUME = " << comm_volume << std::endl;
-  }
+  size_t comm_vol = spmv_info.communication_volume();
+  if( world_rank == 0 ) std::cout << "COMM VOLUME = " << comm_vol << std::endl;
 
   
 
 
   // Serial SPMV
   std::vector<double> V(N), AV(N);
-  std::iota( V.begin(), V.end(), 0 );
-  for( auto& x : V ) x *= 0.01;
+  //std::iota( V.begin(), V.end(), 0 );
+  //for( auto& x : V ) x *= 0.01;
+  std::minstd_rand gen;
+  std::uniform_real_distribution<> dist(-1,1);
+  std::generate( V.begin(), V.end(), [&](){ return dist(gen); } );
   if( mat_perm.size() ) {
     sparsexx::permute_vector( N, V.data(), mat_perm.data(),
       sparsexx::PermuteDirection::Backward );
   }
 
+  auto spmv_st = clock_type::now();
   sparsexx::spblas::gespmbv(1, 1., A, V.data(), N, 0., AV.data(), N );
+  auto spmv_en = clock_type::now();
   if( mat_perm.size() ) {
     sparsexx::permute_vector( N, AV.data(), mat_perm.data(), 
       sparsexx::PermuteDirection::Forward );
@@ -162,12 +189,21 @@ int main(int argc, char** argv) {
     V_dist[i-dist_row_st] = V[i];
   }
 
+  MPI_Barrier(MPI_COMM_WORLD);
+  auto pspmv_st = clock_type::now();
 
   sparsexx::spblas::pgespmv( 1., A_dist, V_dist.data(), 0., AV_dist.data(), 
     spmv_info );
 
+  MPI_Barrier(MPI_COMM_WORLD);
+  auto pspmv_en = clock_type::now();
 
-
+  if( !world_rank ) {
+    duration_type spmv_dur  = spmv_en - spmv_st;
+    duration_type pspmv_dur = pspmv_en - pspmv_st;
+    std::cout << "SERIAL   = " << spmv_dur.count() << std::endl;
+    std::cout << "PARALLEL = " << pspmv_dur.count() << std::endl;
+  }
 
   // Compare results
   std::vector<double> AV_dist_combine(N);
@@ -188,15 +224,17 @@ int main(int argc, char** argv) {
   }
 
   double max_diff = 0.;
+  double nrm = 0.;
   for( auto i = 0; i < N; ++i ) {
-    max_diff = std::max( max_diff, std::abs(AV_dist_combine[i] - AV[i]) );
+    auto diff = std::abs(AV_dist_combine[i] - AV[i]);
+    max_diff = std::max( max_diff, diff );
+    nrm += diff*diff;
   }
-  //std::cout << "MAX DIFF = " << max_diff << std::endl;
+  nrm = std::sqrt(nrm);
 
   if( !world_rank ) {
-  //for( auto i = 0; i < N; ++i ) {
-  //  std::cout << AV[i] << std::endl;
-  //}
+    std::cout << "MAX DIFF = " << max_diff << std::endl;
+    std::cout << "NRM DIFF = " << nrm << std::endl;
   }
   
 
