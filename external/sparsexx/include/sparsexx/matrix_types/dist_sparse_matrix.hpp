@@ -104,6 +104,13 @@ public:
 
   const auto& diagonal_tile() const { return *diagonal_tile_; }
   const auto& off_diagonal_tile() const { return *off_diagonal_tile_; }
+
+  void set_diagonal_tile( SpMatType&& A ) {
+    diagonal_tile_ = std::make_shared<tile_type>( std::move(A) );
+  }
+  void set_off_diagonal_tile( SpMatType&& A ) {
+    off_diagonal_tile_ = std::make_shared<tile_type>( std::move(A) );
+  }
 }; // class dist_sparse_matrix
 
 

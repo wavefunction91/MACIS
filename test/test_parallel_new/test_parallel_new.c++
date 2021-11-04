@@ -86,21 +86,23 @@ int main( int argn, char* argv[] )
     SetSlaterDets stts = BuildShiftHilbertSpace( Norbs, Norbseff, Nups, Ndos );
 
     // Form the Hamiltonian
-    cout << "Building Hamiltonian matrix" << endl;
+    if(!world_rank) cout << "Building Hamiltonian Matrix (Serial)" << endl;
     auto new_hmat_st = clock_type::now();
     auto H = make_csr_hamiltonian( stts, Hop, ints, 1e-09 );
     auto new_hmat_en = clock_type::now();
     std::chrono::duration<double,std::milli> new_hmat_dur = 
       new_hmat_en - new_hmat_st;
 
-    std::cout << "HAM N = " << H.n() << std::endl;
-    std::cout << "NEW HMAT NNZ = " << H.nnz() << std::endl;
+    if(!world_rank) {
+      std::cout << "HAM N = " << H.n() << std::endl;
+      std::cout << "NEW HMAT NNZ = " << H.nnz() << std::endl;
 
-    std::cout << "H Construction Duration " << new_hmat_dur.count() << std::endl;
-    
+      std::cout << "Serial H Construction Duration " 
+       << new_hmat_dur.count() << std::endl;
+    }
 
     // Hamiltonian reordering
-    const bool do_reorder = true;
+    const bool do_reorder = false;
     if( do_reorder ) {
       if(world_rank == 0){
         int npart = std::max(2l,world_size);
@@ -132,11 +134,60 @@ int main( int argn, char* argv[] )
 
     // Distribute the matrix from replicated data
     sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double, int32_t> >
-      H_dist( MPI_COMM_WORLD, H ); 
+      H_dist_ref( MPI_COMM_WORLD, H ); 
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    auto dist_h_start = clock_type::now();
+
+    // Form matrix distributed
+    sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double, int32_t> >
+      H_dist( MPI_COMM_WORLD, stts.size(), stts.size() );
+
+    auto [ bra_st, bra_en ] = H_dist.row_bounds(world_rank);
+
+    // Build diagonal part
+    auto local_diagonal_bra_begin = std::next( stts.begin(), bra_st );
+    auto local_diagonal_bra_end   = std::next( stts.begin(), bra_en );
+    auto H_local_diagonal_tile = make_csr_hamiltonian_block<int32_t>(
+      local_diagonal_bra_begin, local_diagonal_bra_end,
+      local_diagonal_bra_begin, local_diagonal_bra_end,
+      Hop, ints, 1e-9 );
+
+   // Build offdiagonal part
+   // Zero states in the bra
+   std::vector<slater_det> stts_offdiag( stts.begin(), stts.end() );
+   for(auto i = bra_st; i < bra_en; ++i ) {
+     stts_offdiag[i] = slater_det();
+   }
+
+   auto H_local_off_diagonal_tile = make_csr_hamiltonian_block<int32_t>(
+      local_diagonal_bra_begin, local_diagonal_bra_end,
+      stts_offdiag.begin(), stts_offdiag.end(),
+      Hop, ints, 1e-9 );
+     
+   // Populate H_dist
+   H_dist.set_diagonal_tile( std::move( H_local_diagonal_tile ) );
+   H_dist.set_off_diagonal_tile( std::move( H_local_off_diagonal_tile ) );
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    auto dist_h_end = clock_type::now();
+    duration_type dist_h_dur = dist_h_end - dist_h_start;
+    if(!world_rank)  std::cout << "Dist H Duration " << dist_h_dur.count() << std::endl;
 
 
+   auto check_eq = [](const auto& A, const auto& B) {
+     return (A.colind() == B.colind()) and
+            (A.rowptr() == B.rowptr()) and
+            (A.nzval()  == B.nzval() );
+   };
 
-    //return 0;
+
+   std::cout << std::boolalpha << 
+     check_eq( H_dist.diagonal_tile(), H_dist_ref.diagonal_tile() ) << std::endl;
+   std::cout << std::boolalpha << 
+     check_eq( H_dist.off_diagonal_tile(), H_dist_ref.off_diagonal_tile() ) << std::endl;
+
+   #if 0
 
     cout << "Computing Ground State..." << endl;
 
@@ -179,6 +230,7 @@ int main( int argn, char* argv[] )
 
     cout << std::setprecision(16);
     cout << "Ground state energy: " << E0 + ints.core_energy << endl;
+    #endif
 
   }
   catch(const char *s)
