@@ -84,21 +84,44 @@ int main( int argn, char* argv[] )
 
     // Build configuration space
     SetSlaterDets stts = BuildShiftHilbertSpace( Norbs, Norbseff, Nups, Ndos );
+    
+
 
     // Form the Hamiltonian
-    if(!world_rank) cout << "Building Hamiltonian Matrix (Serial)" << endl;
-    auto new_hmat_st = clock_type::now();
-    auto H = make_csr_hamiltonian( stts, Hop, ints, 1e-09 );
-    auto new_hmat_en = clock_type::now();
-    std::chrono::duration<double,std::milli> new_hmat_dur = 
-      new_hmat_en - new_hmat_st;
+    sparsexx::csr_matrix<double,int32_t> H;
+    if(!world_rank) { 
+      // Build Hamiltonian on root rank
 
-    if(!world_rank) {
+      cout << "Building Hamiltonian Matrix (Serial)" << endl;
+      auto new_hmat_st = clock_type::now();
+      H = make_csr_hamiltonian( stts, Hop, ints, 1e-09 );
+      auto new_hmat_en = clock_type::now();
+      std::chrono::duration<double,std::milli> new_hmat_dur = 
+        new_hmat_en - new_hmat_st;
+
+      // Broadcast data
+      size_t nnz = H.nnz();
+      sparsexx::detail::mpi_bcast( &nnz, 1, 0, MPI_COMM_WORLD );
+
+      sparsexx::detail::mpi_bcast( H.rowptr(), 0, MPI_COMM_WORLD );
+      sparsexx::detail::mpi_bcast( H.colind(), 0, MPI_COMM_WORLD );
+      sparsexx::detail::mpi_bcast( H.nzval(),  0, MPI_COMM_WORLD );
+
       std::cout << "HAM N = " << H.n() << std::endl;
       std::cout << "NEW HMAT NNZ = " << H.nnz() << std::endl;
 
-      std::cout << "Serial H Construction Duration " 
-       << new_hmat_dur.count() << std::endl;
+      std::cout << "Serial H Construction Duration " << new_hmat_dur.count() << std::endl;
+    } else {
+      // Recieve data from root rank
+      size_t nnz;
+      sparsexx::detail::mpi_bcast( &nnz, 1, 0, MPI_COMM_WORLD );
+
+      size_t n = stts.size();
+      H = sparsexx::csr_matrix<double,int32_t>(n,n,nnz,0);
+
+      sparsexx::detail::mpi_bcast( H.rowptr(), 0, MPI_COMM_WORLD );
+      sparsexx::detail::mpi_bcast( H.colind(), 0, MPI_COMM_WORLD );
+      sparsexx::detail::mpi_bcast( H.nzval(),  0, MPI_COMM_WORLD );
     }
 
     // Hamiltonian reordering
@@ -139,6 +162,7 @@ int main( int argn, char* argv[] )
     MPI_Barrier(MPI_COMM_WORLD);
     auto dist_h_start = clock_type::now();
 
+#if 0
     // Form matrix distributed
     sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double, int32_t> >
       H_dist( MPI_COMM_WORLD, stts.size(), stts.size() );
@@ -168,6 +192,10 @@ int main( int argn, char* argv[] )
    // Populate H_dist
    H_dist.set_diagonal_tile( std::move( H_local_diagonal_tile ) );
    H_dist.set_off_diagonal_tile( std::move( H_local_off_diagonal_tile ) );
+#else
+    auto H_dist = make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
+      stts.begin(), stts.end(), Hop, ints, 1e-9 );
+#endif
 
     MPI_Barrier(MPI_COMM_WORLD);
     auto dist_h_end = clock_type::now();
@@ -186,6 +214,9 @@ int main( int argn, char* argv[] )
      check_eq( H_dist.diagonal_tile(), H_dist_ref.diagonal_tile() ) << std::endl;
    std::cout << std::boolalpha << 
      check_eq( H_dist.off_diagonal_tile(), H_dist_ref.off_diagonal_tile() ) << std::endl;
+
+   std::cout << H_dist.diagonal_tile().nnz() + H_dist.off_diagonal_tile().nnz() << std::endl;
+
 
    #if 0
 

@@ -6,95 +6,30 @@
 #include "cmz_ed/lanczos.h++"
 #include "cmz_ed/rdms.h++"
 #include <sparsexx/matrix_types/csr_matrix.hpp>
+#include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
 
 using namespace std;
 using namespace cmz::ed;
 
-template <typename index_t = int32_t>
-sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian(
-  const SetSlaterDets& stts,
-  const FermionHamil&  Hop,
-  const intgrls::integrals& ints,
-  const double H_thresh
-) {
 
 
-  // Form CSR adjacency
-  std::vector<index_t> colind, rowptr;
-  std::vector<double>  nzval;
-
-  const auto ndets = stts.size();
-
-  std::vector<slater_det> stts_vec( stts.begin(), stts.end() );
-  std::vector<uint64_t> stts_states(ndets);
-  std::transform( stts_vec.begin(), stts_vec.end(), stts_states.begin(),
-    [](const auto& s){ return s.GetState(); } );
-
-  std::vector< std::vector<index_t> > colind_by_row( ndets );
-  std::vector< std::vector<double>  > nzval_by_row ( ndets );
-
-  const double res_fraction = 0.07;
-  for( auto& v : colind_by_row ) v.reserve( ndets * res_fraction );
-  for( auto& v : nzval_by_row )  v.reserve( ndets * res_fraction );
-
-  #pragma omp parallel for
-  for( index_t i = 0; i < ndets; ++i ) {
-    for( index_t j = 0; j < ndets; ++j ) 
-    if( std::popcount( stts_states[i] ^ stts_states[j] ) <= 4 ) {
-      const auto h_el = Hop.GetHmatel( stts_vec[i], stts_vec[j] );
-      if( std::abs(h_el) > H_thresh ) {
-        colind_by_row[i].emplace_back(j);
-        nzval_by_row[i].emplace_back( h_el );
-      }
-    }
-  }
-
-  std::vector<size_t> row_counts( ndets );
-  std::transform( colind_by_row.begin(), colind_by_row.end(), row_counts.begin(),
-    [](const auto& v){ return v.size(); } );
-  const size_t _nnz = std::accumulate( row_counts.begin(), row_counts.end(), 0ul );
-
-  rowptr.resize( ndets + 1 );
-  std::exclusive_scan( row_counts.begin(), row_counts.end(), rowptr.begin(), 0);
-  rowptr[ndets] = rowptr[ndets-1] + row_counts[ndets-1];
-
-  colind.reserve( _nnz );
-  nzval .reserve( _nnz );
-  for( auto& v : colind_by_row ) colind.insert(colind.end(), v.begin(), v.end());
-  for( auto& v : nzval_by_row )  nzval .insert(nzval.end(),  v.begin(), v.end());
-
-  // Move resources into CSR matrix
-  const auto nnz = colind.size();
-  sparsexx::csr_matrix<double, index_t> H( ndets, ndets, nnz, 0 );
-  H.colind() = std::move(colind);
-  H.rowptr() = std::move(rowptr);
-  H.nzval()  = std::move(nzval);
-
-  return H;
-
-}
-
-
-
-template <typename index_t, typename BraIterator, typename KetIterator>
+// This creates a block of the hamiltonian
+// H( bra_begin:bra_end, ket_begin:ket_end )
+// Currently double loops, but should delegate if the bra/ket coencide in the future
+template <typename index_t>
 sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
-  BraIterator bra_begin,
-  BraIterator bra_end,
-  KetIterator ket_begin,
-  KetIterator ket_end,
+  std::vector<slater_det>::iterator bra_begin,
+  std::vector<slater_det>::iterator bra_end,
+  std::vector<slater_det>::iterator ket_begin,
+  std::vector<slater_det>::iterator ket_end,
   const FermionHamil&  Hop,
   const intgrls::integrals& ints,
   const double H_thresh
 ) {
-
-
-  // Put SD's into contiguous, random-access memory
-  std::vector< slater_det > bra_vec( bra_begin, bra_end );
-  std::vector< slater_det > ket_vec( ket_begin, ket_end );
 
   // Extract states for superior memory access
-  const size_t nbra_dets = bra_vec.size();
-  const size_t nket_dets = ket_vec.size();
+  const size_t nbra_dets = std::distance( bra_begin, bra_end );
+  const size_t nket_dets = std::distance( ket_begin, ket_end );
   std::vector<uint64_t> bra_states( nbra_dets );
   std::vector<uint64_t> ket_states( nket_dets );
 
@@ -115,7 +50,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   for( index_t i = 0; i < nbra_dets; ++i ) {
   for( index_t j = 0; j < nket_dets; ++j ) 
   if( std::popcount( bra_states[i] ^ ket_states[j] ) <= 4 ) {
-    const auto h_el = Hop.GetHmatel( bra_vec[i], ket_vec[j] );
+    const auto h_el = Hop.GetHmatel( *(bra_begin+i), *(ket_begin+j) );
     if( std::abs(h_el) > H_thresh ) {
       colind_by_row[i].emplace_back( j );
       nzval_by_row [i].emplace_back( h_el );
@@ -152,6 +87,107 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   linearize_vov( nzval_by_row,  nzval  );
 
   return H;
+
+}
+
+
+
+// Dispatch make_csr_hamiltonian for non-vector SD containers (saves a copy)
+template <typename index_t, typename BraIterator, typename KetIterator>
+sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
+  BraIterator bra_begin,
+  BraIterator bra_end,
+  KetIterator ket_begin,
+  KetIterator ket_end,
+  const FermionHamil&  Hop,
+  const intgrls::integrals& ints,
+  const double H_thresh
+) {
+
+
+  // Put SD's into contiguous, random-access memory
+  std::vector< slater_det > bra_vec( bra_begin, bra_end );
+  std::vector< slater_det > ket_vec( ket_begin, ket_end );
+
+  return make_csr_hamiltonian_block<index_t>( bra_vec.begin(), bra_vec.end(),
+    ket_vec.begin(), ket_vec.end(), Hop, ints, H_thresh );
+
+}
+
+
+// Syntactic sugar for SetSlaterDets containers
+template <typename index_t = int32_t>
+sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian(
+  const SetSlaterDets& stts,
+  const FermionHamil&  Hop,
+  const intgrls::integrals& ints,
+  const double H_thresh
+) {
+  return make_csr_hamiltonian_block<index_t>( stts.begin(), stts.end(), 
+    stts.begin(), stts.end(), Hop, ints, H_thresh );
+}
+
+
+template <typename index_t>
+sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
+  make_dist_csr_hamiltonian( MPI_Comm comm, 
+                             std::vector<slater_det>::iterator sd_begin,
+                             std::vector<slater_det>::iterator sd_end,
+                             const FermionHamil& Hop,
+                             const intgrls::integrals& ints,
+                             const double H_thresh
+                           ) {
+
+  using namespace sparsexx;
+  using namespace sparsexx::detail;
+
+  size_t ndets = std::distance( sd_begin, sd_end );
+  dist_sparse_matrix< csr_matrix<double,index_t> > H_dist( comm, ndets, ndets );
+
+  // Get local row bounds
+  auto [bra_st, bra_en] = H_dist.row_bounds( get_mpi_rank(comm) );
+
+  // Build diagonal part
+  H_dist.set_diagonal_tile(
+    make_csr_hamiltonian_block<index_t>( 
+      sd_begin + bra_st, sd_begin + bra_en,
+      sd_begin + bra_st, sd_begin + bra_en,
+      Hop, ints, H_thresh
+    )
+  );
+
+  // Create a copy of SD's with local bra dets zero'd out
+  std::vector<slater_det> sds_offdiag( sd_begin, sd_end );
+  for( auto i = bra_st; i < bra_en; ++i ) sds_offdiag[i] = slater_det();
+
+  // Build off-diagonal part
+  H_dist.set_off_diagonal_tile(
+    make_csr_hamiltonian_block<index_t>( 
+      sd_begin + bra_st, sd_begin + bra_en,
+      sds_offdiag.begin(), sds_offdiag.end(),
+      Hop, ints, H_thresh
+    )
+  );
+
+  return H_dist;
+    
+}
+
+
+template <typename index_t, typename SlaterDetIterator>
+sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
+  make_dist_csr_hamiltonian( MPI_Comm comm, 
+                             SlaterDetIterator   sd_begin,
+                             SlaterDetIterator   sd_end,
+                             const FermionHamil& Hop,
+                             const intgrls::integrals& ints,
+                             const double H_thresh
+                           ) {
+
+  std::vector<slater_det> sd_vec( sd_begin, sd_end );
+  return make_dist_csr_hamiltonian<index_t>( comm, sd_vec.begin(), sd_vec.end(),
+    Hop, ints, H_thresh );
+
 }
 
 
