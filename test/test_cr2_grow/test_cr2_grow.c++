@@ -41,95 +41,23 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian(
   std::vector<double>  nzval;
 
   const auto ndets = stts.size();
-  rowptr.reserve( ndets + 1 );
-  rowptr.push_back(0);
-
-#if 0
-  index_t i = 0;
-  for( const auto& det : stts ) {
-    // Form all single/double excitations from current det
-    // XXX: This is proabably too much work, no?
-    auto sd_exes = det.GetSinglesAndDoubles( &ints );
-    const auto nsd_det = sd_exes.size();
-
-    // Initialize memory for adjacency row
-    std::vector<index_t> colind_local; colind_local.reserve( nsd_det + 1 );
-    std::vector<double>  nzval_local;  nzval_local .reserve( nsd_det + 1 );
-
-    // Initialize adjacency row with diagonal element
-    colind_local.push_back(i++);
-    nzval_local .push_back( Hop.GetHmatel( det, det ) );
-
-    // Loop over singles and doubles
-    for( const auto& ex_det : sd_exes ) {
-      // Attempt to locate excited determinant in full determinant list
-      auto it = stts.find( ex_det );
-
-      // If ex_det in list and ( det | H | ex_det) > thresh, append to adjacency
-      if( it != stts.end() ) {
-        const auto h_el = Hop.GetHmatel(det, *it);
-        if( std::abs( h_el ) > H_thresh ) {
-          colind_local.push_back( std::distance( stts.begin(), it ) );
-          nzval_local .push_back( h_el );
-        }
-      }
-    } // End loop over excited determinants
-
-    // Sort column indicies selected for adjacency row
-    const size_t nnz_col = colind_local.size();
-    std::vector<index_t> idx( nnz_col );
-    std::iota( idx.begin(), idx.end(), 0 );
-    std::sort( idx.begin(), idx.end(),
-      [&]( auto _i, auto _j ) { return colind_local[_i] < colind_local[_j]; }
-    );
-
-    // Place into permanent storage 
-    for( auto j = 0; j < nnz_col; ++j ) {
-      colind.push_back( colind_local[idx[j]] );
-      nzval. push_back( nzval_local[idx[j]]  );
-    }
-
-    // Update next rowptr
-    rowptr.push_back( rowptr.back() + nnz_col );
-
-  } // End loop over all determinants 
-#else
-
-#if 0
-  index_t i = 0;
-  for( auto bra : stts ) {
-    size_t nnz_col = 0;
-
-    index_t j = 0;
-    for( auto ket : stts ) {
-      if( std::popcount( bra.GetState() ^ ket.GetState() ) <= 4 ) {
-        const auto h_el = Hop.GetHmatel( bra, ket );
-        if( std::abs(h_el) > H_thresh ) {
-          nnz_col++;
-          colind.emplace_back(j);
-          nzval.emplace_back( h_el );
-        }
-      }
-      j++;
-    }
-
-    rowptr.push_back( rowptr.back() + nnz_col );
-    i++;
-  }
-#else
-
-  const double res_fraction = 0.20;
 
   std::vector<slater_det> stts_vec( stts.begin(), stts.end() );
+  std::vector<uint64_t> stts_states(ndets);
+  std::transform( stts_vec.begin(), stts_vec.end(), stts_states.begin(),
+    [](const auto& s){ return s.GetState(); } );
+
   std::vector< std::vector<index_t> > colind_by_row( ndets );
   std::vector< std::vector<double>  > nzval_by_row ( ndets );
+
+  const double res_fraction = 0.20;
   for( auto& v : colind_by_row ) v.reserve( ndets * res_fraction );
   for( auto& v : nzval_by_row )  v.reserve( ndets * res_fraction );
 
   #pragma omp parallel for
   for( index_t i = 0; i < ndets; ++i ) {
     for( index_t j = 0; j < ndets; ++j ) 
-    if( std::popcount( stts_vec[i].GetState() ^ stts_vec[j].GetState() <= 4 ) ) {
+    if( std::popcount( stts_states[i] ^ stts_states[j] ) <= 4 ) {
       const auto h_el = Hop.GetHmatel( stts_vec[i], stts_vec[j] );
       if( std::abs(h_el) > H_thresh ) {
         colind_by_row[i].emplace_back(j);
@@ -143,6 +71,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian(
     [](const auto& v){ return v.size(); } );
   const size_t _nnz = std::accumulate( row_counts.begin(), row_counts.end(), 0ul );
 
+  rowptr.resize( ndets + 1 );
   std::exclusive_scan( row_counts.begin(), row_counts.end(), rowptr.begin(), 0);
   rowptr[ndets] = rowptr[ndets-1] + row_counts[ndets-1];
 
@@ -150,10 +79,6 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian(
   nzval .reserve( _nnz );
   for( auto& v : colind_by_row ) colind.insert(colind.end(), v.begin(), v.end());
   for( auto& v : nzval_by_row )  nzval .insert(nzval.end(),  v.begin(), v.end());
-
-#endif
-#endif
-
 
   // Move resources into CSR matrix
   const auto nnz = colind.size();
@@ -253,8 +178,9 @@ int main( int argn, char* argv[] )
               << new_hmat_dur.count() << std::endl;
     
 
-    // Hamiltonian graph partitioning
-    if(1){
+    // Hamiltonian reordering
+    const bool do_reorder = true;
+    if( do_reorder ) {
       int npart = 4;
       auto kway_part_begin = clock_type::now();
       auto part = sparsexx::kway_partition( npart, Hmat_csr );
