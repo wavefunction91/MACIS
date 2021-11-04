@@ -86,8 +86,23 @@ int main( int argn, char* argv[] )
     SetSlaterDets stts = BuildShiftHilbertSpace( Norbs, Norbseff, Nups, Ndos );
     
 
+    // Form the Hamiltonian in distributed memory
+    MPI_Barrier(MPI_COMM_WORLD);
+    auto dist_h_start = clock_type::now();
 
-    // Form the Hamiltonian
+    auto H_dist = make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
+      stts.begin(), stts.end(), Hop, ints, 1e-9 );
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    auto dist_h_end = clock_type::now();
+
+    duration_type dist_h_dur = dist_h_end - dist_h_start;
+    if(!world_rank)  
+      std::cout << "Dist H Duration " << dist_h_dur.count() << std::endl;
+
+
+#if 0 
+    // Form the Hamiltonian on the root rank and broadcast
     sparsexx::csr_matrix<double,int32_t> H;
     if(!world_rank) { 
       // Build Hamiltonian on root rank
@@ -158,49 +173,11 @@ int main( int argn, char* argv[] )
     // Distribute the matrix from replicated data
     sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double, int32_t> >
       H_dist_ref( MPI_COMM_WORLD, H ); 
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    auto dist_h_start = clock_type::now();
-
-#if 0
-    // Form matrix distributed
-    sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double, int32_t> >
-      H_dist( MPI_COMM_WORLD, stts.size(), stts.size() );
-
-    auto [ bra_st, bra_en ] = H_dist.row_bounds(world_rank);
-
-    // Build diagonal part
-    auto local_diagonal_bra_begin = std::next( stts.begin(), bra_st );
-    auto local_diagonal_bra_end   = std::next( stts.begin(), bra_en );
-    auto H_local_diagonal_tile = make_csr_hamiltonian_block<int32_t>(
-      local_diagonal_bra_begin, local_diagonal_bra_end,
-      local_diagonal_bra_begin, local_diagonal_bra_end,
-      Hop, ints, 1e-9 );
-
-   // Build offdiagonal part
-   // Zero states in the bra
-   std::vector<slater_det> stts_offdiag( stts.begin(), stts.end() );
-   for(auto i = bra_st; i < bra_en; ++i ) {
-     stts_offdiag[i] = slater_det();
-   }
-
-   auto H_local_off_diagonal_tile = make_csr_hamiltonian_block<int32_t>(
-      local_diagonal_bra_begin, local_diagonal_bra_end,
-      stts_offdiag.begin(), stts_offdiag.end(),
-      Hop, ints, 1e-9 );
-     
-   // Populate H_dist
-   H_dist.set_diagonal_tile( std::move( H_local_diagonal_tile ) );
-   H_dist.set_off_diagonal_tile( std::move( H_local_off_diagonal_tile ) );
 #else
-    auto H_dist = make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
-      stts.begin(), stts.end(), Hop, ints, 1e-9 );
+  auto H_dist_ref = make_dist_csr_hamiltonian_bcast<int32_t>(
+    MPI_COMM_WORLD, stts.begin(), stts.end(), Hop, ints, 1e-9 );
 #endif
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    auto dist_h_end = clock_type::now();
-    duration_type dist_h_dur = dist_h_end - dist_h_start;
-    if(!world_rank)  std::cout << "Dist H Duration " << dist_h_dur.count() << std::endl;
 
 
    auto check_eq = [](const auto& A, const auto& B) {

@@ -39,6 +39,7 @@ protected:
 public:
 
   constexpr dist_sparse_matrix() noexcept = default;
+  dist_sparse_matrix( dist_sparse_matrix&& ) noexcept = default;
 
   dist_sparse_matrix( MPI_Comm c, size_type M, size_type N ) :
     comm_(c), global_m_(M), global_n_(N) {
@@ -57,6 +58,15 @@ public:
     }
     dist_row_extents_.back().second += M % comm_size_; // Last rank gets carry-over
   
+  }
+
+  dist_sparse_matrix( const dist_sparse_matrix& other ) :
+    dist_sparse_matrix( other.comm_, other.global_m_, other.global_n_ ) {
+
+    if( other.diagonal_tile_ ) set_diagonal_tile( other.diagonal_tile() );
+    if( other.off_diagonal_tile_ ) 
+      set_off_diagonal_tile( other.off_diagonal_tile() );
+
   }
 
   dist_sparse_matrix( MPI_Comm c, const SpMatType& A ) :
@@ -104,6 +114,13 @@ public:
 
   const auto& diagonal_tile() const { return *diagonal_tile_; }
   const auto& off_diagonal_tile() const { return *off_diagonal_tile_; }
+
+  void set_diagonal_tile( const SpMatType& A ) {
+    diagonal_tile_ = std::make_shared<tile_type>( A );
+  }
+  void set_off_diagonal_tile( const SpMatType& A ) {
+    off_diagonal_tile_ = std::make_shared<tile_type>( A );
+  }
 
   void set_diagonal_tile( SpMatType&& A ) {
     diagonal_tile_ = std::make_shared<tile_type>( std::move(A) );

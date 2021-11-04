@@ -191,3 +191,60 @@ sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
 }
 
 
+
+template <typename index_t>
+sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
+  make_dist_csr_hamiltonian_bcast( MPI_Comm comm,
+                             std::vector<slater_det>::iterator sd_begin,
+                             std::vector<slater_det>::iterator sd_end,
+                             const FermionHamil& Hop,
+                             const intgrls::integrals& ints,
+                             const double H_thresh
+                           ) {
+
+  using namespace sparsexx;
+  using namespace sparsexx::detail;
+   
+  csr_matrix<double, index_t> H_replicated;
+
+  const auto ndets     = std::distance( sd_begin, sd_end );
+  const auto comm_rank = get_mpi_rank( comm );
+
+  // Form Hamiltonian explicitly on the root rank
+  if( !comm_rank ) { 
+    H_replicated = make_csr_hamiltonian_block<index_t>( sd_begin, sd_end, 
+      sd_begin, sd_end, Hop, ints, H_thresh );
+  }
+
+
+  // Broadcast NNZ to allow for non-root ranks to allocate memory 
+  size_t nnz = H_replicated.nnz();
+  mpi_bcast( &nnz, 1, 0, comm );
+
+  // Allocate H_replicated on non-root ranks
+  if( comm_rank ) {
+    H_replicated = csr_matrix<double, index_t>( ndets, ndets, nnz, 0 );
+  }
+
+  // Broadcast the matrix data
+  mpi_bcast( H_replicated.colind(), 0, comm );
+  mpi_bcast( H_replicated.rowptr(), 0, comm );
+  mpi_bcast( H_replicated.nzval(),  0, comm );
+     
+  // Distribute Hamiltonian from replicated data
+  return dist_sparse_matrix< csr_matrix<double,index_t> >( comm, H_replicated );
+}
+
+template <typename index_t, typename SlaterDetIterator>
+sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
+  make_dist_csr_hamiltonian_bcast( MPI_Comm comm,
+                             SlaterDetIterator sd_begin,
+                             SlaterDetIterator sd_end,
+                             const FermionHamil& Hop,
+                             const intgrls::integrals& ints,
+                             const double H_thresh
+                           ) {
+  std::vector<slater_det> sd_vec( sd_begin, sd_end );
+  return make_dist_csr_hamiltonian_bcast<index_t>( comm, 
+    sd_vec.begin(), sd_vec.end(), Hop, ints, H_thresh );
+}
