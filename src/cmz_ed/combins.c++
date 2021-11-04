@@ -1,4 +1,5 @@
 #include "cmz_ed/combins.h++"
+#include <cstdint>
 
 namespace cmz
 {
@@ -14,14 +15,14 @@ namespace cmz
 
      //From vector bool to uint 
      do {
-           uint64_t temp = 0;
-           for (int i = 0; i < Nbits; ++i) {
-           if (v[i]) {
-               temp = temp + (1<< i);
-            }
-        }
+       uint64_t temp = 0;
+       for (int i = 0; i < Nbits; ++i) {
+         if (v[i]) {
+             temp = temp + (1 << i);
+         }
+       }
      //End: From vvector bool to uint
-        store.push_back(temp);
+       store.emplace_back(temp);
       } while (std::prev_permutation(v.begin(), v.end()));
       return store;
     }

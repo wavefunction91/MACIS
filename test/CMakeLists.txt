@@ -16,12 +16,12 @@ foreach( testdir ${TEST_DIRECTORIES} )
     # add executable
     add_executable( ${testdir}.x ${testdir}/${testdir}.c++ )
     # links
-    target_link_libraries( ${testdir}.x CMZed lobpcgxx )
+    target_link_libraries( ${testdir}.x CMZed lobpcgxx sparsexx )
     # if applicable, copy input file
     if( EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${testdir}/input.in.in" )
       configure_file(${testdir}/input.in.in ${testdir}/input.in)
     endif()
 endforeach( testdir ${TEST_DIRECTORIES} )
 
-add_executable( test_parallel.x test_parallel/test_parallel.c++ )
-target_link_libraries( test_parallel.x CMZed lobpcgxx sparsexx )
+#add_executable( test_parallel.x test_parallel/test_parallel.c++ )
+#target_link_libraries( test_parallel.x CMZed lobpcgxx sparsexx )

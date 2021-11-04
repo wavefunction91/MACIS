@@ -137,17 +137,10 @@ int main(int argc, char** argv) {
 
     // Broadcast reordered data
     if( world_size > 1 ) {
-      using index_type = sparsexx::detail::index_type_t<spmat_type>;
-      using value_type = sparsexx::detail::value_type_t<spmat_type>;
-      MPI_Bcast( A.rowptr().data(), A.rowptr().size() * sizeof(index_type),
-                 MPI_BYTE, 0, MPI_COMM_WORLD );
-      MPI_Bcast( A.colind().data(), A.colind().size() * sizeof(index_type),
-                 MPI_BYTE, 0, MPI_COMM_WORLD );
-      MPI_Bcast( A.nzval().data(), A.nzval().size() * sizeof(value_type),
-                 MPI_BYTE, 0, MPI_COMM_WORLD );
-
-      MPI_Bcast( mat_perm.data(), mat_perm.size() * sizeof(int32_t),
-                 MPI_BYTE, 0, MPI_COMM_WORLD );
+      sparsexx::detail::mpi_bcast( A.rowptr(), 0, MPI_COMM_WORLD );
+      sparsexx::detail::mpi_bcast( A.colind(), 0, MPI_COMM_WORLD );
+      sparsexx::detail::mpi_bcast( A.nzval(),  0, MPI_COMM_WORLD );
+      sparsexx::detail::mpi_bcast( mat_perm,   0, MPI_COMM_WORLD );
     }
   }
 

@@ -44,6 +44,19 @@ template <typename T>
 inline static constexpr auto mpi_data_t = mpi_data<T>::type;
 
 template <typename T>
+T mpi_allreduce( const T& value, MPI_Op op, MPI_Comm comm ) {
+  T reduced_value;
+  MPI_Allreduce( &value, &reduced_value, 1, mpi_data_t<T>, op , comm );
+  return reduced_value;
+}
+
+template <typename T>
+void mpi_allgather( const T* data, size_t count, T* gathered_data, MPI_Comm comm ){
+  MPI_Allgather( data, count, mpi_data_t<T>, gathered_data, count, mpi_data_t<T>,
+    comm );
+}
+
+template <typename T>
 std::vector<T> mpi_allgather( const std::vector<T>& data, MPI_Comm comm ) {
   const size_t count = data.size();
   const auto   comm_size = get_mpi_size(comm);
@@ -53,6 +66,16 @@ std::vector<T> mpi_allgather( const std::vector<T>& data, MPI_Comm comm ) {
     count, mpi_data_t<T>, comm );
 
   return gathered_data;
+}
+
+template <typename T>
+void mpi_bcast( T* data, size_t count, int root, MPI_Comm comm ) {
+  MPI_Bcast( data, count, mpi_data_t<T>, root, comm );
+}
+
+template <typename T>
+void mpi_bcast( std::vector<T>& data, int root, MPI_Comm comm ) {
+  mpi_bcast( data.data(), data.size(), root, comm );
 }
 
 template <typename T>

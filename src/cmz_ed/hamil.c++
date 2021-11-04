@@ -128,6 +128,7 @@ namespace cmz
       cout << "In double loop gethpairs" << endl;
     
       
+      #if 0
       // Iterate over set, and find possible pairs
       for( SetSlaterDets_It curr1_it = stts.begin(); curr1_it != stts.end(); curr1_it++ )
       {
@@ -144,6 +145,18 @@ namespace cmz
 	      }  
 	    } 
        }
+      #else
+      std::vector< slater_det > stts_vec( stts.begin(), stts.end() );
+      const size_t ndets = stts.size();
+      for( size_t i = 0; i < ndets; ++i ) {
+      //std::cout << i << std::endl;
+      for( size_t j = 0; j < i;     ++j ) 
+      if( stts_vec[i].GetState() ^ stts_vec[j].GetState() <= 4 ) {
+        pairs.push_back( {i,j} );
+        pairs.push_back( {j,i} );
+      }
+      }
+      #endif
       return pairs;
     }
 
@@ -190,8 +203,8 @@ namespace cmz
       // Find pairs of states with non-vanishing 
       // matrix elements.
       std::vector<std::pair<size_t, size_t> > pairs;
-      pairs = H->GetHpairs( stts );  //dloop
-      //pairs = H->GetHpairs_dloop( stts );  //dloop
+      //pairs = H->GetHpairs( stts );  //dloop
+      pairs = H->GetHpairs_dloop( stts );  //dloop
      
       if( print )
         std::cout << "Possible NNZ pairs: " << pairs.size() + nelems << ", worst sparsity : " << double(pairs.size() + nelems) / double(nelems * nelems) * 100. << "%" << std::endl;
