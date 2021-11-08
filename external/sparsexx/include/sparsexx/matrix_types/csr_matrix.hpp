@@ -188,8 +188,29 @@ public:
 #endif
 
 
+  bool operator==( const csr_matrix& other ) const noexcept {
+    return m_ == other.m_ and n_ == other.n_ and 
+           indexing_ == other.indexing_ and
+           colind_ == other.colind_ and
+           rowptr_ == other.rowptr_ and
+           nzval_  == other.nzval_;
+  }
 
+  bool operator!=( const csr_matrix& other ) const noexcept {
+    return not ((*this) == other);
+  }
 
+  size_type mem_footprint() const noexcept {
+    return nzval_.capacity() * sizeof(T) +
+           colind_.capacity() * sizeof(index_t) +
+           rowptr_.capacity() * sizeof(index_t);
+  }
+
+  void shrink_storage_to_fit() {
+    nzval_.shrink_to_fit();
+    colind_.shrink_to_fit();
+    rowptr_.shrink_to_fit();
+  }
 }; // class csr_matrix
 
 } // namespace sparsexx

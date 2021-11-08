@@ -143,7 +143,7 @@ int main( int argn, char* argv[] )
 
     cout << "Building Hamiltonian matrix (old)" << endl;
     auto old_hmat_st = clock_type::now();
-    //SpMatD Hmat = GetHmat( &Hop, stts, print );
+    SpMatD Hmat = GetHmat( &Hop, stts, print );
     auto old_hmat_en = clock_type::now();
     std::chrono::duration<double,std::milli> old_hmat_dur = 
       old_hmat_en - old_hmat_st;
@@ -179,7 +179,7 @@ int main( int argn, char* argv[] )
     
 
     // Hamiltonian reordering
-    const bool do_reorder = true;
+    const bool do_reorder = false;
     if( do_reorder ) {
       int npart = 4;
       auto kway_part_begin = clock_type::now();
@@ -217,7 +217,7 @@ int main( int argn, char* argv[] )
       [&]( int64_t n , int64_t k , const double* x , int64_t ldx ,
            double* y , int64_t ldy ) -> void {
 
-        #if 0
+        #if 1
         Eigen::Map<const Eigen::MatrixXd> xmap(x,ldx,k); 
         Eigen::Map<Eigen::MatrixXd>       ymap(y,ldy,k);
         ymap.block(0,0,n,k).noalias() = Hmat * xmap;

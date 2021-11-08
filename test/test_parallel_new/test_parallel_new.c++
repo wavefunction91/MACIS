@@ -18,6 +18,7 @@
 #include <sparsexx/matrix_types/csr_matrix.hpp>
 #include <sparsexx/util/graph.hpp>
 #include <sparsexx/spblas/spmbv.hpp>
+#include <sparsexx/spblas/pspmbv.hpp>
 #include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
 #include "csr_hamiltonian.hpp"
 
@@ -25,6 +26,7 @@
 using clock_type = std::chrono::high_resolution_clock;
 using duration_type = std::chrono::duration<double, std::milli>;
 
+#include <random>
 
 using namespace std;
 using namespace cmz::ed;
@@ -38,208 +40,156 @@ int main( int argn, char* argv[] )
   const auto world_rank = sparsexx::detail::get_mpi_rank(MPI_COMM_WORLD);
   const auto world_size = sparsexx::detail::get_mpi_size(MPI_COMM_WORLD);
 
-  if( argn != 2 )
-  {
+  if( argn != 2 ) {
     cout << "Usage: " << argv[0] << " <Input-File>" << endl;
     return 0;
   }  
-  try
-  {
-    string in_file = argv[1];
-    Input_t input;
-    ReadInput(in_file, input);
+  try {
 
-    uint64_t Norbs = getParam<int>( input, "norbs" );
-    uint64_t Nups  = getParam<int>( input, "nups"  );
-    uint64_t Ndos  = getParam<int>( input, "ndos"  );
-    uint64_t Norbseff  = getParam<int>( input, "norbseff"  );
-    bool print = true;
-    string fcidump = getParam<string>( input, "fcidump_file" );
+  string in_file = argv[1];
+  Input_t input;
+  ReadInput(in_file, input);
 
-//    if( Norbs > 16 )
-//      throw( "cmz::ed is not ready for more than 16 orbitals!" );
- //   if( Nups > Norbs || Ndos > Norbs )
- //     throw( "Nups or Ndos cannot be larger than Norbs!" );
-    if(Norbseff < Nups) Norbseff = Nups;
-    if(Norbseff < Ndos) Norbseff = Ndos;
-    cout << "Using effective norbs space " << Norbseff << endl; 
+  uint64_t Norbs = getParam<int>( input, "norbs" );
+  uint64_t Nups  = getParam<int>( input, "nups"  );
+  uint64_t Ndos  = getParam<int>( input, "ndos"  );
+  uint64_t Norbseff  = getParam<int>( input, "norbseff"  );
+  bool print = true;
+  string fcidump = getParam<string>( input, "fcidump_file" );
 
-    intgrls::integrals ints(Norbs, fcidump);
+  if(Norbseff < Nups) Norbseff = Nups;
+  if(Norbseff < Ndos) Norbseff = Ndos;
+  cout << "Using effective norbs space " << Norbseff << endl; 
 
-    FermionHamil Hop(ints);
-    //Lets test hartree-fock
-    uint64_t u1 = 37793167;
-    uint64_t d1 = 37793167;
-    u1 = (1 << Nups)-1;
-    d1 = (1 << Ndos)-1;
-    uint64_t st =   (d1 << Norbs) + u1;
-    slater_det hello =  slater_det( st, Norbs, Nups, Ndos ) ;
-    double nE =  Hop.GetHmatel(hello,hello);
-    cout << std::setprecision(16) << "E0 = " << nE + ints.core_energy << endl;
-    //exit(0);
+  intgrls::integrals ints(Norbs, fcidump);
 
-    //SetSlaterDets stts = BuildFullHilbertSpace( Norbs, Nups, Ndos );
+  FermionHamil Hop(ints);
+  #if 0
+  //Lets test hartree-fock
+  uint64_t u1 = 37793167;
+  uint64_t d1 = 37793167;
+  u1 = (1 << Nups)-1;
+  d1 = (1 << Ndos)-1;
+  uint64_t st =   (d1 << Norbs) + u1;
+  slater_det hello =  slater_det( st, Norbs, Nups, Ndos ) ;
+  double nE =  Hop.GetHmatel(hello,hello);
+  cout << std::setprecision(16) << "E0 = " << nE + ints.core_energy << endl;
+  //exit(0);
+
+  //SetSlaterDets stts = BuildFullHilbertSpace( Norbs, Nups, Ndos );
+  #endif
 
 
 
-    // Build configuration space
-    SetSlaterDets stts = BuildShiftHilbertSpace( Norbs, Norbseff, Nups, Ndos );
-    
+  // Build configuration space
+  SetSlaterDets stts = BuildShiftHilbertSpace( Norbs, Norbseff, Nups, Ndos );
+  const size_t ndets = stts.size();
+  if(!world_rank) std::cout << "NDETS = " << ndets << std::endl;
+  
 
-    // Form the Hamiltonian in distributed memory
-    MPI_Barrier(MPI_COMM_WORLD);
-    auto dist_h_start = clock_type::now();
+  // Form the Hamiltonian in distributed memory
+  MPI_Barrier(MPI_COMM_WORLD);
+  auto dist_h_start = clock_type::now();
 
-    auto H_dist = make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
-      stts.begin(), stts.end(), Hop, ints, 1e-9 );
+  auto H_dist = make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
+    stts.begin(), stts.end(), Hop, ints, 1e-9 );
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    auto dist_h_end = clock_type::now();
+  MPI_Barrier(MPI_COMM_WORLD);
+  auto dist_h_end = clock_type::now();
 
-    duration_type dist_h_dur = dist_h_end - dist_h_start;
-    if(!world_rank)  
-      std::cout << "Dist H Duration " << dist_h_dur.count() << std::endl;
+  duration_type dist_h_dur = dist_h_end - dist_h_start;
+  if(!world_rank)  
+    std::cout << "Distributed H Construction took " << dist_h_dur.count() 
+              << " ms" << std::endl;
 
+  const bool do_serial_check = false;
+  if( do_serial_check ) {
+    auto H_dist_ref = make_dist_csr_hamiltonian_bcast<int32_t>(
+      MPI_COMM_WORLD, stts.begin(), stts.end(), Hop, ints, 1e-9 );
 
-#if 0 
-    // Form the Hamiltonian on the root rank and broadcast
-    sparsexx::csr_matrix<double,int32_t> H;
-    if(!world_rank) { 
-      // Build Hamiltonian on root rank
-
-      cout << "Building Hamiltonian Matrix (Serial)" << endl;
-      auto new_hmat_st = clock_type::now();
-      H = make_csr_hamiltonian( stts, Hop, ints, 1e-09 );
-      auto new_hmat_en = clock_type::now();
-      std::chrono::duration<double,std::milli> new_hmat_dur = 
-        new_hmat_en - new_hmat_st;
-
-      // Broadcast data
-      size_t nnz = H.nnz();
-      sparsexx::detail::mpi_bcast( &nnz, 1, 0, MPI_COMM_WORLD );
-
-      sparsexx::detail::mpi_bcast( H.rowptr(), 0, MPI_COMM_WORLD );
-      sparsexx::detail::mpi_bcast( H.colind(), 0, MPI_COMM_WORLD );
-      sparsexx::detail::mpi_bcast( H.nzval(),  0, MPI_COMM_WORLD );
-
-      std::cout << "HAM N = " << H.n() << std::endl;
-      std::cout << "NEW HMAT NNZ = " << H.nnz() << std::endl;
-
-      std::cout << "Serial H Construction Duration " << new_hmat_dur.count() << std::endl;
-    } else {
-      // Recieve data from root rank
-      size_t nnz;
-      sparsexx::detail::mpi_bcast( &nnz, 1, 0, MPI_COMM_WORLD );
-
-      size_t n = stts.size();
-      H = sparsexx::csr_matrix<double,int32_t>(n,n,nnz,0);
-
-      sparsexx::detail::mpi_bcast( H.rowptr(), 0, MPI_COMM_WORLD );
-      sparsexx::detail::mpi_bcast( H.colind(), 0, MPI_COMM_WORLD );
-      sparsexx::detail::mpi_bcast( H.nzval(),  0, MPI_COMM_WORLD );
-    }
-
-    // Hamiltonian reordering
-    const bool do_reorder = false;
-    if( do_reorder ) {
-      if(world_rank == 0){
-        int npart = std::max(2l,world_size);
-        auto kway_part_begin = clock_type::now();
-        auto part = sparsexx::kway_partition( npart, H );
-        auto kway_part_end = clock_type::now();
-
-        std::vector<int32_t> mat_perm;
-        std::tie( mat_perm, std::ignore ) = sparsexx::perm_from_part( npart, part );
-
-        auto permute_begin = clock_type::now();
-        H = sparsexx::permute_rows_cols( H, mat_perm, mat_perm );
-        auto permute_end = clock_type::now();
-
-        duration_type kway_part_dur = kway_part_end - kway_part_begin;
-        duration_type permute_dur   = permute_end - permute_begin;
-
-        std::cout << "KWAY PART DUR = " << kway_part_dur.count() << std::endl;
-        std::cout << "PERMUTE DUR   = " << permute_dur.count() << std::endl;
-      }
-
-      // Broadcast reordered matrix
-      if( world_size > 1 ) {
-        sparsexx::detail::mpi_bcast( H.rowptr(), 0, MPI_COMM_WORLD );
-        sparsexx::detail::mpi_bcast( H.colind(), 0, MPI_COMM_WORLD );
-        sparsexx::detail::mpi_bcast( H.nzval(),  0, MPI_COMM_WORLD );
-      }
-    }
-
-    // Distribute the matrix from replicated data
-    sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double, int32_t> >
-      H_dist_ref( MPI_COMM_WORLD, H ); 
-#else
-  auto H_dist_ref = make_dist_csr_hamiltonian_bcast<int32_t>(
-    MPI_COMM_WORLD, stts.begin(), stts.end(), Hop, ints, 1e-9 );
-#endif
+    std::cout << std::boolalpha << 
+      ( H_dist.diagonal_tile() == H_dist_ref.diagonal_tile() ) << std::endl;
+    std::cout << std::boolalpha << 
+      ( H_dist.off_diagonal_tile() == H_dist_ref.off_diagonal_tile() ) << std::endl;
+  }
 
 
+  //std::minstd_rand0 gen;
+  //std::uniform_real_distribution<> dist(-1,1);
 
-   auto check_eq = [](const auto& A, const auto& B) {
-     return (A.colind() == B.colind()) and
-            (A.rowptr() == B.rowptr()) and
-            (A.nzval()  == B.nzval() );
-   };
-
-
-   std::cout << std::boolalpha << 
-     check_eq( H_dist.diagonal_tile(), H_dist_ref.diagonal_tile() ) << std::endl;
-   std::cout << std::boolalpha << 
-     check_eq( H_dist.off_diagonal_tile(), H_dist_ref.off_diagonal_tile() ) << std::endl;
-
-   std::cout << H_dist.diagonal_tile().nnz() + H_dist.off_diagonal_tile().nnz() << std::endl;
+  // Generate V (replicated)
+  std::vector<double> V(ndets);
+  //std::generate( V.begin(), V.end(), [&](){ return dist(gen); } );
+  std::fill( V.begin(), V.end(), 1./ndets );
+  //std::cout << "LOCAL NNZ = " << H_dist.nnz() << std::endl;
+  size_t local_mf = H_dist.mem_footprint();
+  std::cout << "LOCAL MF = " << (local_mf/(1024.*1024.*1024.)) << " GB" << std::endl;
 
 
-   #if 0
+  // Copy local parts of V into "distributed" V
+  auto [local_rs, local_re] = H_dist.row_bounds(world_rank);
+  const auto local_extent = H_dist.local_row_extent();
+  std::vector<double> V_dist( local_extent ), AV_dist( local_extent );
+  for( auto i = local_rs; i < local_re; ++i ) {
+    V_dist[i - local_rs] = V[i];
+  }
 
-    cout << "Computing Ground State..." << endl;
+  // Generate SPMV info
+  auto spmv_info = sparsexx::spblas::generate_spmv_comm_info( H_dist );
 
-    double E0;
-    VectorXd psi0;
+  // Do matvec
+  MPI_Barrier(MPI_COMM_WORLD);
+  auto pspmbv_start = clock_type::now();
+
+  sparsexx::spblas::pgespmv( 1., H_dist, V_dist.data(), 
+    0., AV_dist.data(), spmv_info );
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  auto pspmbv_end = clock_type::now();
+  duration_type pspmv_dur = pspmbv_end - pspmbv_start;
+
+  if(!world_rank) std::cout << "PSPMV took " << pspmv_dur.count() << " ms" 
+    << std::endl;
 
 
-    lobpcgxx::operator_action_type<double> HamOp = 
-      [&]( int64_t n , int64_t k , const double* x , int64_t ldx ,
-           double* y , int64_t ldy ) -> void {
+  #if 0
+  auto H = make_csr_hamiltonian( stts, Hop, ints, 1e-9 );
 
-        sparsexx::spblas::gespmbv( k, 1., H, x, ldx, 0., y, ldy );
+  lobpcgxx::operator_action_type<double> HamOp = 
+    [&]( int64_t n , int64_t k , const double* x , int64_t ldx ,
+         double* y , int64_t ldy ) -> void {
 
-      };
-    lobpcgxx::lobpcg_settings settings;
-    settings.conv_tol = 1e-6;
-    settings.maxiter  = 2000;
-    settings.print_iter = true;
-    lobpcgxx::lobpcg_operator<double> lob_op( HamOp );
+      sparsexx::spblas::gespmbv( k, 1., H, x, ldx, 0., y, ldy );
 
-    int64_t K = 4;
-    int64_t N = H.n();
-    std::vector<double> X0( N * K );
+    };
+  lobpcgxx::lobpcg_settings settings;
+  settings.conv_tol = 1e-6;
+  settings.maxiter  = 2000;
+  settings.print_iter = true;
+  lobpcgxx::lobpcg_operator<double> lob_op( HamOp );
 
-    // Random vectors 
-    std::default_random_engine gen;
-    std::normal_distribution<> dist(0., 1.);
-    auto rand_gen = [&](){ return dist(gen); };
-    std::generate( X0.begin(), X0.end(), rand_gen );
-    lobpcgxx::cholqr( N, K, X0.data(), N ); // Orthogonalize
+  int64_t K = 4;
+  int64_t N = H.n();
+  std::vector<double> X0( N * K );
 
-    std::vector<double> lam(K), res(K);
-    lobpcgxx::lobpcg( settings, N, K, K, lob_op, lam.data(), X0.data(), N,
-      res.data() );
+  // Random vectors 
+  std::default_random_engine gen;
+  std::normal_distribution<> dist(0., 1.);
+  auto rand_gen = [&](){ return dist(gen); };
+  std::generate( X0.begin(), X0.end(), rand_gen );
+  lobpcgxx::cholqr( N, K, X0.data(), N ); // Orthogonalize
 
-    E0 = lam[0];
-    psi0 = Eigen::Map<Eigen::VectorXd>( X0.data(), N );
+  std::vector<double> lam(K), res(K);
+  lobpcgxx::lobpcg( settings, N, K, K, lob_op, lam.data(), X0.data(), N,
+    res.data() );
 
-    std::cout << std::scientific << std::setprecision(5);
+  auto E0 = lam[0];
+  auto psi0 = Eigen::Map<Eigen::VectorXd>( X0.data(), N );
 
-    cout << std::setprecision(16);
-    cout << "Ground state energy: " << E0 + ints.core_energy << endl;
-    #endif
+  cout << std::scientific << std::setprecision(16);
+  cout << "Ground state energy: " << E0 + ints.core_energy << endl;
 
+  #endif
   }
   catch(const char *s)
   {

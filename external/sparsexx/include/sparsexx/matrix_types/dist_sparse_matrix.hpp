@@ -107,6 +107,20 @@ public:
     return dist_row_extents_[comm_rank_].first;
   }
 
+  inline size_type nnz() const noexcept {
+    size_t _nnz = 0;
+    if( diagonal_tile_ ) _nnz += diagonal_tile_->nnz();
+    if( off_diagonal_tile_ ) _nnz += off_diagonal_tile_->nnz();
+    return _nnz;
+  }
+
+  inline size_type mem_footprint() const noexcept {
+    size_type _mf = 0;
+    if( diagonal_tile_ ) _mf += diagonal_tile_->mem_footprint();
+    if( off_diagonal_tile_ ) _mf += off_diagonal_tile_->mem_footprint();
+    return _mf;
+  }
+
   auto       diagonal_tile_ptr()       { return diagonal_tile_; }
   const auto diagonal_tile_ptr() const { return diagonal_tile_; }
   auto       off_diagonal_tile_ptr()       { return off_diagonal_tile_; }

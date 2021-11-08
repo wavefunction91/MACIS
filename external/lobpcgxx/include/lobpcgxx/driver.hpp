@@ -146,7 +146,7 @@ void lobpcg( const lobpcg_settings& settings, int64_t N, int64_t K, int64_t NR,
   // Main LOBPCG loop
   for( auto iter = 0; iter < settings.maxiter; ++iter ) {
 
-    std::cout << "ITER = " << iter << std::endl;
+    //std::cout << "ITER = " << iter << std::endl;
     // Append to convergence data structure
     if (settings.track_convergence) {
       conv.conv_data.emplace_back();
