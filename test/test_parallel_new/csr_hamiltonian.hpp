@@ -98,22 +98,22 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   const uint64_t beta_mask  = alpha_mask << norb;
 
   auto first_occ_flipped = [=]( uint64_t state, uint64_t ex ) {
-    return (ffs( state & ex ) - 1ul ) % norb;
+    return (ffsll( state & ex ) - 1ul ) % norb;
   };
 
   auto first_occ_flipped_up = [=]( uint64_t state, uint64_t ex ) {
-    return (ffs( state & ex & alpha_mask ) - 1ul) % norb;
+    return (ffsll( state & ex & alpha_mask ) - 1ul) % norb;
   };
   auto first_occ_flipped_do = [=]( uint64_t state, uint64_t ex ) {
-    return (ffs( state & ex & beta_mask ) - 1ul) % norb;
+    return (ffsll( state & ex & beta_mask ) - 1ul) % norb;
   };
 
   auto single_ex_up_sign = []( uint64_t state, uint64_t p, uint64_t q ) {
     uint64_t mask = 0x0;
     if( p > q ) {
-      mask = state & (((1 << p) - 1) ^ ((1 << (q+1)) - 1));
+      mask = state & (((1ul << p) - 1ul) ^ ((1ul << (q+1)) - 1ul));
     } else {
-      mask = state & (((1 << q) - 1) ^ ((1 << (p+1)) - 1));
+      mask = state & (((1ul << q) - 1ul) ^ ((1ul << (p+1)) - 1ul));
     }
     return (std::popcount(mask) % 2) ? -1. : 1.;
   };
@@ -132,6 +132,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   #pragma omp for
   for( index_t i = 0; i < nbra_dets; ++i ) {
 
+    //std::cout << i << std::endl;
     uint64_t bra = bra_states[i];
 
     // Determine which orbitals are occupied in the bra det

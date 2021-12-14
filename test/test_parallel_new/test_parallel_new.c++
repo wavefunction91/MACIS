@@ -20,6 +20,8 @@
 #include <sparsexx/spblas/spmbv.hpp>
 #include <sparsexx/spblas/pspmbv.hpp>
 #include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
+#include <sparsexx/matrix_types/dense_conversions.hpp>
+#include <sparsexx/io/read_mm.hpp>
 #include "csr_hamiltonian.hpp"
 
 #include <chrono>
@@ -31,6 +33,115 @@ using duration_type = std::chrono::duration<double, std::milli>;
 using namespace std;
 using namespace cmz::ed;
 
+void gram_schmidt( int64_t N, int64_t K, const double* V_old, int64_t LDV,
+  double* V_new ) {
+
+  std::vector<double> inner(K);
+  blas::gemm( blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
+    K, 1, N, 1., V_old, LDV, V_new, N, 0., inner.data(), K );
+  blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+    N, 1, K, -1., V_old, LDV, inner.data(), K, 1., V_new, N );
+
+  blas::gemm( blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
+    K, 1, N, 1., V_old, LDV, V_new, N, 0., inner.data(), K );
+  blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+    N, 1, K, -1., V_old, LDV, inner.data(), K, 1., V_new, N );
+
+  auto nrm = blas::nrm2(N,V_new,1);
+  blas::scal( N, 1./nrm, V_new, 1 );
+}  
+
+
+void davidson( int64_t max_m, const sparsexx::csr_matrix<double,int32_t>& A, double tol ) {
+
+  int64_t N = A.n();
+  std::cout << "N = " << N << ", MAX_M = " << max_m << std::endl;
+  std::vector<double> V(N * (max_m+1)), AV(N * (max_m+1)), C((max_m+1)*(max_m+1)), 
+    LAM(max_m+1);
+
+  // Extract diagonal and setup guess
+  auto D = extract_diagonal_elements( A );
+  auto D_min = std::min_element(D.begin(), D.end());
+  auto min_idx = std::distance( D.begin(), D_min );
+  V[min_idx] = 1.;
+
+  // Prime iterations
+  // AV(:,0) = A * V(:,0)
+  // V(:,1)  = AV(:,0) - V(:,0) * <V(:,0), AV(:,0)>
+  // V(:,1)  = V(:,1) / NORM(V(:,1))
+  sparsexx::spblas::gespmbv(1, 1., A, V.data(), N, 0., V.data()+N, N);
+  gram_schmidt( N, 1, V.data(), N, V.data()+N );
+  //std::cout << blas::nrm2( N, V.data() + N, 1 ) << std::endl;
+
+
+  for( size_t i = 1; i < max_m; ++i ) {
+
+    // AV(:,i) = A * V(:,i)
+    sparsexx::spblas::gespmbv( i+1, 1., A, V.data(), N, 0., AV.data(), N );
+
+    const auto k = i + 1;
+
+    // Rayleigh Ritz
+    //blas::gemm( blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
+    //  k, k, N, 1., V.data(), N, AV.data(), N, 0., C.data(), k );
+    //std::cout << "MATRIX" << std::endl;
+    //for( auto j = 0; j < k; ++j ) {
+    //  for( auto l = 0; l < k; ++l ) std::cout << C[l + j*k] << ", ";
+    //  std::cout << std::endl;
+    //}
+    lobpcgxx::rayleigh_ritz( N, k, V.data(), N, AV.data(), N, LAM.data(),
+      C.data(), k);
+    //std::cout << "Eigenvectors" << std::endl;
+    //for( auto j = 0; j < k; ++j ) {
+    //  for( auto l = 0; l < k; ++l ) std::cout << C[l + j*k] << ", ";
+    //  std::cout << std::endl;
+    //}
+    //std::cout << std::endl;
+
+    //std::cout << "LAMBDA ";
+    //for( auto j = 0; j < k; ++j ) { std::cout << LAM[j] << ", "; } std::cout << std::endl;
+    //std::cout << std::endl;
+
+    // Compute Residual (A - LAM(0)*I) * V(:,0:i) * C(:,0)
+    double* R = V.data() + (i+1)*N;
+    #if 1
+    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+      N, 1, k, 1., AV.data(), N, C.data(), k, 0., R, N );
+    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+      N, 1, k, -LAM[0], V.data(), N, C.data(), k, 1., R, N );
+    #endif
+
+    // Compute residual norm
+    auto res_nrm = blas::nrm2( N, R, 1 );
+    std::cout << std::scientific << std::setprecision(12);
+    std::cout << i << ", " << LAM[0] << ", " << res_nrm << std::endl;
+    if( res_nrm < tol ) break;
+
+    // Compute new vector
+    // (D - LAM(0)*I) * W = -R ==> W = -(D - LAM(0)*I)**-1 * R
+    for( auto j = 0; j < N; ++j ) {
+      R[j] = - R[j] / (D[j] - LAM[0]);
+      //R[j] = - R[j];
+    }
+
+    // Project new vector out form old vectors
+    std::vector<double> inner(k);
+    blas::gemm( blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
+      k, 1, N, 1., V.data(), N, R, N, 0., inner.data(), k );
+    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+      N, 1, k, -1., V.data(), N, inner.data(), k, 1., R, N );
+    blas::gemm( blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
+      k, 1, N, 1., V.data(), N, R, N, 0., inner.data(), k );
+    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+      N, 1, k, -1., V.data(), N, inner.data(), k, 1., R, N );
+
+    // Normalize new vector
+    auto nrm = blas::nrm2(N, R, 1);
+    blas::scal( N, 1./nrm, R, 1 );
+
+  } // Davidson iterations
+
+}
 
 
 int main( int argn, char* argv[] )
@@ -87,6 +198,7 @@ int main( int argn, char* argv[] )
   if(!world_rank) std::cout << "NDETS = " << ndets << std::endl;
   
 
+#if 0
   // Form the Hamiltonian in distributed memory
   MPI_Barrier(MPI_COMM_WORLD);
   auto dist_h_start = clock_type::now();
@@ -112,8 +224,10 @@ int main( int argn, char* argv[] )
     std::cout << std::boolalpha << 
       ( H_dist.off_diagonal_tile() == H_dist_ref.off_diagonal_tile() ) << std::endl;
   }
+#endif
 
 
+#if 0
   //std::minstd_rand0 gen;
   //std::uniform_real_distribution<> dist(-1,1);
 
@@ -150,10 +264,20 @@ int main( int argn, char* argv[] )
 
   if(!world_rank) std::cout << "PSPMV took " << pspmv_dur.count() << " ms" 
     << std::endl;
+#endif
 
 
   #if 0
   auto H = make_csr_hamiltonian( stts, Hop, ints, 1e-9 );
+  {
+  std::ofstream H_file( "H_cr2_" + std::to_string(ndets) + ".bin", std::ios::binary );
+  size_t nnz = H.nnz();
+  H_file.write( (const char*)&ndets, sizeof(size_t) );
+  H_file.write( (const char*)&nnz,   sizeof(size_t) );
+  H_file.write( (const char*)H.rowptr().data(), (ndets+1) * sizeof(int32_t) );
+  H_file.write( (const char*)H.colind().data(), nnz * sizeof(int32_t) );
+  H_file.write( (const char*)H.nzval().data(),  nnz * sizeof(double) );
+  }
 
   lobpcgxx::operator_action_type<double> HamOp = 
     [&]( int64_t n , int64_t k , const double* x , int64_t ldx ,
@@ -162,6 +286,7 @@ int main( int argn, char* argv[] )
       sparsexx::spblas::gespmbv( k, 1., H, x, ldx, 0., y, ldy );
 
     };
+
   lobpcgxx::lobpcg_settings settings;
   settings.conv_tol = 1e-6;
   settings.maxiter  = 2000;
@@ -189,7 +314,46 @@ int main( int argn, char* argv[] )
   cout << std::scientific << std::setprecision(16);
   cout << "Ground state energy: " << E0 + ints.core_energy << endl;
 
+
+  #else
+
+  #if 1
+  auto H = make_csr_hamiltonian( stts, Hop, ints, 1e-9 );
+  #else
+  auto H = sparsexx::read_mm< sparsexx::csr_matrix<double,int> >(
+    "/global/cfs/cdirs/m1027/dbwy/ASCI-CI/external/sparsexx/SiNa/SiNa.mtx" 
+    //"/global/cfs/cdirs/m1027/dbwy/ASCI-CI/external/sparsexx/Ga41As41H72/Ga41As41H72.mtx"
+  );
   #endif
+
+  auto N = H.m();
+  std::cout << "NNZ = " << H.nnz() << std::endl;
+  #if 0
+  std::vector<double> H_dense(N*N);
+  sparsexx::convert_to_dense( H, H_dense.data(), N );
+  double max_diff = 0.;
+  for( auto i = 0; i < N; ++i )
+  for( auto j = i; j < N; ++j ) {
+    max_diff = std::max( max_diff, std::abs(H_dense[i+j*N] - H_dense[j+i*N]) );
+  }
+  std::cout << "MAX DIFF = " << max_diff << std::endl;
+
+  //for( auto i = 0; i < N; ++i ) {
+  //  double sum = 0.;
+  //  for( auto j = 0; j < N; ++j ) sum += std::abs(H_dense[j + i*N]);
+  //  auto diag = H_dense[i*(N+1)];
+  //  sum -= std::abs(diag);
+  //  std::cout << i << ", " << std::abs(diag) << ", " << sum << std::endl;
+  //}
+  #endif
+
+  // Davidson
+
+  const size_t max_m = 500;
+  davidson(max_m, H, 1e-8);
+
+  #endif
+
   }
   catch(const char *s)
   {
