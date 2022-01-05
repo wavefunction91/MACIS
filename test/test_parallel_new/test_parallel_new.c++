@@ -317,6 +317,7 @@ int main( int argn, char* argv[] )
 
   #else
 
+  auto start = clock_type::now(); 
   #if 1
   auto H = make_csr_hamiltonian( stts, Hop, ints, 1e-9 );
   #else
@@ -325,6 +326,8 @@ int main( int argn, char* argv[] )
     //"/global/cfs/cdirs/m1027/dbwy/ASCI-CI/external/sparsexx/Ga41As41H72/Ga41As41H72.mtx"
   );
   #endif
+  duration_type H_dur = clock_type::now() - start;
+  std::cout << "H duration = " << H_dur.count() << std::endl;
 
   auto N = H.m();
   std::cout << "NNZ = " << H.nnz() << std::endl;

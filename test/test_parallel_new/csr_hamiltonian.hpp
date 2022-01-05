@@ -258,7 +258,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
       } else if (ex_up_count == 0 and ex_do_count == 2 ) {
 
         // Get first single excition (down)
-        #if 1
+        #if 0
         const uint64_t o1 = first_occ_flipped( ket, ex_total );
         const uint64_t v1 = first_occ_flipped( bra, ex_total );
         auto sign = single_ex_do_sign( ket, v1, o1 );
