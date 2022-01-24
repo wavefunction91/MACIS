@@ -60,6 +60,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   const size_t  norb3 = norb2 * norb;
   const size_t  norb4 = norb3 * norb;
 
+#if 1
   std::vector<double> G_pqrs(V_pqrs, V_pqrs + norb4);
   for( auto i = 0; i < norb; ++i )
   for( auto j = 0; j < norb; ++j )
@@ -86,6 +87,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
     G2_red[i + j*norb] = 0.5 * G_pqrs[i*(norb+1) + j*(norb2+norb3)];
     V2_red[i + j*norb] = V_pqrs[i*(norb+1) + j*(norb2+norb3)];
   }
+#endif
 
   //std::cout << "G2 = " << (G2_red.size()*8.)/1024/1024/1024 << " GB " << std::endl;
   //std::cout << "V2 = " << (V2_red.size()*8.)/1024/1024/1024 << " VB " << std::endl;
@@ -129,12 +131,13 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   std::vector<index_t> bra_occ_up, bra_occ_do;
   bra_occ_up.reserve(norb);
   bra_occ_do.reserve(norb);
-  #pragma omp for
+  #pragma omp for 
   for( index_t i = 0; i < nbra_dets; ++i ) {
 
     //std::cout << i << std::endl;
     uint64_t bra = bra_states[i];
 
+#if 1
     // Determine which orbitals are occupied in the bra det
     bra_occ_up.clear();
     bra_occ_do.clear();
@@ -145,6 +148,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
       up_mask = up_mask << 1;
       do_mask = do_mask << 1;
     }
+#endif
 
   for( index_t j = 0; j < nket_dets; ++j ) { 
     uint64_t ket = ket_states[j];
@@ -328,7 +332,8 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
         cases[5]++;
       }
 #else
-      auto h_el = Hop.GetHmatel( *(bra_begin+i), *(ket_begin+j) );
+      //auto h_el = Hop.GetHmatel( *(bra_begin+i), *(ket_begin+j) );
+      auto h_el = 1.0;
 #endif
       if( std::abs(h_el) > H_thresh ) {
         colind_by_row[i].emplace_back( j );

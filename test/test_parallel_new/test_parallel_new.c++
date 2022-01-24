@@ -65,6 +65,7 @@ void davidson( int64_t max_m, const sparsexx::csr_matrix<double,int32_t>& A, dou
   auto min_idx = std::distance( D.begin(), D_min );
   V[min_idx] = 1.;
 
+#if 0
   // Prime iterations
   // AV(:,0) = A * V(:,0)
   // V(:,1)  = AV(:,0) - V(:,0) * <V(:,0), AV(:,0)>
@@ -72,44 +73,39 @@ void davidson( int64_t max_m, const sparsexx::csr_matrix<double,int32_t>& A, dou
   sparsexx::spblas::gespmbv(1, 1., A, V.data(), N, 0., V.data()+N, N);
   gram_schmidt( N, 1, V.data(), N, V.data()+N );
   //std::cout << blas::nrm2( N, V.data() + N, 1 ) << std::endl;
+#else
+
+  // Compute Initial A*V
+  sparsexx::spblas::gespmbv(1, 1., A, V.data(), N, 0., AV.data(), N);
+
+  // Copy AV(:,0) -> V(:,1) and orthogonalize wrt V(:,0)
+  std::copy_n(AV.data(), N, V.data()+N);
+  gram_schmidt(N, 1, V.data(), N, V.data()+N);
+
+#endif
 
 
   for( size_t i = 1; i < max_m; ++i ) {
 
     // AV(:,i) = A * V(:,i)
+    #if 0
     sparsexx::spblas::gespmbv( i+1, 1., A, V.data(), N, 0., AV.data(), N );
+    #else
+    sparsexx::spblas::gespmbv(1, 1., A, V.data()+i*N, N, 0., AV.data()+i*N, N );
+    #endif
 
     const auto k = i + 1;
 
     // Rayleigh Ritz
-    //blas::gemm( blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
-    //  k, k, N, 1., V.data(), N, AV.data(), N, 0., C.data(), k );
-    //std::cout << "MATRIX" << std::endl;
-    //for( auto j = 0; j < k; ++j ) {
-    //  for( auto l = 0; l < k; ++l ) std::cout << C[l + j*k] << ", ";
-    //  std::cout << std::endl;
-    //}
     lobpcgxx::rayleigh_ritz( N, k, V.data(), N, AV.data(), N, LAM.data(),
       C.data(), k);
-    //std::cout << "Eigenvectors" << std::endl;
-    //for( auto j = 0; j < k; ++j ) {
-    //  for( auto l = 0; l < k; ++l ) std::cout << C[l + j*k] << ", ";
-    //  std::cout << std::endl;
-    //}
-    //std::cout << std::endl;
-
-    //std::cout << "LAMBDA ";
-    //for( auto j = 0; j < k; ++j ) { std::cout << LAM[j] << ", "; } std::cout << std::endl;
-    //std::cout << std::endl;
 
     // Compute Residual (A - LAM(0)*I) * V(:,0:i) * C(:,0)
     double* R = V.data() + (i+1)*N;
-    #if 1
     blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
       N, 1, k, 1., AV.data(), N, C.data(), k, 0., R, N );
     blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
       N, 1, k, -LAM[0], V.data(), N, C.data(), k, 1., R, N );
-    #endif
 
     // Compute residual norm
     auto res_nrm = blas::nrm2( N, R, 1 );
@@ -125,19 +121,7 @@ void davidson( int64_t max_m, const sparsexx::csr_matrix<double,int32_t>& A, dou
     }
 
     // Project new vector out form old vectors
-    std::vector<double> inner(k);
-    blas::gemm( blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
-      k, 1, N, 1., V.data(), N, R, N, 0., inner.data(), k );
-    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-      N, 1, k, -1., V.data(), N, inner.data(), k, 1., R, N );
-    blas::gemm( blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
-      k, 1, N, 1., V.data(), N, R, N, 0., inner.data(), k );
-    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-      N, 1, k, -1., V.data(), N, inner.data(), k, 1., R, N );
-
-    // Normalize new vector
-    auto nrm = blas::nrm2(N, R, 1);
-    blas::scal( N, 1./nrm, R, 1 );
+    gram_schmidt(N, k, V.data(), N, R);
 
   } // Davidson iterations
 
