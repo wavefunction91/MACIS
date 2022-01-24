@@ -23,6 +23,8 @@
 #include <sparsexx/matrix_types/dense_conversions.hpp>
 #include <sparsexx/io/read_mm.hpp>
 #include "csr_hamiltonian.hpp"
+#include "davidson.hpp"
+#include "serial_tests.hpp"
 
 #include <chrono>
 using clock_type = std::chrono::high_resolution_clock;
@@ -33,99 +35,6 @@ using duration_type = std::chrono::duration<double, std::milli>;
 using namespace std;
 using namespace cmz::ed;
 
-void gram_schmidt( int64_t N, int64_t K, const double* V_old, int64_t LDV,
-  double* V_new ) {
-
-  std::vector<double> inner(K);
-  blas::gemm( blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
-    K, 1, N, 1., V_old, LDV, V_new, N, 0., inner.data(), K );
-  blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-    N, 1, K, -1., V_old, LDV, inner.data(), K, 1., V_new, N );
-
-  blas::gemm( blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
-    K, 1, N, 1., V_old, LDV, V_new, N, 0., inner.data(), K );
-  blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-    N, 1, K, -1., V_old, LDV, inner.data(), K, 1., V_new, N );
-
-  auto nrm = blas::nrm2(N,V_new,1);
-  blas::scal( N, 1./nrm, V_new, 1 );
-}  
-
-
-void davidson( int64_t max_m, const sparsexx::csr_matrix<double,int32_t>& A, double tol ) {
-
-  int64_t N = A.n();
-  std::cout << "N = " << N << ", MAX_M = " << max_m << std::endl;
-  std::vector<double> V(N * (max_m+1)), AV(N * (max_m+1)), C((max_m+1)*(max_m+1)), 
-    LAM(max_m+1);
-
-  // Extract diagonal and setup guess
-  auto D = extract_diagonal_elements( A );
-  auto D_min = std::min_element(D.begin(), D.end());
-  auto min_idx = std::distance( D.begin(), D_min );
-  V[min_idx] = 1.;
-
-#if 0
-  // Prime iterations
-  // AV(:,0) = A * V(:,0)
-  // V(:,1)  = AV(:,0) - V(:,0) * <V(:,0), AV(:,0)>
-  // V(:,1)  = V(:,1) / NORM(V(:,1))
-  sparsexx::spblas::gespmbv(1, 1., A, V.data(), N, 0., V.data()+N, N);
-  gram_schmidt( N, 1, V.data(), N, V.data()+N );
-  //std::cout << blas::nrm2( N, V.data() + N, 1 ) << std::endl;
-#else
-
-  // Compute Initial A*V
-  sparsexx::spblas::gespmbv(1, 1., A, V.data(), N, 0., AV.data(), N);
-
-  // Copy AV(:,0) -> V(:,1) and orthogonalize wrt V(:,0)
-  std::copy_n(AV.data(), N, V.data()+N);
-  gram_schmidt(N, 1, V.data(), N, V.data()+N);
-
-#endif
-
-
-  for( size_t i = 1; i < max_m; ++i ) {
-
-    // AV(:,i) = A * V(:,i)
-    #if 0
-    sparsexx::spblas::gespmbv( i+1, 1., A, V.data(), N, 0., AV.data(), N );
-    #else
-    sparsexx::spblas::gespmbv(1, 1., A, V.data()+i*N, N, 0., AV.data()+i*N, N );
-    #endif
-
-    const auto k = i + 1;
-
-    // Rayleigh Ritz
-    lobpcgxx::rayleigh_ritz( N, k, V.data(), N, AV.data(), N, LAM.data(),
-      C.data(), k);
-
-    // Compute Residual (A - LAM(0)*I) * V(:,0:i) * C(:,0)
-    double* R = V.data() + (i+1)*N;
-    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-      N, 1, k, 1., AV.data(), N, C.data(), k, 0., R, N );
-    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-      N, 1, k, -LAM[0], V.data(), N, C.data(), k, 1., R, N );
-
-    // Compute residual norm
-    auto res_nrm = blas::nrm2( N, R, 1 );
-    std::cout << std::scientific << std::setprecision(12);
-    std::cout << i << ", " << LAM[0] << ", " << res_nrm << std::endl;
-    if( res_nrm < tol ) break;
-
-    // Compute new vector
-    // (D - LAM(0)*I) * W = -R ==> W = -(D - LAM(0)*I)**-1 * R
-    for( auto j = 0; j < N; ++j ) {
-      R[j] = - R[j] / (D[j] - LAM[0]);
-      //R[j] = - R[j];
-    }
-
-    // Project new vector out form old vectors
-    gram_schmidt(N, k, V.data(), N, R);
-
-  } // Davidson iterations
-
-}
 
 
 int main( int argn, char* argv[] )
@@ -159,22 +68,6 @@ int main( int argn, char* argv[] )
   intgrls::integrals ints(Norbs, fcidump);
 
   FermionHamil Hop(ints);
-  #if 0
-  //Lets test hartree-fock
-  uint64_t u1 = 37793167;
-  uint64_t d1 = 37793167;
-  u1 = (1 << Nups)-1;
-  d1 = (1 << Ndos)-1;
-  uint64_t st =   (d1 << Norbs) + u1;
-  slater_det hello =  slater_det( st, Norbs, Nups, Ndos ) ;
-  double nE =  Hop.GetHmatel(hello,hello);
-  cout << std::setprecision(16) << "E0 = " << nE + ints.core_energy << endl;
-  //exit(0);
-
-  //SetSlaterDets stts = BuildFullHilbertSpace( Norbs, Nups, Ndos );
-  #endif
-
-
 
   // Build configuration space
   SetSlaterDets stts = BuildShiftHilbertSpace( Norbs, Norbseff, Nups, Ndos );
@@ -301,43 +194,21 @@ int main( int argn, char* argv[] )
 
   #else
 
+#if 0
   auto start = clock_type::now(); 
-  #if 1
   auto H = make_csr_hamiltonian( stts, Hop, ints, 1e-9 );
-  #else
-  auto H = sparsexx::read_mm< sparsexx::csr_matrix<double,int> >(
-    "/global/cfs/cdirs/m1027/dbwy/ASCI-CI/external/sparsexx/SiNa/SiNa.mtx" 
-    //"/global/cfs/cdirs/m1027/dbwy/ASCI-CI/external/sparsexx/Ga41As41H72/Ga41As41H72.mtx"
-  );
-  #endif
   duration_type H_dur = clock_type::now() - start;
   std::cout << "H duration = " << H_dur.count() << std::endl;
 
   auto N = H.m();
   std::cout << "NNZ = " << H.nnz() << std::endl;
-  #if 0
-  std::vector<double> H_dense(N*N);
-  sparsexx::convert_to_dense( H, H_dense.data(), N );
-  double max_diff = 0.;
-  for( auto i = 0; i < N; ++i )
-  for( auto j = i; j < N; ++j ) {
-    max_diff = std::max( max_diff, std::abs(H_dense[i+j*N] - H_dense[j+i*N]) );
-  }
-  std::cout << "MAX DIFF = " << max_diff << std::endl;
-
-  //for( auto i = 0; i < N; ++i ) {
-  //  double sum = 0.;
-  //  for( auto j = 0; j < N; ++j ) sum += std::abs(H_dense[j + i*N]);
-  //  auto diag = H_dense[i*(N+1)];
-  //  sum -= std::abs(diag);
-  //  std::cout << i << ", " << std::abs(diag) << ", " << sum << std::endl;
-  //}
-  #endif
 
   // Davidson
-
   const size_t max_m = 500;
   davidson(max_m, H, 1e-8);
+#else
+  serial_davidson_test( stts, Hop, ints, 1e-10, 500, 1e-8 );
+#endif
 
   #endif
 
