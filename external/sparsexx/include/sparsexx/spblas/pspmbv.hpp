@@ -261,6 +261,7 @@ void pgespmv( detail::type_identity_t<ScalarType> ALPHA, const DistSpMatType& A,
 
 
   /***** Off-diagonal Matvec *****/
+  if( A.off_diagonal_tile_ptr() )
   gespmbv( 1, ALPHA, A.off_diagonal_tile(), V_remote.data(), N, 1., AV, N );
 
   // Wait for all sends to complete to keep packed buffer in scope

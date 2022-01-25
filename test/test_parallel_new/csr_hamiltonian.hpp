@@ -136,6 +136,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
 
     //std::cout << i << std::endl;
     uint64_t bra = bra_states[i];
+    if(bra == 0) continue;
 
 #if 1
     // Determine which orbitals are occupied in the bra det
@@ -152,6 +153,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
 
   for( index_t j = 0; j < nket_dets; ++j ) { 
     uint64_t ket = ket_states[j];
+    if(ket == 0) continue;
 
     uint64_t ex_total = bra ^ ket;
     uint64_t ex_count = std::popcount( ex_total );

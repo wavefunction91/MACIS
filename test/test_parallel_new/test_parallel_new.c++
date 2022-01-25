@@ -194,21 +194,8 @@ int main( int argn, char* argv[] )
 
   #else
 
-#if 0
-  auto start = clock_type::now(); 
-  auto H = make_csr_hamiltonian( stts, Hop, ints, 1e-9 );
-  duration_type H_dur = clock_type::now() - start;
-  std::cout << "H duration = " << H_dur.count() << std::endl;
-
-  auto N = H.m();
-  std::cout << "NNZ = " << H.nnz() << std::endl;
-
-  // Davidson
-  const size_t max_m = 500;
-  davidson(max_m, H, 1e-8);
-#else
   serial_davidson_test( stts, Hop, ints, 1e-10, 500, 1e-8 );
-#endif
+  parallel_davidson_test( stts, Hop, ints, 1e-10, 500, 1e-8 );
 
   #endif
 
