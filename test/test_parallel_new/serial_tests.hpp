@@ -34,20 +34,32 @@ void parallel_davidson_test( const SetSlaterDets& stts, const FermionHamil& Hop,
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
 
+  MPI_Barrier(MPI_COMM_WORLD);
   auto H_st = clock_type::now();
+
   auto H  = make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD, stts.begin(), stts.end(),
     Hop, ints, H_tol );
+
+  MPI_Barrier(MPI_COMM_WORLD);
   auto H_en = clock_type::now();
 
-  std::cout << "HERE" << std::endl;
+  MPI_Barrier(MPI_COMM_WORLD);
   auto eig_st = clock_type::now();
+
   auto E0 = p_davidson(max_m, H, eig_tol);
+
+  MPI_Barrier(MPI_COMM_WORLD);
   auto eig_en = clock_type::now();
 
-  std::cout << "E0  = " << E0 << std::endl;
-  std::cout << "NNZ = " << H.nnz() << std::endl;
-  std::cout << "H Construction = " << duration_type(H_en-H_st).count() << " ms\n";
-  std::cout << "Davidson       = " << duration_type(eig_en-eig_st).count() 
-            << " ms" << std::endl;
+  int world_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+  if( world_rank == 0 ) {
+    std::cout << "E0  = " << E0 << std::endl;
+    std::cout << "NNZ = " << H.nnz() << std::endl;
+    std::cout << "H Construction = " << duration_type(H_en-H_st).count() << " ms\n";
+    std::cout << "Davidson       = " << duration_type(eig_en-eig_st).count() 
+              << " ms" << std::endl;
+  }
 
 }
