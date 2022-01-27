@@ -14,6 +14,7 @@ using duration_type = std::chrono::duration<double, std::milli>;
 
 #include <bitset>
 #include "hamiltonian_generator.hpp"
+#include "double_loop.hpp"
 
 using namespace std;
 using namespace cmz::ed;
@@ -134,7 +135,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian(
 ) {
 
   // Generate intermediates
-  HamiltonianGenerator<64> ham_gen( stts.begin()->GetNorbs(), ints );
+  DoubleLoopHamiltonianGenerator<64> ham_gen( stts.begin()->GetNorbs(), ints );
 
   return make_csr_hamiltonian_block<index_t>( stts.begin(), stts.end(), 
     stts.begin(), stts.end(), ham_gen, H_thresh );
@@ -232,7 +233,7 @@ sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
                              const double H_thresh
                            ) {
 
-  HamiltonianGenerator<64> ham_gen( sd_begin->GetNorbs(), ints );
+  DoubleLoopHamiltonianGenerator<64> ham_gen( sd_begin->GetNorbs(), ints );
   return make_dist_csr_hamiltonian<index_t>( comm, sd_begin, sd_end, ham_gen, H_thresh );
 
 }

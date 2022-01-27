@@ -38,7 +38,7 @@ void bits_to_indices( std::bitset<N> bits, std::vector<uint32_t>& indices ) {
 
 
 template <size_t N, size_t M>
-std::bitset<N> truncate_bitset( std::bitset<M> bits ) {
+inline std::bitset<N> truncate_bitset( std::bitset<M> bits ) {
   if constexpr ( M == N ) return bits;
   
   const auto mask = full_mask<N,M>();
@@ -65,6 +65,11 @@ public:
 
   using full_det_t = std::bitset<N>;
   using spin_det_t = std::bitset<N/2>;
+
+  template <typename index_t>
+  using sparse_matrix_type = sparsexx::csr_matrix<double,index_t>;
+
+  using full_det_iterator = std::vector<full_det_t>::iterator;
 
 protected:
 
@@ -108,6 +113,13 @@ protected:
 
   void generate_integral_intermediates_(size_t no, const double* V); 
 
+  virtual sparse_matrix_type<int32_t> make_csr_hamiltonian_block_32bit_(
+    full_det_iterator, full_det_iterator, full_det_iterator, full_det_iterator,
+    double ) = 0;
+  virtual sparse_matrix_type<int64_t> make_csr_hamiltonian_block_64bit_(
+    full_det_iterator, full_det_iterator, full_det_iterator, full_det_iterator,
+    double ) = 0;
+
 public:
 
   HamiltonianGenerator( size_t no, const cmz::ed::intgrls::integrals& ints ) :
@@ -118,6 +130,8 @@ public:
     generate_integral_intermediates_(no, V_pqrs_);
 
   }
+
+  virtual ~HamiltonianGenerator() noexcept = default;
 
   double matrix_element_4( spin_det_t bra, spin_det_t ket, spin_det_t ex ); 
   double matrix_element_22( spin_det_t bra_alpha, spin_det_t ket_alpha,
@@ -136,12 +150,6 @@ public:
     spin_det_t ex_beta, const std::vector<uint32_t>& bra_occ_alpha,
     const std::vector<uint32_t>& bra_occ_beta );
 
-
-  template <typename index_t>
-  using sparse_matrix_type = sparsexx::csr_matrix<double,index_t>;
-
-  using full_det_iterator = std::vector<full_det_t>::iterator;
-
   template <typename index_t>
   sparse_matrix_type<index_t> make_csr_hamiltonian_block(
     full_det_iterator bra_begin,
@@ -150,112 +158,19 @@ public:
     full_det_iterator ket_end,
     double H_thresh ) {
 
-    
-    const size_t nbra_dets = std::distance( bra_begin, bra_end );
-    const size_t nket_dets = std::distance( ket_begin, ket_end );
-
-    std::vector< index_t > colind, rowptr( nbra_dets + 1 );
-    std::vector< double  > nzval;
-
-    colind.reserve( nbra_dets * nbra_dets * 0.005 );
-    nzval .reserve( nbra_dets * nbra_dets * 0.005 );
-
-    std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
-
-    rowptr[0] = 0;
-
-    // Loop over bra determinants
-    for( size_t i = 0; i < nbra_dets; ++i ) {
-      const auto bra = *(bra_begin + i);
-
-      size_t nrow = 0;
-      if( bra.count() ) {
-
-        // Separate out into alpha/beta components 
-        spin_det_t bra_alpha = alpha_string(bra);
-        spin_det_t bra_beta  = beta_string(bra);
-        
-        // Get occupied indices
-        detail::bits_to_indices( bra_alpha, bra_occ_alpha );
-        detail::bits_to_indices( bra_beta, bra_occ_beta );
-
-        // Loop over ket determinants
-        for( size_t j = 0; j < nket_dets; ++j ) {
-          const auto ket = *(ket_begin + j);
-          if( ket.count() ) {
-            spin_det_t ket_alpha = alpha_string(ket);
-            spin_det_t ket_beta  = beta_string(ket);
-
-            full_det_t ex_total = bra ^ ket;
-            if( ex_total.count() <= 4 ) {
-            
-              spin_det_t ex_alpha = alpha_string( ex_total );
-              spin_det_t ex_beta  = beta_string( ex_total );
-
-              // Compute Matrix Element
-              const auto h_el = matrix_element( bra_alpha, ket_alpha,
-                ex_alpha, bra_beta, ket_beta, ex_beta, bra_occ_alpha,
-                bra_occ_beta );
-
-              if( std::abs(h_el) > H_thresh ) {
-                nrow++;
-                colind.emplace_back(j);
-                nzval.emplace_back(h_el);
-              }
-
-            } // Possible non-zero connection (Hamming distance)
-            
-          } // Non-zero ket determinant
-        } // Loop over ket determinants
-      
-      } // Non-zero bra determinant
-
-      rowptr[i+1] = rowptr[i] + nrow; // Update rowptr
-    } // Loop over bra determinants 
-
-
-    sparse_matrix_type<index_t> H( nbra_dets, nket_dets, std::move(rowptr),
-      std::move(colind), std::move(nzval) );
-    return H;
+    if constexpr ( std::is_same_v<index_t, int32_t> )
+      return make_csr_hamiltonian_block_32bit_(bra_begin, bra_end,
+        ket_begin, ket_end, H_thresh);
+    else if constexpr ( std::is_same_v<index_t, int64_t> )
+      return make_csr_hamiltonian_block_64bit_(bra_begin, bra_end,
+        ket_begin, ket_end, H_thresh);
+    else {
+      throw std::runtime_error("Unsupported index_t");
+      abort();
+    }
 
   }
 
-#if 0
-  template <typename index_t, typename BraIterator, typename KetIterator>
-  std::enable_if_t<
-    std::is_same_v< detail::iterator_value_type<BraIterator>, slater_det> and
-    std::is_same_v< detail::iterator_value_type<KetIterator>, slater_det>,
-    sparse_matrix_type<index_t>
-  > make_csr_hamiltonian_block(
-    BraIterator bra_begin,
-    BraIterator bra_end,
-    KetIterator ket_begin,
-    KetIterator ket_end,
-    double H_thresh ) {
-
-    size_t nbra = std::distance( bra_begin, bra_end );
-    size_t nket = std::distance( ket_begin, ket_end );
-    size_t norb = bra_begin->GetNorbs();
-
-    const uint64_t sd_alpha_mask = detail::full_mask<64>(norb).to_ullong();
-    const uint64_t sd_beta_mask  = sd_alpha_mask << norb;
-
-    auto sd_to_fd = [=]( slater_det _state ) {
-      auto state = _state.GetState();
-      full_det_t state_alpha = state & sd_alpha_mask;
-      full_det_t state_beta  = ((state & sd_beta_mask) >> norb) << N/2;
-      return state_alpha | state_beta;
-    };
-
-    std::vector< full_det_t > bra_vec( nbra ), ket_vec( nket );
-    std::transform( bra_begin, bra_end, bra_vec.begin(), sd_to_fd );
-    std::transform( ket_begin, ket_end, ket_vec.begin(), sd_to_fd );
-
-    return make_csr_hamiltonian_block( bra_vec.begin(), bra_vec.end(),
-      ket_vec.begin(), ket_vec.end(), H_thresh );
-
-  }
-#endif
   
 };
 
