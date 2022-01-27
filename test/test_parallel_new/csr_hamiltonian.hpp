@@ -59,39 +59,66 @@ to_bitset( Iterator states_begin, Iterator states_end ) {
 
 
 
-// Dispatch make_csr_hamiltonian for non-vector SD containers (saves a copy)
+
+
+// Base implementation of bitset CSR generation
+template <typename index_t>
+sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
+  std::vector< std::bitset<64> >::iterator bra_begin,
+  std::vector< std::bitset<64> >::iterator bra_end,
+  std::vector< std::bitset<64> >::iterator ket_begin,
+  std::vector< std::bitset<64> >::iterator ket_end,
+  HamiltonianGenerator<64>&                ham_gen,
+  double                                   H_thresh
+) {
+
+  size_t nbra = std::distance( bra_begin, bra_end );
+  size_t nket = std::distance( ket_begin, ket_end );
+  
+  if( nbra and nket ) {
+    return ham_gen.make_csr_hamiltonian_block<index_t>(
+      bra_begin, bra_end, ket_begin, ket_end, H_thresh
+    );
+  } else {
+    return sparsexx::csr_matrix<double,index_t>(nbra,nket,0,0);
+  }
+
+}
+
+
+
+
+
+
+
+
+// Dispatch make_csr_hamiltonian_block for non-bitset containers
 template <typename index_t, typename BraIterator, typename KetIterator>
-std::enable_if_t<
-  detail::value_type_equiv_v<BraIterator, slater_det> and
-  detail::value_type_equiv_v<KetIterator, slater_det>,
-  sparsexx::csr_matrix<double,index_t>
->
-make_csr_hamiltonian_block(
+sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   BraIterator bra_begin,
   BraIterator bra_end,
   KetIterator ket_begin,
   KetIterator ket_end,
-  const FermionHamil&  Hop,
-  const intgrls::integrals& ints,
+  HamiltonianGenerator<64>& ham_gen,
   const double H_thresh
 ) {
 
   size_t nbra = std::distance( bra_begin, bra_end );
   size_t nket = std::distance( ket_begin, ket_end );
 
-  if( nbra and nket ) {
+  if(nbra and nket) {
+
     // Convert cmz slater_det -> bitset
     auto bra_vec = detail::to_bitset<64>(bra_begin, bra_end);
     auto ket_vec = detail::to_bitset<64>(ket_begin, ket_end);
 
-    // Generate intermediates
-    HamiltonianGenerator<64> ham_gen( bra_begin->GetNorbs(), ints );
+    return make_csr_hamiltonian_block<index_t>(bra_vec.begin(), bra_vec.end(),
+      ket_vec.begin(), ket_vec.end(), ham_gen, H_thresh );
 
-    // Compute Hamiltonian block
-    return ham_gen.make_csr_hamiltonian_block<index_t>( bra_vec.begin(), bra_vec.end(),
-      ket_vec.begin(), ket_vec.end(), H_thresh );
   } else {
+
     return sparsexx::csr_matrix<double,index_t>(nbra,nket,0,0);
+
   }
 
 }
@@ -105,19 +132,38 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian(
   const intgrls::integrals& ints,
   const double H_thresh
 ) {
+
+  // Generate intermediates
+  HamiltonianGenerator<64> ham_gen( stts.begin()->GetNorbs(), ints );
+
   return make_csr_hamiltonian_block<index_t>( stts.begin(), stts.end(), 
-    stts.begin(), stts.end(), Hop, ints, H_thresh );
+    stts.begin(), stts.end(), ham_gen, H_thresh );
+
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Base implementation of dist-CSR H construction for bitsets
 template <typename index_t>
 sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
   make_dist_csr_hamiltonian( MPI_Comm comm, 
-                             std::vector<slater_det>::iterator sd_begin,
-                             std::vector<slater_det>::iterator sd_end,
-                             const FermionHamil& Hop,
-                             const intgrls::integrals& ints,
-                             const double H_thresh
+                             std::vector<std::bitset<64>>::iterator sd_begin,
+                             std::vector<std::bitset<64>>::iterator sd_end,
+                             HamiltonianGenerator<64>&              ham_gen,
+                             const double                           H_thresh
                            ) {
 
   using namespace sparsexx;
@@ -134,23 +180,24 @@ sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
     make_csr_hamiltonian_block<index_t>( 
       sd_begin + bra_st, sd_begin + bra_en,
       sd_begin + bra_st, sd_begin + bra_en,
-      Hop, ints, H_thresh
+      ham_gen, H_thresh
     )
   );
 
   auto world_size = get_mpi_size(comm);
 
   if( world_size > 1 ) {
+
     // Create a copy of SD's with local bra dets zero'd out
-    std::vector<slater_det> sds_offdiag( sd_begin, sd_end );
-    for( auto i = bra_st; i < bra_en; ++i ) sds_offdiag[i] = slater_det();
+    std::vector<std::bitset<64>> sds_offdiag( sd_begin, sd_end );
+    for( auto i = bra_st; i < bra_en; ++i ) sds_offdiag[i] = 0ul;
 
     // Build off-diagonal part
     H_dist.set_off_diagonal_tile(
       make_csr_hamiltonian_block<index_t>( 
         sd_begin + bra_st, sd_begin + bra_en,
         sds_offdiag.begin(), sds_offdiag.end(),
-        Hop, ints, H_thresh
+        ham_gen, H_thresh
       )
     );
   }
@@ -159,25 +206,45 @@ sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
     
 }
 
+template <typename index_t, typename Iterator>
+sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
+  make_dist_csr_hamiltonian( MPI_Comm                   comm, 
+                             Iterator                   sd_begin,
+                             Iterator                   sd_end,
+                             HamiltonianGenerator<64>&  ham_gen,
+                             const double               H_thresh
+                           ) {
 
-template <typename index_t, typename SlaterDetIterator>
+  auto sd_vec = detail::to_bitset<64>(sd_begin, sd_end);
+  return make_dist_csr_hamiltonian<index_t>( comm, sd_vec.begin(), sd_vec.end(),
+    ham_gen, H_thresh);
+
+}
+
+
+template <typename index_t, typename Iterator>
 sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
   make_dist_csr_hamiltonian( MPI_Comm comm, 
-                             SlaterDetIterator   sd_begin,
-                             SlaterDetIterator   sd_end,
+                             Iterator   sd_begin,
+                             Iterator   sd_end,
                              const FermionHamil& Hop,
                              const intgrls::integrals& ints,
                              const double H_thresh
                            ) {
 
-  std::vector<slater_det> sd_vec( sd_begin, sd_end );
-  return make_dist_csr_hamiltonian<index_t>( comm, sd_vec.begin(), 
-    sd_vec.end(), Hop, ints, H_thresh );
+  HamiltonianGenerator<64> ham_gen( sd_begin->GetNorbs(), ints );
+  return make_dist_csr_hamiltonian<index_t>( comm, sd_begin, sd_end, ham_gen, H_thresh );
 
 }
 
 
 
+
+
+
+
+
+#if 0
 template <typename index_t>
 sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
   make_dist_csr_hamiltonian_bcast( MPI_Comm comm,
@@ -238,3 +305,4 @@ sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
   return make_dist_csr_hamiltonian_bcast<index_t>( comm, 
     sd_vec.begin(), sd_vec.end(), Hop, ints, H_thresh );
 }
+#endif
