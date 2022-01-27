@@ -62,6 +62,14 @@ public:
     m_(m), n_(n), nnz_(nnz), indexing_(indexing),
     nzval_(nnz), colind_(nnz), rowptr_(m+1)  { }
 
+  csr_matrix( size_type m, size_type n, 
+    std::vector<index_t>&& rowptr, 
+    std::vector<index_t>&& colind,
+    std::vector<double>&& nzval ) :
+    m_(m), n_(n), nnz_(nzval.size()), indexing_(rowptr[0]),
+    nzval_(std::move(nzval)), colind_(std::move(colind)),
+    rowptr_(std::move(rowptr)) { }
+
   csr_matrix( const csr_matrix& other )          = default;
   csr_matrix( csr_matrix&& other      ) noexcept = default;
 

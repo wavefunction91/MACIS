@@ -194,8 +194,9 @@ int main( int argn, char* argv[] )
 
   #else
 
-  serial_davidson_test( stts, Hop, ints, 1e-10, 500, 1e-8 );
+  //serial_davidson_test( stts, Hop, ints, 1e-10, 500, 1e-8 );
   parallel_davidson_test( stts, Hop, ints, 1e-10, 500, 1e-8 );
+  //parallel_generation_test( stts, Hop, ints, 1e-10 );
 
   #endif
 

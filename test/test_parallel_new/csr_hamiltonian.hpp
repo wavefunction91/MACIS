@@ -13,6 +13,7 @@ using clock_type = std::chrono::high_resolution_clock;
 using duration_type = std::chrono::duration<double, std::milli>;
 
 #include <bitset>
+#include "hamiltonian_generator.hpp"
 
 using namespace std;
 using namespace cmz::ed;
@@ -36,6 +37,17 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   // Extract states for superior memory access
   const size_t nbra_dets = std::distance( bra_begin, bra_end );
   const size_t nket_dets = std::distance( ket_begin, ket_end );
+
+  const size_t  norb = bra_begin->GetNorbs();
+  auto full_mask = [](unsigned nbits) {
+    return (1ul << nbits) - 1ul;
+  };
+
+  const uint64_t alpha_mask = full_mask(norb);
+  const uint64_t beta_mask  = alpha_mask << norb;
+  HamiltonianGenerator<64> ham_gen( norb, ints );
+
+#if 0
   std::vector<uint64_t> bra_states( nbra_dets );
   std::vector<uint64_t> ket_states( nket_dets );
 
@@ -55,7 +67,6 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
 
   const double* V_pqrs = ints.u.data();
   const double* T_pq   = ints.t.data();
-  const size_t  norb = bra_begin->GetNorbs();
   const size_t  norb2 = norb  * norb;
   const size_t  norb3 = norb2 * norb;
   const size_t  norb4 = norb3 * norb;
@@ -92,12 +103,6 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   //std::cout << "G2 = " << (G2_red.size()*8.)/1024/1024/1024 << " GB " << std::endl;
   //std::cout << "V2 = " << (V2_red.size()*8.)/1024/1024/1024 << " VB " << std::endl;
 
-  auto full_mask = [](unsigned nbits) {
-    return (1ul << nbits) - 1ul;
-  };
-
-  const uint64_t alpha_mask = full_mask(norb);
-  const uint64_t beta_mask  = alpha_mask << norb;
 
   auto first_occ_flipped = [=]( uint64_t state, uint64_t ex ) {
     return (ffsll( state & ex ) - 1ul ) % norb;
@@ -125,10 +130,37 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   };
 
 
+#if 0
+  {
+    std::vector<std::bitset<64>> fds(nbra_dets);
+    auto sd_to_fd = [=]( slater_det _state ) -> std::bitset<64>{
+      auto state = _state.GetState();
+      std::bitset<64> state_alpha = state & alpha_mask;
+      std::bitset<64> state_beta  = ((state & beta_mask) >> norb) << 32;
+      return state_alpha | state_beta;
+    };
+
+    std::transform( bra_begin, bra_end, fds.begin(), sd_to_fd );
+    std::cout << std::bitset<64>(bra_states[0]) << " ";
+    std::cout << std::bitset<64>(bra_states[1]) << std::endl;
+    std::cout << fds[0] << " ";
+    std::cout << fds[1] << std::endl;
+
+    uint32_t bra_alpha_sd = bra_states[1] & alpha_mask;
+    uint32_t bra_beta_sd  = (bra_states[1] & beta_mask) >> norb;
+    std::bitset<32> bra_alpha_fd = detail::truncate_bitset<32>(fds[1]);
+    std::bitset<32> bra_beta_fd = detail::truncate_bitset<32>(fds[1] >> 32);
+
+    std::cout << std::bitset<32>(bra_alpha_sd) << " ";
+    std::cout << std::bitset<32>(bra_beta_sd) << std::endl;
+    std::cout << bra_alpha_fd << " " << bra_beta_fd << std::endl;
+  }
+#endif
+
   // Construct adjacencey
   #pragma omp parallel
   {
-  std::vector<index_t> bra_occ_up, bra_occ_do;
+  std::vector<uint32_t> bra_occ_up, bra_occ_do;
   bra_occ_up.reserve(norb);
   bra_occ_do.reserve(norb);
   #pragma omp for 
@@ -162,7 +194,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
       const uint64_t ex_up_count = std::popcount(ex_total & alpha_mask); 
       const uint64_t ex_do_count = ex_count - ex_up_count;
 
-#if 1
+#if 0
       double h_el = 0;
 
       if( ex_up_count == 4 and ex_do_count == 0 ) {
@@ -206,7 +238,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
         sign *= single_ex_do_sign( ket, v2, o2 );
         
         h_el = sign * G_pqrs[v1 + o1*norb + v2*norb2 + o2*norb3];
-         
+
         #if 0
         auto tmp = Hop.GetHmatel( *(bra_begin+i), *(ket_begin+j) );
         if( std::abs(tmp - h_el) > 1e-11 ) std::cout << "Wrong Case 1" << std::endl;
@@ -229,7 +261,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
         sign *= single_ex_do_sign( ket, v2, o2 );
         
         h_el = sign * V_pqrs[v1 + o1*norb + v2*norb2 + o2*norb3]; 
-         
+
         #if 0
         auto tmp = Hop.GetHmatel( *(bra_begin+i), *(ket_begin+j) );
         if( std::abs(tmp - h_el) > 1e-11 ) 
@@ -254,6 +286,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
         }  
 
         h_el *= sign;
+
         #if 0
         auto tmp = Hop.GetHmatel( *(bra_begin+i), *(ket_begin+j) );
         if( std::abs(tmp - h_el) > 1e-11 ) 
@@ -334,9 +367,18 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
         cases[5]++;
       }
 #else
-      //auto h_el = Hop.GetHmatel( *(bra_begin+i), *(ket_begin+j) );
-      auto h_el = 1.0;
+      std::bitset<32> bra_alpha = bra & alpha_mask;
+      std::bitset<32> ket_alpha = ket & alpha_mask;
+      std::bitset<32> ex_alpha  = ex_total & alpha_mask;
+
+      std::bitset<32> bra_beta = (bra & beta_mask) >> norb;
+      std::bitset<32> ket_beta = (ket & beta_mask) >> norb;
+      std::bitset<32> ex_beta  = (ex_total & beta_mask) >> norb;
+
+      auto h_el = ham_gen.matrix_element( bra_alpha, ket_alpha, ex_alpha,
+        bra_beta, ket_beta, ex_beta, bra_occ_up, bra_occ_do );
 #endif
+
       if( std::abs(h_el) > H_thresh ) {
         colind_by_row[i].emplace_back( j );
         nzval_by_row [i].emplace_back( h_el );
@@ -379,6 +421,19 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   linearize_vov( nzval_by_row,  nzval  );
 
   return H;
+#else
+  std::vector<std::bitset<64>> bra_fds(nbra_dets), ket_fds(nket_dets);
+  auto sd_to_fd = [=]( slater_det _state ) {
+    auto state = _state.GetState();
+    std::bitset<64> state_alpha = state & alpha_mask;
+    std::bitset<64> state_beta = (state & beta_mask) >> norb;
+    return state_alpha | (state_beta << 32);
+  };
+  std::transform( bra_begin, bra_end, bra_fds.begin(), sd_to_fd );
+  std::transform( ket_begin, ket_end, ket_fds.begin(), sd_to_fd );
+  return ham_gen.make_csr_hamiltonian_block<index_t>( bra_fds.begin(), bra_fds.end(),
+    ket_fds.begin(), ket_fds.end(), H_thresh );
+#endif
 
 }
 
@@ -401,8 +456,9 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   std::vector< slater_det > bra_vec( bra_begin, bra_end );
   std::vector< slater_det > ket_vec( ket_begin, ket_end );
 
-  return make_csr_hamiltonian_block<index_t>( bra_vec.begin(), bra_vec.end(),
-    ket_vec.begin(), ket_vec.end(), Hop, ints, H_thresh );
+  return make_csr_hamiltonian_block<index_t>( 
+    bra_vec.begin(), bra_vec.end(), ket_vec.begin(), ket_vec.end(), Hop, ints, 
+    H_thresh );
 
 }
 
@@ -477,8 +533,8 @@ sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
                            ) {
 
   std::vector<slater_det> sd_vec( sd_begin, sd_end );
-  return make_dist_csr_hamiltonian<index_t>( comm, sd_vec.begin(), sd_vec.end(),
-    Hop, ints, H_thresh );
+  return make_dist_csr_hamiltonian<index_t>( comm, sd_vec.begin(), 
+    sd_vec.end(), Hop, ints, H_thresh );
 
 }
 
