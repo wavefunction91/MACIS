@@ -1,11 +1,12 @@
-#if 0
 #pragma once
-#include "dbwy/bitset_operations.hpp"
+#include "bitset_operations.hpp"
+
+namespace dbwy {
 
 template <size_t N = 64>
 class HamiltonianGenerator {
 
-  static_assert(N%2 == 0, "N Must Be Even");
+  static_assert(N % 2 == 0, "N Must Be Even");
 
 public:
 
@@ -291,4 +292,5 @@ double HamiltonianGenerator<N>::matrix_element(
   else return matrix_element_diag( bra_occ_alpha, bra_occ_beta );
 
 }
-#endif
+
+} // namespace dbwy

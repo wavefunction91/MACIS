@@ -1,5 +1,19 @@
 #pragma once
-#include "hamiltonian_generator.hpp"
+#include "dbwy/hamiltonian_generator.hpp"
+#include "dbwy/sd_operations.hpp"
+
+namespace dbwy {
+
+namespace detail {
+
+inline size_t factorial( size_t n ) {
+  if( n == 0 or n == 1 ) return 1;
+  size_t i = 1;
+  for( size_t j = 2; j <= n; ++j ) i *= j;
+  return i;
+}
+
+}
 
 template <size_t N>
 class DoubleLoopHamiltonianGenerator : public HamiltonianGenerator<N> {
@@ -31,40 +45,38 @@ protected:
     std::vector< index_t > colind, rowptr( nbra_dets + 1 );
     std::vector< double  > nzval;
 
-    colind.reserve( nbra_dets * nbra_dets * 0.005 );
-    nzval .reserve( nbra_dets * nbra_dets * 0.005 );
-
     std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
 
     rowptr[0] = 0;
 
     // Loop over bra determinants
     for( size_t i = 0; i < nbra_dets; ++i ) {
+      //if( (i%1000) == 0 ) std::cout << i << ", " << rowptr[i] << std::endl;
       const auto bra = *(bra_begin + i);
 
       size_t nrow = 0;
       if( bra.count() ) {
 
         // Separate out into alpha/beta components 
-        spin_det_t bra_alpha = detail::truncate_bitset<N/2>(bra);
-        spin_det_t bra_beta  = detail::truncate_bitset<N/2>(bra >> (N/2));
+        spin_det_t bra_alpha = truncate_bitset<N/2>(bra);
+        spin_det_t bra_beta  = truncate_bitset<N/2>(bra >> (N/2));
         
         // Get occupied indices
-        detail::bits_to_indices( bra_alpha, bra_occ_alpha );
-        detail::bits_to_indices( bra_beta, bra_occ_beta );
+        bits_to_indices( bra_alpha, bra_occ_alpha );
+        bits_to_indices( bra_beta, bra_occ_beta );
 
         // Loop over ket determinants
         for( size_t j = 0; j < nket_dets; ++j ) {
           const auto ket = *(ket_begin + j);
           if( ket.count() ) {
-            spin_det_t ket_alpha = detail::truncate_bitset<N/2>(ket);
-            spin_det_t ket_beta  = detail::truncate_bitset<N/2>(ket >> (N/2));
+            spin_det_t ket_alpha = truncate_bitset<N/2>(ket);
+            spin_det_t ket_beta  = truncate_bitset<N/2>(ket >> (N/2));
 
             full_det_t ex_total = bra ^ ket;
             if( ex_total.count() <= 4 ) {
             
-              spin_det_t ex_alpha = detail::truncate_bitset<N/2>( ex_total );
-              spin_det_t ex_beta  = detail::truncate_bitset<N/2>( ex_total >> (N/2) );
+              spin_det_t ex_alpha = truncate_bitset<N/2>( ex_total );
+              spin_det_t ex_beta  = truncate_bitset<N/2>( ex_total >> (N/2) );
 
               // Compute Matrix Element
               const auto h_el = this->matrix_element( bra_alpha, ket_alpha,
@@ -85,7 +97,11 @@ protected:
       } // Non-zero bra determinant
 
       rowptr[i+1] = rowptr[i] + nrow; // Update rowptr
+
     } // Loop over bra determinants 
+
+    colind.shrink_to_fit();
+    nzval.shrink_to_fit();
 
 
     return sparse_matrix_type<index_t>( nbra_dets, nket_dets, std::move(rowptr),
@@ -121,3 +137,5 @@ public:
     HamiltonianGenerator<N>(std::forward<Args>(args)...) { }
 
 };
+
+} // namespace dbwy

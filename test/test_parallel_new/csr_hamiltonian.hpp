@@ -13,8 +13,9 @@ using clock_type = std::chrono::high_resolution_clock;
 using duration_type = std::chrono::duration<double, std::milli>;
 
 #include <bitset>
-#include "hamiltonian_generator.hpp"
-#include "double_loop.hpp"
+#include "dbwy/hamiltonian_generator.hpp"
+#include "dbwy/double_loop.hpp"
+#include "dbwy/residue_arrays.hpp"
 
 using namespace std;
 using namespace cmz::ed;
@@ -69,7 +70,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   std::vector< std::bitset<64> >::iterator bra_end,
   std::vector< std::bitset<64> >::iterator ket_begin,
   std::vector< std::bitset<64> >::iterator ket_end,
-  HamiltonianGenerator<64>&                ham_gen,
+  dbwy::HamiltonianGenerator<64>&          ham_gen,
   double                                   H_thresh
 ) {
 
@@ -100,7 +101,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian_block(
   BraIterator bra_end,
   KetIterator ket_begin,
   KetIterator ket_end,
-  HamiltonianGenerator<64>& ham_gen,
+  dbwy::HamiltonianGenerator<64>& ham_gen,
   const double H_thresh
 ) {
 
@@ -135,7 +136,7 @@ sparsexx::csr_matrix<double,index_t> make_csr_hamiltonian(
 ) {
 
   // Generate intermediates
-  DoubleLoopHamiltonianGenerator<64> ham_gen( stts.begin()->GetNorbs(), ints );
+  dbwy::DoubleLoopHamiltonianGenerator<64> ham_gen( stts.begin()->GetNorbs(), ints );
 
   return make_csr_hamiltonian_block<index_t>( stts.begin(), stts.end(), 
     stts.begin(), stts.end(), ham_gen, H_thresh );
@@ -163,7 +164,7 @@ sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
   make_dist_csr_hamiltonian( MPI_Comm comm, 
                              std::vector<std::bitset<64>>::iterator sd_begin,
                              std::vector<std::bitset<64>>::iterator sd_end,
-                             HamiltonianGenerator<64>&              ham_gen,
+                             dbwy::HamiltonianGenerator<64>&        ham_gen,
                              const double                           H_thresh
                            ) {
 
@@ -209,11 +210,11 @@ sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
 
 template <typename index_t, typename Iterator>
 sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
-  make_dist_csr_hamiltonian( MPI_Comm                   comm, 
-                             Iterator                   sd_begin,
-                             Iterator                   sd_end,
-                             HamiltonianGenerator<64>&  ham_gen,
-                             const double               H_thresh
+  make_dist_csr_hamiltonian( MPI_Comm                         comm, 
+                             Iterator                         sd_begin,
+                             Iterator                         sd_end,
+                             dbwy::HamiltonianGenerator<64>&  ham_gen,
+                             const double                     H_thresh
                            ) {
 
   auto sd_vec = detail::to_bitset<64>(sd_begin, sd_end);
@@ -233,7 +234,7 @@ sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double,index_t> >
                              const double H_thresh
                            ) {
 
-  DoubleLoopHamiltonianGenerator<64> ham_gen( sd_begin->GetNorbs(), ints );
+  dbwy::DoubleLoopHamiltonianGenerator<64> ham_gen( sd_begin->GetNorbs(), ints );
   return make_dist_csr_hamiltonian<index_t>( comm, sd_begin, sd_end, ham_gen, H_thresh );
 
 }

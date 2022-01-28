@@ -12,6 +12,7 @@ list( APPEND TEST_DIRECTORIES
       test_cr2_grow
       test_c2
       test_parallel_new
+      test_asci
     )
 foreach( testdir ${TEST_DIRECTORIES} )
     # add executable
