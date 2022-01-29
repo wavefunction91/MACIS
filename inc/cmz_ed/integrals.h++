@@ -35,6 +35,7 @@
 #include "cmz_ed/utils.h++"
 #include <cmath>
 #include <unordered_map>
+#include <mpi.h>
 
 namespace cmz
 {
@@ -815,7 +816,10 @@ namespace cmz
             if(!ifile)
               throw ("ERROR OPENING FILE " + file);
       
-            std::cout << "READING FCIDUMP FILE " << file << std::endl;
+            int world_rank; MPI_Comm_rank( MPI_COMM_WORLD, &world_rank );
+            if( world_rank == 0 ) {
+              std::cout << "READING FCIDUMP FILE " << file << std::endl;
+            }
       
             string line;
             int64_t i, j, a, b;
@@ -860,9 +864,11 @@ namespace cmz
       
               if( bad ) throw ( "Bad integral read of " + file);
             }	
+            if( world_rank == 0 ) {
             std::cout << "Read " << t_store.size() + u_store.size() << " integrals" << std::endl;
             if( core_energy )
               std::cout << "  (also read core energy = " << core_energy << ")" << std::endl;
+            }
           }
       
           /**

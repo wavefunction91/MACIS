@@ -69,14 +69,16 @@ protected:
 
 public:
 
-  HamiltonianGenerator( size_t no, const cmz::ed::intgrls::integrals& ints ) :
+  HamiltonianGenerator( size_t no, const double* V, const double* T ) :
     norb_(no), norb2_(no*no), norb3_(no*no*no),
-    V_pqrs_(ints.u.data()),
-    T_pq_(ints.t.data()) {
+    V_pqrs_(V), T_pq_(T) {
 
     generate_integral_intermediates_(no, V_pqrs_);
 
   }
+
+
+
 
   virtual ~HamiltonianGenerator() noexcept = default;
 

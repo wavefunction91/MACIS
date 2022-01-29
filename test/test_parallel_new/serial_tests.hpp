@@ -1,11 +1,12 @@
 #pragma once
 
-#include "csr_hamiltonian.hpp"
-#include "davidson.hpp"
+#include "dbwy/cmz_compat_csr_matrix.hpp"
+#include "dbwy/davidson.hpp"
 #include <chrono>
 
-void serial_davidson_test( const SetSlaterDets& stts, const FermionHamil& Hop,
-  const intgrls::integrals& ints, double H_tol, int max_m, double eig_tol ) {
+void serial_davidson_test( const cmz::ed::SetSlaterDets& stts, 
+  const cmz::ed::FermionHamil& Hop, const cmz::ed::intgrls::integrals& ints, 
+  double H_tol, int max_m, double eig_tol ) {
 
 #if 0
   using clock_type = std::chrono::high_resolution_clock;
@@ -28,8 +29,9 @@ void serial_davidson_test( const SetSlaterDets& stts, const FermionHamil& Hop,
 
 }
 
-void parallel_davidson_test( const SetSlaterDets& stts, const FermionHamil& Hop,
-  const intgrls::integrals& ints, double H_tol, int max_m, double eig_tol ) {
+void parallel_davidson_test( const cmz::ed::SetSlaterDets& stts, 
+  const cmz::ed::FermionHamil& Hop, const cmz::ed::intgrls::integrals& ints, 
+  double H_tol, int max_m, double eig_tol ) {
 
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
@@ -37,7 +39,7 @@ void parallel_davidson_test( const SetSlaterDets& stts, const FermionHamil& Hop,
   MPI_Barrier(MPI_COMM_WORLD);
   auto H_st = clock_type::now();
 
-  auto H  = make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD, 
+  auto H  = dbwy::make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD, 
     stts.begin(), stts.end(), Hop, ints, H_tol );
 
   MPI_Barrier(MPI_COMM_WORLD);
@@ -64,8 +66,9 @@ void parallel_davidson_test( const SetSlaterDets& stts, const FermionHamil& Hop,
 
 }
 
-void parallel_generation_test( const SetSlaterDets& stts, const FermionHamil& Hop,
-  const intgrls::integrals& ints, double H_tol ) {
+void parallel_generation_test( const cmz::ed::SetSlaterDets& stts, 
+  const cmz::ed::FermionHamil& Hop, const cmz::ed::intgrls::integrals& ints, 
+  double H_tol ) {
 
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
@@ -73,7 +76,7 @@ void parallel_generation_test( const SetSlaterDets& stts, const FermionHamil& Ho
   MPI_Barrier(MPI_COMM_WORLD);
   auto H_st = clock_type::now();
 
-  auto H  = make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD, 
+  auto H  = dbwy::make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD, 
     stts.begin(), stts.end(), Hop, ints, H_tol );
 
   MPI_Barrier(MPI_COMM_WORLD);

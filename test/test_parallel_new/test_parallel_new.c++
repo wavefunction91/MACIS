@@ -22,8 +22,8 @@
 #include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
 #include <sparsexx/matrix_types/dense_conversions.hpp>
 #include <sparsexx/io/read_mm.hpp>
-#include "csr_hamiltonian.hpp"
-#include "davidson.hpp"
+#include "dbwy/cmz_compat_csr_matrix.hpp"
+#include "dbwy/davidson.hpp"
 #include "serial_tests.hpp"
 
 #include <chrono>

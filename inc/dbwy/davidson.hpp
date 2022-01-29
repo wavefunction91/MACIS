@@ -152,7 +152,8 @@ void p_rayleigh_ritz( int64_t N_local, int64_t K, const double* X, int64_t LDX,
 }
 
 
-double p_davidson( int64_t max_m, const sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double,int32_t>>& A, double tol ) {
+double p_davidson( int64_t max_m, const sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double,int32_t>>& A, double tol,
+  double* X_local = nullptr ) {
 
   //int64_t N = A.n();
   int64_t N_local = A.local_row_extent();
@@ -161,6 +162,14 @@ double p_davidson( int64_t max_m, const sparsexx::dist_sparse_matrix<sparsexx::c
   int world_rank, world_size;
   MPI_Comm_rank( comm, &world_rank );
   MPI_Comm_size( comm, &world_size );
+
+  if( world_rank == 0 ) {
+    std::cout << "\nDavidson Eigensolver" << std::endl
+              << "  MAX_M = " << max_m << std::endl
+              << "  RTOL  = " << tol   << std::endl
+              << std::endl
+              << "Iterations:" << std::endl;
+  }
 
   //if( world_rank == 0 ) {
   //  std::cout << "N = " << N << ", MAX_M = " << max_m << std::endl;
@@ -223,12 +232,33 @@ double p_davidson( int64_t max_m, const sparsexx::dist_sparse_matrix<sparsexx::c
 
     // Compute Residual (A - LAM(0)*I) * V(:,0:i) * C(:,0)
     double* R_local = V_local.data() + (i+1)*N_local;
-    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-      N_local, 1, k, 1., AV_local.data(), N_local, C.data(), k, 0., 
-      R_local, N_local );
-    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-      N_local, 1, k, -LAM[0], V_local.data(), N_local, C.data(), k, 1., 
-      R_local, N_local );
+
+    if( X_local ) {
+      // If X_local is non-null, save Ritz vector
+
+      // X = V*C
+      blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+        N_local, 1, k, 1., V_local.data(), N_local, C.data(), k, 0., 
+        X_local, N_local );
+
+      // R = X
+      std::copy_n( X_local, N_local, R_local );
+
+      // R = (AV - LAM[0]*V)*C = AV*C - LAM[0]*X = AV*C - LAM[0]*R
+      blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+        N_local, 1, k, 1., AV_local.data(), N_local, C.data(), k, -LAM[0], 
+        R_local, N_local );
+
+    } else {
+
+      blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+        N_local, 1, k, 1., AV_local.data(), N_local, C.data(), k, 0., 
+        R_local, N_local );
+      blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+        N_local, 1, k, -LAM[0], V_local.data(), N_local, C.data(), k, 1., 
+        R_local, N_local );
+
+    }
 
     // Compute residual norm
     auto res_dot = blas::dot( N_local, R_local, 1, R_local, 1 );
@@ -236,7 +266,7 @@ double p_davidson( int64_t max_m, const sparsexx::dist_sparse_matrix<sparsexx::c
     auto res_nrm = std::sqrt(res_dot);
     if( world_rank == 0 ) {
       std::cout << std::scientific << std::setprecision(12);
-      std::cout << i << ", " << LAM[0] << ", " << res_nrm << std::endl;
+      std::cout << std::setw(4) << i << ", " << LAM[0] << ", " << res_nrm << std::endl;
     }
     if( res_nrm < tol ) return LAM[0];
 

@@ -103,7 +103,6 @@ protected:
     full_det_iterator ket_begin, full_det_iterator ket_end,
     double H_thresh) override {
 
-    std::cout << "in 32 bit" << std::endl;
     return make_csr_hamiltonian_block_<int32_t>(bra_begin, bra_end,
       ket_begin, ket_end, H_thresh );
 
