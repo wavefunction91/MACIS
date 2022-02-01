@@ -141,8 +141,11 @@ int main( int argc, char* argv[] ) {
 #endif
 
   cmz::ed::intgrls::integrals ints(norb, fcidump);
+  MPI_Barrier(MPI_COMM_WORLD);
 
   constexpr size_t nbits = 128;
+
+#if 0
   std::vector<std::bitset<nbits>> dets;
   if( do_fci ) {
     // do FCI
@@ -164,16 +167,27 @@ int main( int argc, char* argv[] ) {
 
   if(world_rank == 0)
     std::cout << "NDETS = " << dets.size() << std::endl;
+  MPI_Barrier(MPI_COMM_WORLD);
 
   dbwy::DoubleLoopHamiltonianGenerator<nbits> 
     ham_gen( norb, ints.u.data(), ints.t.data() );
+  const std::bitset<nbits> hf_det = dbwy::canonical_hf_determinant(nalpha,nbeta);
+  const double EHF = ham_gen.matrix_element(hf_det, hf_det);
+  if(world_rank == 0) {
+    std::cout << std::scientific << std::setprecision(12);
+    std::cout << "E(HF) = " << EHF + ints.core_energy << std::endl;
+  }
+
+
   auto H = dbwy::make_dist_csr_hamiltonian<int32_t>(MPI_COMM_WORLD,
     dets.begin(), dets.end(), ham_gen, 1e-12 );
 
   std::vector<double> X_local( H.local_row_extent() );
   auto E0 = p_davidson( 100, H, 1e-8, X_local.data() );
-  if(world_rank == 0)
-    std::cout << "\nE0 = " <<  E0 + ints.core_energy << std::endl;
+  if(world_rank == 0) {
+    std::cout << "\nE(CI)   = " <<  E0 + ints.core_energy << std::endl;
+    std::cout << "E(CORR) = " << (E0 - EHF) << std::endl;
+  }
 
   // Gather Eigenvector
   std::vector<double> X( world_rank ? 0 : dets.size() );
@@ -199,7 +213,172 @@ int main( int argc, char* argv[] ) {
       std::cout << "  " << std::setw(5) << std::left << i << " " << std::setw(20) << std::right << X[i] << std::endl;
     }
   }
+#else
 
+  // Hamiltonian Matrix Element Generator
+  dbwy::DoubleLoopHamiltonianGenerator<nbits> 
+    ham_gen( norb, ints.u.data(), ints.t.data() );
+
+  // Compute HF Energy
+  const std::bitset<nbits> hf_det = 
+    dbwy::canonical_hf_determinant<nbits>(nalpha,nbeta);
+  const double EHF = ham_gen.matrix_element(hf_det, hf_det);
+  if(world_rank == 0) {
+    std::cout << std::scientific << std::setprecision(12);
+    std::cout << "E(HF) = " << EHF + ints.core_energy << std::endl;
+  }
+
+#if 1
+  // Compute CISD Energy
+  double ECISD = 0.;
+  if(world_rank == 0) {
+    std::cout << "\nPerforming CISD Calculation" << std::endl;
+  }
+  {
+    auto cisd_dets = dbwy::generate_cisd_hilbert_space<nbits>( norb_eff, hf_det );
+    if(world_rank == 0) {
+      std::cout << "NDETS_CISD = " << cisd_dets.size() << std::endl;
+    }
+    auto H_cisd = dbwy::make_dist_csr_hamiltonian<int32_t>(MPI_COMM_WORLD,
+      cisd_dets.begin(), cisd_dets.end(), ham_gen, 1e-12 );
+    ECISD = p_davidson( 100, H_cisd, 1e-8 );
+  }
+  if(world_rank == 0) {
+    std::cout << "E(CISD)   = " << ECISD + ints.core_energy << std::endl;
+    std::cout << "E_c(CISD) = " << ECISD - EHF << std::endl;
+  }
+#endif
+
+#if 0
+  // Compute Full CI Energy
+  double EFCI = 0.;
+  if(world_rank == 0) {
+    std::cout << "\nPerforming FCI Calculation" << std::endl;
+  }
+  {
+    auto fci_dets = build_hilbert_space<nbits>( norb_eff, nalpha, nbeta );
+    if(world_rank == 0) {
+      std::cout << "NDETS_FCI = " << fci_dets.size() << std::endl;
+    }
+    auto H_fci = dbwy::make_dist_csr_hamiltonian<int32_t>(MPI_COMM_WORLD,
+      fci_dets.begin(), fci_dets.end(), ham_gen, 1e-12 );
+    EFCI = p_davidson( 100, H_fci, 1e-8 );
+  }
+  if(world_rank == 0) {
+    std::cout << "E(FCI)   = " << EFCI + ints.core_energy << std::endl;
+    std::cout << "E_c(FCI) = " << EFCI - EHF << std::endl;
+    std::cout << "E(FCI) - E(CISD) = " << (EFCI - ECISD) << std::endl;
+  }
+#endif
+
+
+#if 0
+  // CIPSI
+  size_t ndets_max = 1000;
+  double pt2_thresh = 1e-8;
+  {
+
+  auto bitset_comp = [](auto x, auto y){ return dbwy::bitset_less(x,y); };
+
+  // First do CISD
+  auto dets = dbwy::generate_cisd_hilbert_space<nbits>( norb, hf_det );
+  std::sort(dets.begin(),dets.end(), bitset_comp );
+
+  double ESCI = 0.;
+  std::vector<double> X_local;
+  {
+    auto H = dbwy::make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
+      dets.begin(), dets.end(), ham_gen, 1e-12 );
+    
+    X_local.resize( H.local_row_extent() );
+    ESCI = p_davidson(100, H, 1e-8, X_local.data() );
+  }
+
+
+  // Expand Search Space
+  std::vector<std::bitset<nbits>> new_dets, sd_i;
+  std::unordered_set<std::bitset<nbits>> new_dets_set;
+  for( auto i = 0; i < dets.size(); ++i ) {
+
+    // Get all SD states connects to D[i]
+    dbwy::generate_cisd_hilbert_space<nbits>( norb, dets[i], sd_i );
+    new_dets_set.insert( sd_i.begin(), sd_i.end() );
+
+  }
+
+  std::cout << new_dets_set.size() << std::endl;
+
+
+#if 0
+  // Get doubly connected states
+  std::vector<std::bitset<nbits>> new_dets;
+  for( auto i = 0; i < dets.size(); ++i ) {
+    auto new_dets_i = dbwy::generate_cisd_hilbert_space<nbits>( norb, dets[i] );
+    new_dets.insert(new_dets.end(), new_dets_i.begin()+1, new_dets_i.end());
+  }
+
+  std::sort(new_dets.begin(), new_dets.end(),
+    [](auto x, auto y){ return dbwy::bitset_less(x,y); });
+  {
+    auto it = std::unique(new_dets.begin(), new_dets.end());
+    new_dets.erase(it, new_dets.end());
+    new_dets.shrink_to_fit();
+  }
+
+  
+  {
+    std::vector<std::bitset<nbits>> uniq_dets;
+    std::set_difference( 
+      new_dets.begin(), new_dets.end(),
+      dets.begin(), dets.end(),
+      std::back_inserter(uniq_dets),
+      [](auto x, auto y){ return dbwy::bitset_less(x,y); }
+    );
+    new_dets = std::move( uniq_dets );
+  }
+
+  std::cout << "NEW_NDETS = " << new_dets.size() << std::endl; 
+
+  // Compute PT2 Contributions
+  std::vector<double> PT2(new_dets.size());
+  for( auto i = 0; i < new_dets.size(); ++i ) {
+    double numerator = 0.;
+    for( auto j = 0; j < dets.size(); ++j )
+      numerator += ham_gen.matrix_element(dets[j], new_dets[i]) * X_local[j];
+    numerator *= numerator;
+
+    PT2[i] = numerator / (ESCI - ham_gen.matrix_element(new_dets[i],new_dets[i]));
+  }
+
+  std::vector<uint32_t> new_det_indices( new_dets.size() );
+  std::iota( new_det_indices.begin(), new_det_indices.end(), 0 );
+  std::sort( new_det_indices.begin(), new_det_indices.end(), [&](auto i, auto j) {
+    return std::abs(PT2[i]) > std::abs(PT2[j]);
+  });
+
+  for( auto i : new_det_indices ) {
+    if( dets.size() > ndets_max ) break;
+    if( std::abs(PT2[i]) < pt2_thresh ) break;
+
+    dets.emplace_back( new_dets[i] );
+  }
+  std::sort(dets.begin(),dets.end(),
+    [](auto x, auto y){ return dbwy::bitset_less(x,y); });
+
+
+  auto H_new = dbwy::make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
+    dets.begin(), dets.end(), ham_gen, 1e-12 );
+  
+  ESCI = p_davidson(100, H_new, 1e-8, nullptr );
+
+  std::cout << "E(SCI)   = " << ESCI  + ints.core_energy << std::endl;
+  std::cout << "E_c(SCI) = " << ESCI - EHF << std::endl;
+  //std::cout << "E(FCI) - E(SCI) = " << (EFCI - ESCI) << std::endl;
+#endif
+  } // CIPSI
+#endif
+
+#endif
 
   } // MPI Scope
   MPI_Finalize();

@@ -99,6 +99,23 @@ public:
     spin_det_t ex_beta, const std::vector<uint32_t>& bra_occ_alpha,
     const std::vector<uint32_t>& bra_occ_beta );
 
+  inline double matrix_element( full_det_t bra, full_det_t ket ) {
+    auto bra_alpha = truncate_bitset<N/2>(bra);
+    auto ket_alpha = truncate_bitset<N/2>(ket);
+    auto bra_beta  = truncate_bitset<N/2>(bra >> (N/2));
+    auto ket_beta  = truncate_bitset<N/2>(ket >> (N/2));
+
+    auto ex_alpha = bra_alpha ^ ket_alpha;
+    auto ex_beta  = bra_beta  ^ ket_beta;
+
+    auto bra_occ_alpha = bits_to_indices( bra_alpha );
+    auto bra_occ_beta  = bits_to_indices( bra_beta  );
+
+    return matrix_element( bra_alpha, ket_alpha, ex_alpha,
+      bra_beta, ket_beta, ex_beta, bra_occ_alpha, bra_occ_beta );
+
+  }
+
   template <typename index_t>
   sparse_matrix_type<index_t> make_csr_hamiltonian_block(
     full_det_iterator bra_begin,

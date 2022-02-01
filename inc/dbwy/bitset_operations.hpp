@@ -85,9 +85,14 @@ inline std::bitset<N> expand_bitset( std::bitset<M> bits ) {
 
 template <size_t N>
 bool bitset_less( std::bitset<N> x, std::bitset<N> y ) {
-  static_assert( N <= 64, "N > 64");
   if constexpr (N <= 32) return x.to_ulong() < y.to_ulong();
   else if constexpr (N <= 64) return x.to_ullong() < y.to_ullong();
+  else {
+    for (int i = N-1; i >= 0; i--) {
+      if (x[i] ^ y[i]) return y[i];
+    }
+    return false;
+  }
   abort();
 }
 
