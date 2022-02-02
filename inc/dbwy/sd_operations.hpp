@@ -161,6 +161,7 @@ void generate_cisd_hilbert_space( size_t norb, std::bitset<N> state,
 
 }
 
+
 template <size_t N>
 std::vector<std::bitset<N>> generate_cisd_hilbert_space( size_t norb, 
   std::bitset<N> state ) {
@@ -168,6 +169,29 @@ std::vector<std::bitset<N>> generate_cisd_hilbert_space( size_t norb,
   generate_cisd_hilbert_space( norb, state, dets );
   return dets;
 }
+
+
+template <size_t N>
+uint32_t first_occupied_flipped( std::bitset<N> state, std::bitset<N> ex ) {
+  return ffs( state & ex ) - 1u;
+}
+
+template <size_t N>
+double single_excitation_sign( std::bitset<N> state, unsigned p, unsigned q ) {
+  std::bitset<N> mask = 0ul;
+
+  if( p > q ) {
+    mask = state & ( full_mask<N>(p) ^ full_mask<N>(q+1) );
+  } else {
+    mask = state & ( full_mask<N>(q) ^ full_mask<N>(p+1) );
+  }
+  return (mask.count() % 2) ? -1. : 1.;
+}
+
+
+
+
+
 
 template <size_t N>
 void generate_residues( std::bitset<N> state, std::vector<std::bitset<N>>& res ) {

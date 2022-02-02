@@ -11,6 +11,8 @@
 
 #include <bitset>
 
+#include "dbwy/asci_util.hpp"
+
 template <size_t N>
 std::vector<std::bitset<N>> build_combs( uint64_t nbits, uint64_t nset ) {
 
@@ -273,8 +275,8 @@ int main( int argc, char* argv[] ) {
 
 
 #if 1
-  // CIPSI
-  size_t ndets_max = 10000;
+  // ASCI
+  size_t ndets_max = 100000;
   double metric_thresh = 1e-6;
   double coeff_thresh  = 1e-6;
   {
@@ -352,6 +354,7 @@ int main( int argc, char* argv[] ) {
     const std::bitset<nbits/2> one_h = 1ul;
 
     // Alpha
+#if 0
     for( auto i : occ_alpha )
     for( auto a : vir_alpha ) {
 
@@ -367,14 +370,20 @@ int main( int argc, char* argv[] ) {
       // Get excited determinant
       auto ex = state ^ (one << i) ^ (one << a);
 
-      double sign = ham_gen.single_ex_sign( state_alpha, a, i );
+      double sign = dbwy::single_excitation_sign( state_alpha, a, i );
       h_el *= sign;
 
       singles_v.push_back( {ex, coeff*h_el} );
 
     }
+#else
+    dbwy::append_singles_asci_contributions<(nbits/2),0>( coeff, state, state_alpha,
+      occ_alpha, vir_alpha, occ_beta, ham_gen.T_pq_, ham_gen.G_red_.data(),
+      ham_gen.V_red_.data(), norb, 1e-12, singles_v );
+#endif
 
     // Beta 
+#if 0
     for( auto i : occ_beta )
     for( auto a : vir_beta ) {
 
@@ -390,18 +399,24 @@ int main( int argc, char* argv[] ) {
       // Get excited determinant
       auto ex = state ^ (((one << i) ^ (one << a)) << (nbits/2));
 
-      double sign = ham_gen.single_ex_sign( state_beta, a, i);
+      double sign = dbwy::single_excitation_sign( state_beta, a, i );
       h_el *= sign;
 
       singles_v.push_back( {ex, coeff*h_el} );
 
     }
+#else
+    dbwy::append_singles_asci_contributions<(nbits/2),(nbits/2)>( coeff, state, 
+      state_beta, occ_beta, vir_beta, occ_alpha, ham_gen.T_pq_, 
+      ham_gen.G_red_.data(), ham_gen.V_red_.data(), norb, 1e-12, singles_v );
+#endif
 
     // Doubles
     const size_t nocc = occ_alpha.size();
     const size_t nvir = vir_alpha.size();
 
     // All Alpha
+#if 0
     for( auto ii = 0; ii < nocc; ++ii )
     for( auto aa = 0; aa < nvir; ++aa ) {
       const auto i = occ_alpha[ii];
@@ -455,8 +470,14 @@ int main( int argc, char* argv[] ) {
         singles_v.push_back( {ex_det, coeff*h_el} );
       }
     }
+#else
+    dbwy::append_ss_doubles_asci_contributions<nbits/2,0>( coeff, state, 
+      state_alpha, occ_alpha, vir_alpha, ham_gen.G_pqrs_.data(), norb,
+      1e-12, singles_v);
+#endif
 
     // All Beta 
+#if 0
     for( auto ii = 0; ii < nocc; ++ii )
     for( auto aa = 0; aa < nvir; ++aa ) {
       const auto i = occ_beta[ii];
@@ -510,8 +531,14 @@ int main( int argc, char* argv[] ) {
       
       }
     }
+#else
+    dbwy::append_ss_doubles_asci_contributions<nbits/2,nbits/2>( coeff, state, 
+      state_beta, occ_beta, vir_beta, ham_gen.G_pqrs_.data(), norb,
+      1e-12, singles_v);
+#endif
 
     // Mixed Alpha/Beta
+#if 0
     for( auto i : occ_alpha )
     for( auto a : vir_alpha ) {
       const auto V_ai = ham_gen.V_pqrs_ + a + i*norb;
@@ -537,6 +564,11 @@ int main( int argc, char* argv[] ) {
         singles_v.push_back( {ex_det, coeff*h_el} );
       }
     }
+#else
+    dbwy::append_os_doubles_asci_contributions( coeff, state, state_alpha,
+      state_beta, occ_alpha, occ_beta, vir_alpha, vir_beta, ham_gen.V_pqrs_,
+      norb, 1e-12, singles_v );
+#endif
       
   }
 
@@ -553,6 +585,7 @@ int main( int argc, char* argv[] ) {
       cur_it = it;
     } else {
       cur_it->second += it->second;
+      it->second = 0;
     }
   }
 
@@ -561,11 +594,30 @@ int main( int argc, char* argv[] ) {
       return x.first == y.first;
     });
   singles_v.erase(uit,singles_v.end());
-  singles_v.shrink_to_fit();
   std::cout << "UNIQ = " << singles_v.size() << std::endl;
+
+  for( auto i = 0; i < singles_v.size(); ++i ) {
+    auto det = singles_v[i].first;
+    auto diag_element = ham_gen.matrix_element(det,det);
+    singles_v[i].second /= EASCI - diag_element;
+  }
+
+  std::sort( singles_v.begin(), singles_v.end(), 
+  [](auto x, auto y){ return std::abs(x.second) > std::abs(y.second); });
+
+  singles_v.erase(singles_v.begin() + ndets_max, singles_v.end());
+  singles_v.shrink_to_fit();
 
   auto en = std::chrono::high_resolution_clock::now();
   std::cout << "DUR  = " << std::chrono::duration<double>(en-st).count() << std::endl;
+
+  for( auto [x,y] : singles_v ) {
+    std::cout << x << ", " << y << ", " << std::endl;
+  }
+  // Compute new energy
+
+
+
 #if 0
 
   // Compute weights of determinants already in space
