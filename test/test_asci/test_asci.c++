@@ -349,226 +349,31 @@ int main( int argc, char* argv[] ) {
     dbwy::bitset_to_occ_vir( norb, state_alpha, occ_alpha, vir_alpha ); 
     dbwy::bitset_to_occ_vir( norb, state_beta,  occ_beta,  vir_beta  ); 
 
-    // Generate single excitations
-    const std::bitset<nbits>   one   = 1ul;
-    const std::bitset<nbits/2> one_h = 1ul;
 
-    // Alpha
-#if 0
-    for( auto i : occ_alpha )
-    for( auto a : vir_alpha ) {
-
-      double h_el = ham_gen.T_pq_[a + i*norb];
-
-      const double* G_red_ov = ham_gen.G_red_.data() + a*norb + i*norb*norb;
-      const double* V_red_ov = ham_gen.V_red_.data() + a*norb + i*norb*norb;
-      for( auto p : occ_alpha ) h_el += G_red_ov[p];
-      for( auto p : occ_beta  ) h_el += V_red_ov[p];
-
-      if( std::abs(h_el) < 1e-12 ) continue;
-
-      // Get excited determinant
-      auto ex = state ^ (one << i) ^ (one << a);
-
-      double sign = dbwy::single_excitation_sign( state_alpha, a, i );
-      h_el *= sign;
-
-      singles_v.push_back( {ex, coeff*h_el} );
-
-    }
-#else
+    // Singles - AA
     dbwy::append_singles_asci_contributions<(nbits/2),0>( coeff, state, state_alpha,
       occ_alpha, vir_alpha, occ_beta, ham_gen.T_pq_, ham_gen.G_red_.data(),
       ham_gen.V_red_.data(), norb, 1e-12, singles_v );
-#endif
 
-    // Beta 
-#if 0
-    for( auto i : occ_beta )
-    for( auto a : vir_beta ) {
-
-      double h_el = ham_gen.T_pq_[a + i*norb];
-
-      const double* G_red_ov = ham_gen.G_red_.data() + a*norb + i*norb*norb;
-      const double* V_red_ov = ham_gen.V_red_.data() + a*norb + i*norb*norb;
-      for( auto p : occ_beta  ) h_el += G_red_ov[p];
-      for( auto p : occ_alpha ) h_el += V_red_ov[p];
-
-      if( std::abs(h_el) < 1e-12 ) continue;
-
-      // Get excited determinant
-      auto ex = state ^ (((one << i) ^ (one << a)) << (nbits/2));
-
-      double sign = dbwy::single_excitation_sign( state_beta, a, i );
-      h_el *= sign;
-
-      singles_v.push_back( {ex, coeff*h_el} );
-
-    }
-#else
+    // Singles - BB 
     dbwy::append_singles_asci_contributions<(nbits/2),(nbits/2)>( coeff, state, 
       state_beta, occ_beta, vir_beta, occ_alpha, ham_gen.T_pq_, 
       ham_gen.G_red_.data(), ham_gen.V_red_.data(), norb, 1e-12, singles_v );
-#endif
 
-    // Doubles
-    const size_t nocc = occ_alpha.size();
-    const size_t nvir = vir_alpha.size();
-
-    // All Alpha
-#if 0
-    for( auto ii = 0; ii < nocc; ++ii )
-    for( auto aa = 0; aa < nvir; ++aa ) {
-      const auto i = occ_alpha[ii];
-      const auto a = vir_alpha[aa];
-      const auto G_ai = ham_gen.G_pqrs_.data() + a + i*norb;
-
-      for( auto jj = ii + 1; jj < nocc; ++jj )
-      for( auto bb = aa + 1; bb < nvir; ++bb ) {
-        const auto j = occ_alpha[jj];
-        const auto b = vir_alpha[bb];
-        const auto jb = b + j*norb;
-        const auto G_aibj = G_ai[jb*norb*norb];
-
-        if( std::abs(G_aibj) < 1e-12 ) continue;
-
-        // Calculate excited determinant string (alpha)
-        const auto full_ex_alpha = 
-          (one_h << i) ^ (one_h << j) ^ (one_h << a) ^ (one_h << b);
-        auto ex_det_alpha = state_alpha ^ full_ex_alpha;
-
-        // Calculate the sign in a canonical way
-        double sign = 1.;
-        {
-          auto ket = state_alpha;
-          auto bra = ex_det_alpha;
-          const auto _o1 = ham_gen.first_occ_flipped( ket, full_ex_alpha );
-          const auto _v1 = ham_gen.first_occ_flipped( bra, full_ex_alpha );
-          sign = ham_gen.single_ex_sign( ket, _v1, _o1 );
-
-          ket ^= (one_h << _o1) ^ (one_h << _v1);
-          const auto fx = bra ^ ket;
-          const auto _o2 = ham_gen.first_occ_flipped( ket, fx );
-          const auto _v2 = ham_gen.first_occ_flipped( bra, fx );
-          sign *= ham_gen.single_ex_sign( ket, _v2, _o2 );
-        }
-
-        // Calculate full excited determinant
-        const auto full_ex = dbwy::expand_bitset<nbits>(full_ex_alpha);
-        auto ex_det = state ^ full_ex;
-
-        // Update sign of matrix element
-        auto h_el = sign * G_aibj;
-
-#if 0
-        auto ref = ham_gen.matrix_element(ex_det,state);
-        if( std::abs( h_el - ref ) > 1e-14 )
-          std::cout << "WRONG AAAA " << ref << ", " << h_el << std::endl;
-#endif
-
-        // Append {det, c*h_el}
-        singles_v.push_back( {ex_det, coeff*h_el} );
-      }
-    }
-#else
+    // Doubles - AAAA
     dbwy::append_ss_doubles_asci_contributions<nbits/2,0>( coeff, state, 
       state_alpha, occ_alpha, vir_alpha, ham_gen.G_pqrs_.data(), norb,
       1e-12, singles_v);
-#endif
 
-    // All Beta 
-#if 0
-    for( auto ii = 0; ii < nocc; ++ii )
-    for( auto aa = 0; aa < nvir; ++aa ) {
-      const auto i = occ_beta[ii];
-      const auto a = vir_beta[aa];
-      const auto G_ai = ham_gen.G_pqrs_.data() + a + i*norb;
-      for( auto jj = ii + 1; jj < nocc; ++jj )
-      for( auto bb = aa + 1; bb < nvir; ++bb ) {
-        const auto j = occ_beta[jj];
-        const auto b = vir_beta[bb];
-        const auto jb = b + j*norb;
-        const auto G_aibj = G_ai[jb*norb*norb];
-
-        if( std::abs(G_aibj) < 1e-12 ) continue;
-
-        // Calculate excited determinant string (beta)
-        const auto full_ex_beta = 
-          (one_h << i) ^ (one_h << j) ^ (one_h << a) ^ (one_h << b);
-        auto ex_det_beta = state_beta ^ full_ex_beta;
-
-        // Calculate the sign in a canonical way
-        double sign = 1.;
-        {
-          auto ket = state_beta;
-          auto bra = ex_det_beta;
-          const auto _o1 = ham_gen.first_occ_flipped( ket, full_ex_beta );
-          const auto _v1 = ham_gen.first_occ_flipped( bra, full_ex_beta );
-          sign = ham_gen.single_ex_sign( ket, _v1, _o1 );
-
-          ket ^= (one_h << _o1) ^ (one_h << _v1);
-          const auto fx = bra ^ ket;
-          const auto _o2 = ham_gen.first_occ_flipped( ket, fx );
-          const auto _v2 = ham_gen.first_occ_flipped( bra, fx );
-          sign *= ham_gen.single_ex_sign( ket, _v2, _o2 );
-        }
-
-        // Calculate full excited determinant
-        const auto full_ex = dbwy::expand_bitset<nbits>(full_ex_beta) << (nbits/2);
-        auto ex_det = state ^ full_ex;
-
-        // Update sign of matrix element
-        auto h_el = sign * G_aibj;
-
-#if 0
-        auto ref = ham_gen.matrix_element(ex_det,state);
-        if( std::abs( h_el - ref ) > 1e-14 )
-          std::cout << "WRONG BBBB " << ref << ", " << h_el << std::endl;
-#endif
-
-        // Append {det, c*h_el}
-        singles_v.push_back( {ex_det, coeff*h_el} );
-      
-      }
-    }
-#else
+    // Doubles - BBBB
     dbwy::append_ss_doubles_asci_contributions<nbits/2,nbits/2>( coeff, state, 
       state_beta, occ_beta, vir_beta, ham_gen.G_pqrs_.data(), norb,
       1e-12, singles_v);
-#endif
 
-    // Mixed Alpha/Beta
-#if 0
-    for( auto i : occ_alpha )
-    for( auto a : vir_alpha ) {
-      const auto V_ai = ham_gen.V_pqrs_ + a + i*norb;
-
-      double sign_alpha = ham_gen.single_ex_sign( state_alpha, a, i );
-      for( auto j : occ_beta )
-      for( auto b : vir_beta ) {
-        const auto jb = b + j*norb;
-        const auto V_aibj = V_ai[jb*norb*norb];
-
-        if( std::abs(V_aibj) < 1e-12 ) continue;
-
-        double sign_beta = ham_gen.single_ex_sign( state_beta,  b, j );
-        double sign = sign_alpha * sign_beta;
-        auto ex_det = state ^ (one << i) ^ (one << a) ^
-                            (((one << j) ^ (one << b)) << (nbits/2));
-        auto h_el = sign * V_aibj;
-#if 0
-        auto ref = ham_gen.matrix_element(ex_det,state);
-        if( std::abs( h_el - ref ) > 1e-14 )
-          std::cout << "WRONG AABB " << ref << ", " << h_el << std::endl;
-#endif
-        singles_v.push_back( {ex_det, coeff*h_el} );
-      }
-    }
-#else
+    // Doubles - AABB
     dbwy::append_os_doubles_asci_contributions( coeff, state, state_alpha,
       state_beta, occ_alpha, occ_beta, vir_alpha, vir_beta, ham_gen.V_pqrs_,
       norb, 1e-12, singles_v );
-#endif
       
   }
 
