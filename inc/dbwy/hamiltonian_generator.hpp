@@ -18,7 +18,7 @@ public:
 
   using full_det_iterator = std::vector<full_det_t>::iterator;
 
-protected:
+public:
 
   inline auto gen_alpha_mask() { return dbwy::full_mask<N/2,N>(); }
   inline auto gen_beta_mask()  { return gen_alpha_mask() << (N/2); }
@@ -30,7 +30,8 @@ protected:
     return dbwy::truncate_bitset<N/2>(str >> (N/2));
   }
 
-  inline uint32_t first_occ_flipped( spin_det_t state, spin_det_t ex ) {
+  template <size_t M>
+  inline uint32_t first_occ_flipped( std::bitset<M> state, std::bitset<M> ex ) {
     return dbwy::ffs( state & ex ) - 1u;
   }
 

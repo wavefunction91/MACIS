@@ -23,6 +23,18 @@ uint32_t ffs( std::bitset<N> bits ) {
 
   if constexpr (N <= 32)      return ffsl( bits.to_ulong() );
   else if constexpr (N <= 64) return ffsll( bits.to_ullong() );
+  #if 1
+  else if constexpr ( N%64 == 0 ) {
+    const auto mask = full_mask<64,N>();
+    constexpr auto nchunks = N/64;
+    #pragma GCC unroll 2
+    for( size_t i = 0; i < nchunks; ++i ) {
+      const uint64_t chunk = ((bits >> (i*64)) & mask).to_ullong();
+      if( chunk ) return ffsll(chunk);
+    }
+    return 0;
+  }
+  #endif
   else {
     uint32_t ind = 0;
     for( ind = 0; ind < N; ++ind )
@@ -87,6 +99,12 @@ template <size_t N>
 bool bitset_less( std::bitset<N> x, std::bitset<N> y ) {
   if constexpr (N <= 32) return x.to_ulong() < y.to_ulong();
   else if constexpr (N <= 64) return x.to_ullong() < y.to_ullong();
+  else if constexpr (N == 128) {
+    typedef unsigned __int128 uint128_t;
+    auto _x = reinterpret_cast<uint128_t*>(&x);
+    auto _y = reinterpret_cast<uint128_t*>(&y);
+    return *_x < *_y;
+  } 
   else {
     for (int i = N-1; i >= 0; i--) {
       if (x[i] ^ y[i]) return y[i];
@@ -97,4 +115,10 @@ bool bitset_less( std::bitset<N> x, std::bitset<N> y ) {
 }
 
 
+template <size_t N>
+struct bitset_less_comparator {
+  bool operator()( std::bitset<N> x, std::bitset<N> y ) const {
+    return bitset_less(x,y);
+  }
+};
 }

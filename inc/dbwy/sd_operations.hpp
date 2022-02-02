@@ -34,10 +34,12 @@ void append_singles( std::bitset<N> state,
   const std::vector<uint32_t>& occ, const std::vector<uint32_t>& vir,
   std::vector<std::bitset<N>>& singles ) {
 
-  singles.clear();
   const size_t nocc = occ.size();
   const size_t nvir = vir.size();
   const std::bitset<N> one = 1ul;
+
+  singles.clear();
+  singles.reserve(nocc*nvir);
 
   for( size_t a = 0; a < nvir; ++a )
   for( size_t i = 0; i < nocc; ++i ) {
@@ -52,10 +54,14 @@ void append_doubles( std::bitset<N> state,
   const std::vector<uint32_t>& occ, const std::vector<uint32_t>& vir,
   std::vector<std::bitset<N>>& doubles ) {
 
-  doubles.clear();
   const size_t nocc = occ.size();
   const size_t nvir = vir.size();
   const std::bitset<N> one = 1ul;
+
+  doubles.clear();
+  const size_t nv2 = (nvir * (nvir-1)) / 2;
+  const size_t no2 = (nocc * (nocc-1)) / 2;
+  doubles.reserve(nv2 * no2);
 
   for( size_t a = 0; a < nvir; ++a )
   for( size_t i = 0; i < nocc; ++i ) 

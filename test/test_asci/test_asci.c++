@@ -228,7 +228,7 @@ int main( int argc, char* argv[] ) {
     std::cout << "E(HF) = " << EHF + ints.core_energy << std::endl;
   }
 
-#if 1
+#if 0
   // Compute CISD Energy
   double ECISD = 0.;
   if(world_rank == 0) {
@@ -272,10 +272,11 @@ int main( int argc, char* argv[] ) {
 #endif
 
 
-#if 0
+#if 1
   // CIPSI
-  size_t ndets_max = 1000;
-  double pt2_thresh = 1e-8;
+  size_t ndets_max = 10000;
+  double metric_thresh = 1e-6;
+  double coeff_thresh  = 1e-6;
   {
 
   auto bitset_comp = [](auto x, auto y){ return dbwy::bitset_less(x,y); };
@@ -284,29 +285,322 @@ int main( int argc, char* argv[] ) {
   auto dets = dbwy::generate_cisd_hilbert_space<nbits>( norb, hf_det );
   std::sort(dets.begin(),dets.end(), bitset_comp );
 
-  double ESCI = 0.;
+  double EASCI = 0.;
   std::vector<double> X_local;
   {
     auto H = dbwy::make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
       dets.begin(), dets.end(), ham_gen, 1e-12 );
     
     X_local.resize( H.local_row_extent() );
-    ESCI = p_davidson(100, H, 1e-8, X_local.data() );
+    EASCI = p_davidson(100, H, 1e-8, X_local.data() );
+  }
+  if(world_rank == 0) {
+    std::cout << "E(ASCI)   = " << EASCI + ints.core_energy << std::endl;
+    std::cout << "E_c(ASCI) = " << EASCI - EHF << std::endl;
   }
 
+  if(world_size != 1) throw "NO MPI";
 
+  // Reorder the dets / coefficients
+  {
+  std::vector<uint32_t> idx( X_local.size() );
+  std::iota( idx.begin(), idx.end(), 0 );
+  std::sort(idx.begin(), idx.end(), [&](auto i, auto j) {
+    return std::abs(X_local[i]) > std::abs(X_local[j]);
+  });
+
+  std::vector<double> tmp( X_local.size() );
+  std::vector<std::bitset<nbits>> tmp_dets(dets.size());
+  for( auto i = 0; i < dets.size(); ++i ) {
+    tmp_dets[i] = dets[idx[i]];
+    tmp[i]      = X_local[idx[i]];
+  }
+
+  dets = std::move(tmp_dets);
+  X_local = std::move(tmp);
+  }
+
+  // Find det cutoff
+  size_t nkeep = 0;
+  {
+    auto it = std::partition_point( X_local.begin(), X_local.end(),
+      [&](auto x){ return std::abs(x) > coeff_thresh; } );
+    nkeep = std::distance( X_local.begin(), it );
+  }
+
+  std::cout << "NKEEP COEFF = " << nkeep << std::endl;
+
+  std::vector<uint32_t> occ_alpha, vir_alpha;
+  std::vector<uint32_t> occ_beta, vir_beta;
+
+  auto st = std::chrono::high_resolution_clock::now();
+  // Loop over kept determinants and expand det space 
+  std::vector<std::pair<std::bitset<nbits>,double>> singles_v;
+  for( auto i = 0ul; i < nkeep; ++i ) {
+    
+    // Get occupied nad virtual indices
+    auto state       = dets[i];
+    auto state_alpha = dbwy::truncate_bitset<nbits/2>(state);
+    auto state_beta  = dbwy::truncate_bitset<nbits/2>(state >> (nbits/2));
+    auto coeff       = X_local[i];
+
+    dbwy::bitset_to_occ_vir( norb, state_alpha, occ_alpha, vir_alpha ); 
+    dbwy::bitset_to_occ_vir( norb, state_beta,  occ_beta,  vir_beta  ); 
+
+    // Generate single excitations
+    const std::bitset<nbits>   one   = 1ul;
+    const std::bitset<nbits/2> one_h = 1ul;
+
+    // Alpha
+    for( auto i : occ_alpha )
+    for( auto a : vir_alpha ) {
+
+      double h_el = ham_gen.T_pq_[a + i*norb];
+
+      const double* G_red_ov = ham_gen.G_red_.data() + a*norb + i*norb*norb;
+      const double* V_red_ov = ham_gen.V_red_.data() + a*norb + i*norb*norb;
+      for( auto p : occ_alpha ) h_el += G_red_ov[p];
+      for( auto p : occ_beta  ) h_el += V_red_ov[p];
+
+      if( std::abs(h_el) < 1e-12 ) continue;
+
+      // Get excited determinant
+      auto ex = state ^ (one << i) ^ (one << a);
+
+      double sign = ham_gen.single_ex_sign( state_alpha, a, i );
+      h_el *= sign;
+
+      singles_v.push_back( {ex, coeff*h_el} );
+
+    }
+
+    // Beta 
+    for( auto i : occ_beta )
+    for( auto a : vir_beta ) {
+
+      double h_el = ham_gen.T_pq_[a + i*norb];
+
+      const double* G_red_ov = ham_gen.G_red_.data() + a*norb + i*norb*norb;
+      const double* V_red_ov = ham_gen.V_red_.data() + a*norb + i*norb*norb;
+      for( auto p : occ_beta  ) h_el += G_red_ov[p];
+      for( auto p : occ_alpha ) h_el += V_red_ov[p];
+
+      if( std::abs(h_el) < 1e-12 ) continue;
+
+      // Get excited determinant
+      auto ex = state ^ (((one << i) ^ (one << a)) << (nbits/2));
+
+      double sign = ham_gen.single_ex_sign( state_beta, a, i);
+      h_el *= sign;
+
+      singles_v.push_back( {ex, coeff*h_el} );
+
+    }
+
+    // Doubles
+    const size_t nocc = occ_alpha.size();
+    const size_t nvir = vir_alpha.size();
+
+    // All Alpha
+    for( auto ii = 0; ii < nocc; ++ii )
+    for( auto aa = 0; aa < nvir; ++aa ) {
+      const auto i = occ_alpha[ii];
+      const auto a = vir_alpha[aa];
+      const auto G_ai = ham_gen.G_pqrs_.data() + a + i*norb;
+
+      for( auto jj = ii + 1; jj < nocc; ++jj )
+      for( auto bb = aa + 1; bb < nvir; ++bb ) {
+        const auto j = occ_alpha[jj];
+        const auto b = vir_alpha[bb];
+        const auto jb = b + j*norb;
+        const auto G_aibj = G_ai[jb*norb*norb];
+
+        if( std::abs(G_aibj) < 1e-12 ) continue;
+
+        // Calculate excited determinant string (alpha)
+        const auto full_ex_alpha = 
+          (one_h << i) ^ (one_h << j) ^ (one_h << a) ^ (one_h << b);
+        auto ex_det_alpha = state_alpha ^ full_ex_alpha;
+
+        // Calculate the sign in a canonical way
+        double sign = 1.;
+        {
+          auto ket = state_alpha;
+          auto bra = ex_det_alpha;
+          const auto _o1 = ham_gen.first_occ_flipped( ket, full_ex_alpha );
+          const auto _v1 = ham_gen.first_occ_flipped( bra, full_ex_alpha );
+          sign = ham_gen.single_ex_sign( ket, _v1, _o1 );
+
+          ket ^= (one_h << _o1) ^ (one_h << _v1);
+          const auto fx = bra ^ ket;
+          const auto _o2 = ham_gen.first_occ_flipped( ket, fx );
+          const auto _v2 = ham_gen.first_occ_flipped( bra, fx );
+          sign *= ham_gen.single_ex_sign( ket, _v2, _o2 );
+        }
+
+        // Calculate full excited determinant
+        const auto full_ex = dbwy::expand_bitset<nbits>(full_ex_alpha);
+        auto ex_det = state ^ full_ex;
+
+        // Update sign of matrix element
+        auto h_el = sign * G_aibj;
+
+#if 0
+        auto ref = ham_gen.matrix_element(ex_det,state);
+        if( std::abs( h_el - ref ) > 1e-14 )
+          std::cout << "WRONG AAAA " << ref << ", " << h_el << std::endl;
+#endif
+
+        // Append {det, c*h_el}
+        singles_v.push_back( {ex_det, coeff*h_el} );
+      }
+    }
+
+    // All Beta 
+    for( auto ii = 0; ii < nocc; ++ii )
+    for( auto aa = 0; aa < nvir; ++aa ) {
+      const auto i = occ_beta[ii];
+      const auto a = vir_beta[aa];
+      const auto G_ai = ham_gen.G_pqrs_.data() + a + i*norb;
+      for( auto jj = ii + 1; jj < nocc; ++jj )
+      for( auto bb = aa + 1; bb < nvir; ++bb ) {
+        const auto j = occ_beta[jj];
+        const auto b = vir_beta[bb];
+        const auto jb = b + j*norb;
+        const auto G_aibj = G_ai[jb*norb*norb];
+
+        if( std::abs(G_aibj) < 1e-12 ) continue;
+
+        // Calculate excited determinant string (beta)
+        const auto full_ex_beta = 
+          (one_h << i) ^ (one_h << j) ^ (one_h << a) ^ (one_h << b);
+        auto ex_det_beta = state_beta ^ full_ex_beta;
+
+        // Calculate the sign in a canonical way
+        double sign = 1.;
+        {
+          auto ket = state_beta;
+          auto bra = ex_det_beta;
+          const auto _o1 = ham_gen.first_occ_flipped( ket, full_ex_beta );
+          const auto _v1 = ham_gen.first_occ_flipped( bra, full_ex_beta );
+          sign = ham_gen.single_ex_sign( ket, _v1, _o1 );
+
+          ket ^= (one_h << _o1) ^ (one_h << _v1);
+          const auto fx = bra ^ ket;
+          const auto _o2 = ham_gen.first_occ_flipped( ket, fx );
+          const auto _v2 = ham_gen.first_occ_flipped( bra, fx );
+          sign *= ham_gen.single_ex_sign( ket, _v2, _o2 );
+        }
+
+        // Calculate full excited determinant
+        const auto full_ex = dbwy::expand_bitset<nbits>(full_ex_beta) << (nbits/2);
+        auto ex_det = state ^ full_ex;
+
+        // Update sign of matrix element
+        auto h_el = sign * G_aibj;
+
+#if 0
+        auto ref = ham_gen.matrix_element(ex_det,state);
+        if( std::abs( h_el - ref ) > 1e-14 )
+          std::cout << "WRONG BBBB " << ref << ", " << h_el << std::endl;
+#endif
+
+        // Append {det, c*h_el}
+        singles_v.push_back( {ex_det, coeff*h_el} );
+      
+      }
+    }
+
+    // Mixed Alpha/Beta
+    for( auto i : occ_alpha )
+    for( auto a : vir_alpha ) {
+      const auto V_ai = ham_gen.V_pqrs_ + a + i*norb;
+
+      double sign_alpha = ham_gen.single_ex_sign( state_alpha, a, i );
+      for( auto j : occ_beta )
+      for( auto b : vir_beta ) {
+        const auto jb = b + j*norb;
+        const auto V_aibj = V_ai[jb*norb*norb];
+
+        if( std::abs(V_aibj) < 1e-12 ) continue;
+
+        double sign_beta = ham_gen.single_ex_sign( state_beta,  b, j );
+        double sign = sign_alpha * sign_beta;
+        auto ex_det = state ^ (one << i) ^ (one << a) ^
+                            (((one << j) ^ (one << b)) << (nbits/2));
+        auto h_el = sign * V_aibj;
+#if 0
+        auto ref = ham_gen.matrix_element(ex_det,state);
+        if( std::abs( h_el - ref ) > 1e-14 )
+          std::cout << "WRONG AABB " << ref << ", " << h_el << std::endl;
+#endif
+        singles_v.push_back( {ex_det, coeff*h_el} );
+      }
+    }
+      
+  }
+
+  std::cout << singles_v.size() << std::endl;
+  std::sort( singles_v.begin(), singles_v.end(), 
+    []( auto x, auto y ) {
+      return dbwy::bitset_less(x.first, y.first);
+    });
+
+  
+  auto cur_it = singles_v.begin();
+  for( auto it = singles_v.begin() + 1; it != singles_v.end(); ++it ) {
+    if( it->first != cur_it->first ) {
+      cur_it = it;
+    } else {
+      cur_it->second += it->second;
+    }
+  }
+
+  auto uit = std::unique( singles_v.begin(), singles_v.end(), 
+    []( auto x, auto y ) {
+      return x.first == y.first;
+    });
+  singles_v.erase(uit,singles_v.end());
+  singles_v.shrink_to_fit();
+  std::cout << "UNIQ = " << singles_v.size() << std::endl;
+
+  auto en = std::chrono::high_resolution_clock::now();
+  std::cout << "DUR  = " << std::chrono::duration<double>(en-st).count() << std::endl;
+#if 0
+
+  // Compute weights of determinants already in space
+
+  // Compute Y = H * X = E * X
+  std::vector<double> Y_local( X_local );
+  std::transform( Y_local.begin(), Y_local.end(), Y_local.begin(), 
+    [=](auto x) { return ESCI*x; });
+
+  // Compute A(i) = H(i,j) * X(j) / (H(i,i) - E)
+  //              = Y(i) / (H(i,i) - E)
+  for( auto i = 0; i < dets.size(); ++i ) {
+    auto d = dets[i];
+    Y_local[i] = Y_local[i] / ( ham_gen.matrix_element(d,d) - ESCI );
+  }
+
+#if 0
+  for( auto i = 0; i < dets.size(); ++i ) {
+    std::cout << i << ", " << X_local[i] << ", " << Y_local[i] << std::endl;
+  }
+#endif
+
+#endif
+
+
+#if 0
   // Expand Search Space
   std::vector<std::bitset<nbits>> new_dets, sd_i;
-  std::unordered_set<std::bitset<nbits>> new_dets_set;
-  for( auto i = 0; i < dets.size(); ++i ) {
+  for( auto i = 1; i < dets.size(); ++i ) {
 
     // Get all SD states connects to D[i]
     dbwy::generate_cisd_hilbert_space<nbits>( norb, dets[i], sd_i );
-    new_dets_set.insert( sd_i.begin(), sd_i.end() );
 
   }
-
-  std::cout << new_dets_set.size() << std::endl;
+#endif
 
 
 #if 0
