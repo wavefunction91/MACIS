@@ -304,6 +304,7 @@ int main( int argc, char* argv[] ) {
   if(world_size != 1) throw "NO MPI";
 
   // Reorder the dets / coefficients
+  #if 0
   {
   std::vector<uint32_t> idx( X_local.size() );
   std::iota( idx.begin(), idx.end(), 0 );
@@ -321,6 +322,9 @@ int main( int argc, char* argv[] ) {
   dets = std::move(tmp_dets);
   X_local = std::move(tmp);
   }
+  #else
+  dbwy::reorder_ci_on_coeff( dets, X_local, MPI_COMM_WORLD );
+  #endif
 
   // Find det cutoff
   size_t nkeep = 0;
@@ -332,12 +336,13 @@ int main( int argc, char* argv[] ) {
 
   std::cout << "NKEEP COEFF = " << nkeep << std::endl;
 
+#if 0
   std::vector<uint32_t> occ_alpha, vir_alpha;
   std::vector<uint32_t> occ_beta, vir_beta;
 
   auto st = std::chrono::high_resolution_clock::now();
   // Loop over kept determinants and expand det space 
-  std::vector<std::pair<std::bitset<nbits>,double>> singles_v;
+  std::vector<std::pair<std::bitset<nbits>,double>> asci_pairs;
   for( auto i = 0ul; i < nkeep; ++i ) {
     
     // Get occupied nad virtual indices
@@ -353,39 +358,38 @@ int main( int argc, char* argv[] ) {
     // Singles - AA
     dbwy::append_singles_asci_contributions<(nbits/2),0>( coeff, state, state_alpha,
       occ_alpha, vir_alpha, occ_beta, ham_gen.T_pq_, ham_gen.G_red_.data(),
-      ham_gen.V_red_.data(), norb, 1e-12, singles_v );
+      ham_gen.V_red_.data(), norb, 1e-12, asci_pairs );
 
     // Singles - BB 
     dbwy::append_singles_asci_contributions<(nbits/2),(nbits/2)>( coeff, state, 
       state_beta, occ_beta, vir_beta, occ_alpha, ham_gen.T_pq_, 
-      ham_gen.G_red_.data(), ham_gen.V_red_.data(), norb, 1e-12, singles_v );
+      ham_gen.G_red_.data(), ham_gen.V_red_.data(), norb, 1e-12, asci_pairs );
 
     // Doubles - AAAA
     dbwy::append_ss_doubles_asci_contributions<nbits/2,0>( coeff, state, 
       state_alpha, occ_alpha, vir_alpha, ham_gen.G_pqrs_.data(), norb,
-      1e-12, singles_v);
+      1e-12, asci_pairs);
 
     // Doubles - BBBB
     dbwy::append_ss_doubles_asci_contributions<nbits/2,nbits/2>( coeff, state, 
       state_beta, occ_beta, vir_beta, ham_gen.G_pqrs_.data(), norb,
-      1e-12, singles_v);
+      1e-12, asci_pairs);
 
     // Doubles - AABB
     dbwy::append_os_doubles_asci_contributions( coeff, state, state_alpha,
       state_beta, occ_alpha, occ_beta, vir_alpha, vir_beta, ham_gen.V_pqrs_,
-      norb, 1e-12, singles_v );
+      norb, 1e-12, asci_pairs );
       
   }
 
-  std::cout << singles_v.size() << std::endl;
-  std::sort( singles_v.begin(), singles_v.end(), 
+  std::sort( asci_pairs.begin(), asci_pairs.end(), 
     []( auto x, auto y ) {
       return dbwy::bitset_less(x.first, y.first);
     });
 
   
-  auto cur_it = singles_v.begin();
-  for( auto it = singles_v.begin() + 1; it != singles_v.end(); ++it ) {
+  auto cur_it = asci_pairs.begin();
+  for( auto it = asci_pairs.begin() + 1; it != asci_pairs.end(); ++it ) {
     if( it->first != cur_it->first ) {
       cur_it = it;
     } else {
@@ -394,33 +398,59 @@ int main( int argc, char* argv[] ) {
     }
   }
 
-  auto uit = std::unique( singles_v.begin(), singles_v.end(), 
+  auto uit = std::unique( asci_pairs.begin(), asci_pairs.end(), 
     []( auto x, auto y ) {
       return x.first == y.first;
     });
-  singles_v.erase(uit,singles_v.end());
-  std::cout << "UNIQ = " << singles_v.size() << std::endl;
+  asci_pairs.erase(uit,asci_pairs.end());
+  std::cout << "UNIQ = " << asci_pairs.size() << std::endl;
 
-  for( auto i = 0; i < singles_v.size(); ++i ) {
-    auto det = singles_v[i].first;
+  for( auto i = 0; i < asci_pairs.size(); ++i ) {
+    auto det = asci_pairs[i].first;
     auto diag_element = ham_gen.matrix_element(det,det);
-    singles_v[i].second /= EASCI - diag_element;
+    asci_pairs[i].second /= EASCI - diag_element;
   }
 
-  std::sort( singles_v.begin(), singles_v.end(), 
+  std::sort( asci_pairs.begin(), asci_pairs.end(), 
   [](auto x, auto y){ return std::abs(x.second) > std::abs(y.second); });
 
-  singles_v.erase(singles_v.begin() + ndets_max, singles_v.end());
-  singles_v.shrink_to_fit();
+  asci_pairs.erase(asci_pairs.begin() + ndets_max, asci_pairs.end());
+  asci_pairs.shrink_to_fit();
 
   auto en = std::chrono::high_resolution_clock::now();
   std::cout << "DUR  = " << std::chrono::duration<double>(en-st).count() << std::endl;
 
-  for( auto [x,y] : singles_v ) {
+#if 0
+  for( auto [x,y] : asci_pairs ) {
     std::cout << x << ", " << y << ", " << std::endl;
   }
-  // Compute new energy
+#endif
 
+
+  // Compute new energy
+  std::vector<std::bitset<nbits>> new_dets; new_dets.reserve( asci_pairs.size() );
+  for( auto [x,y] : asci_pairs ) {
+    new_dets.emplace_back(x);
+  }
+#else
+
+  auto new_dets = asci_search( ndets_max, dets.begin(), dets.begin() + nkeep,
+    EASCI, X_local, norb, ham_gen.T_pq_, ham_gen.G_red_.data(), 
+    ham_gen.V_red_.data(), ham_gen.G_pqrs_.data(), ham_gen.V_pqrs_, ham_gen );
+
+#endif
+
+  {
+    auto H = dbwy::make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
+      new_dets.begin(), new_dets.end(), ham_gen, 1e-12 );
+    
+    X_local.resize( H.local_row_extent() );
+    EASCI = p_davidson(100, H, 1e-8, X_local.data() );
+  }
+  if(world_rank == 0) {
+    std::cout << "E(ASCI)   = " << EASCI + ints.core_energy << std::endl;
+    std::cout << "E_c(ASCI) = " << EASCI - EHF << std::endl;
+  }
 
 
 #if 0
