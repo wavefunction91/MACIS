@@ -287,21 +287,10 @@ int main( int argc, char* argv[] ) {
   auto dets = dbwy::generate_cisd_hilbert_space<nbits>( norb, hf_det );
   std::sort(dets.begin(),dets.end(), bitset_comp );
 
-#if 0
-  double EASCI = 0.;
-  std::vector<double> X_local;
-  {
-    auto H = dbwy::make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
-      dets.begin(), dets.end(), ham_gen, 1e-12 );
-    
-    X_local.resize( H.local_row_extent() );
-    EASCI = p_davidson(100, H, 1e-8, X_local.data() );
-  }
-#else
+  // Diagonalize CISD Hamiltonian
   std::vector<double> X_local;
   double EASCI = dbwy::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
     1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD );
-#endif
   if(world_rank == 0) {
     std::cout << "E(ASCI)   = " << EASCI + ints.core_energy << std::endl;
     std::cout << "E_c(ASCI) = " << EASCI - EHF << std::endl;
@@ -322,31 +311,21 @@ int main( int argc, char* argv[] ) {
 
   std::cout << "NKEEP COEFF = " << nkeep << std::endl;
 
-
+  // Do ASCI Search
   dets = asci_search( ndets_max, dets.begin(), dets.begin() + nkeep,
     EASCI, X_local, norb, ham_gen.T_pq_, ham_gen.G_red_.data(), 
     ham_gen.V_red_.data(), ham_gen.G_pqrs_.data(), ham_gen.V_pqrs_, ham_gen );
 
-
-#if 0
-  {
-    auto H = dbwy::make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
-      new_dets.begin(), new_dets.end(), ham_gen, 1e-12 );
-    
-    X_local.resize( H.local_row_extent() );
-    EASCI = p_davidson(100, H, 1e-8, X_local.data() );
-  }
-#else
+  // Rediagonalize
   EASCI = dbwy::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
     1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD );
-#endif
   if(world_rank == 0) {
     std::cout << "E(ASCI)   = " << EASCI + ints.core_energy << std::endl;
     std::cout << "E_c(ASCI) = " << EASCI - EHF << std::endl;
   }
 
 
-  } // CIPSI
+  } // ASCI 
 #endif
 
 #endif
