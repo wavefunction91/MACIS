@@ -246,6 +246,19 @@ std::vector<std::bitset<N>> asci_search(
     append_os_doubles_asci_contributions( coeff, state, state_alpha, state_beta, 
       occ_alpha, occ_beta, vir_alpha, vir_beta, V_pqrs, norb, 1e-12, asci_pairs );
 
+    // Prune down the contributions
+    if( asci_pairs.size() > 700000000 ) {
+
+      std::cout << i << " Pruning" << std::endl;
+
+      // Remove small contributions
+      auto it = std::partition( asci_pairs.begin(), asci_pairs.end(), 
+        [](auto x){ return std::abs(x.second) > 1e-6; } );
+      asci_pairs.erase(it,asci_pairs.end());
+
+      std::cout << "NEW SIZE = " << asci_pairs.size() << std::endl;
+
+    }
   } // Loop over determinants
 
 

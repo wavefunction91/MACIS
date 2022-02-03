@@ -280,8 +280,15 @@ int main( int argc, char* argv[] ) {
   double metric_thresh = 1e-6;
   double coeff_thresh  = 1e-6;
   {
+  if(world_size != 1) throw "NO MPI"; // Disable MPI for now
 
   auto bitset_comp = [](auto x, auto y){ return dbwy::bitset_less(x,y); };
+  auto print_asci  = [&](double E) {
+    if(world_rank == 0) {
+      std::cout << "E(ASCI)   = " << E + ints.core_energy << std::endl;
+      std::cout << "E_c(ASCI) = " << E - EHF << std::endl;
+    }
+  };
 
   // First do CISD
   auto dets = dbwy::generate_cisd_hilbert_space<nbits>( norb, hf_det );
@@ -291,37 +298,40 @@ int main( int argc, char* argv[] ) {
   std::vector<double> X_local;
   double EASCI = dbwy::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
     1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD );
-  if(world_rank == 0) {
-    std::cout << "E(ASCI)   = " << EASCI + ints.core_energy << std::endl;
-    std::cout << "E_c(ASCI) = " << EASCI - EHF << std::endl;
-  }
+  print_asci( EASCI );
 
-  if(world_size != 1) throw "NO MPI";
+  size_t niter_max = 5;
 
-  // Reorder the dets / coefficients
-  dbwy::reorder_ci_on_coeff( dets, X_local, MPI_COMM_WORLD );
+  // ASCI Loop
+  for( size_t iter = 0; iter < niter_max; ++iter ) {
+    // Reorder the dets / coefficients
+    dbwy::reorder_ci_on_coeff( dets, X_local, MPI_COMM_WORLD );
 
-  // Find det cutoff
-  size_t nkeep = 0;
-  {
-    auto it = std::partition_point( X_local.begin(), X_local.end(),
-      [&](auto x){ return std::abs(x) > coeff_thresh; } );
-    nkeep = std::distance( X_local.begin(), it );
-  }
+    // Find det cutoff
+    size_t nkeep = 0;
+    {
+      auto it = std::partition_point( X_local.begin(), X_local.end(),
+        [&](auto x){ return std::abs(x) > coeff_thresh; } );
+      nkeep = std::distance( X_local.begin(), it );
+    }
 
-  std::cout << "NKEEP COEFF = " << nkeep << std::endl;
+    std::cout << "NKEEP COEFF = " << nkeep << std::endl;
 
-  // Do ASCI Search
-  dets = asci_search( ndets_max, dets.begin(), dets.begin() + nkeep,
-    EASCI, X_local, norb, ham_gen.T_pq_, ham_gen.G_red_.data(), 
-    ham_gen.V_red_.data(), ham_gen.G_pqrs_.data(), ham_gen.V_pqrs_, ham_gen );
+    // Do ASCI Search
+    dets = asci_search( ndets_max, dets.begin(), dets.begin() + nkeep,
+      EASCI, X_local, norb, ham_gen.T_pq_, ham_gen.G_red_.data(), 
+      ham_gen.V_red_.data(), ham_gen.G_pqrs_.data(), ham_gen.V_pqrs_, ham_gen );
 
-  // Rediagonalize
-  EASCI = dbwy::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
-    1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD );
-  if(world_rank == 0) {
-    std::cout << "E(ASCI)   = " << EASCI + ints.core_energy << std::endl;
-    std::cout << "E_c(ASCI) = " << EASCI - EHF << std::endl;
+    // Rediagonalize
+    auto E = dbwy::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
+      1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD );
+
+    // Print iteration results
+    print_asci( E );
+
+    // Check for convergence
+    if( std::abs(E - EASCI) < 1e-6 ) break;
+    EASCI = E;
   }
 
 
