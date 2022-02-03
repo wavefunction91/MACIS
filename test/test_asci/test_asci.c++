@@ -330,7 +330,10 @@ int main( int argc, char* argv[] ) {
     print_asci( E );
 
     // Check for convergence
-    if( std::abs(E - EASCI) < 1e-6 ) break;
+    if( std::abs(E - EASCI) < 1e-6 ) {
+      std::cout << "ASCI Converged" << std::endl;
+      break;
+    }
     EASCI = E;
   }
 

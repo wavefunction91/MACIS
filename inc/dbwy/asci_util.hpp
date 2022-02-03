@@ -210,6 +210,7 @@ std::vector<std::bitset<N>> asci_search(
   std::vector<uint32_t> occ_beta, vir_beta;
 
   std::vector< std::pair<std::bitset<N>,double>> asci_pairs;
+  const double h_el_tol = 1e-12;
 
   // Expand Search Space
   const size_t ndets = std::distance(dets_begin, dets_end);
@@ -226,25 +227,25 @@ std::vector<std::bitset<N>> asci_search(
 
     // Singles - AA
     append_singles_asci_contributions<(N/2),0>( coeff, state, state_alpha,
-      occ_alpha, vir_alpha, occ_beta, T_pq, G_red, V_red, norb, 1e-12, 
+      occ_alpha, vir_alpha, occ_beta, T_pq, G_red, V_red, norb, h_el_tol, 
       asci_pairs );
 
     // Singles - BB 
     append_singles_asci_contributions<(N/2),(N/2)>( coeff, state, state_beta, 
-      occ_beta, vir_beta, occ_alpha, T_pq, G_red, V_red, norb, 1e-12, 
+      occ_beta, vir_beta, occ_alpha, T_pq, G_red, V_red, norb, h_el_tol, 
       asci_pairs );
 
     // Doubles - AAAA
     append_ss_doubles_asci_contributions<N/2,0>( coeff, state, state_alpha, 
-      occ_alpha, vir_alpha, G_pqrs, norb, 1e-12, asci_pairs);
+      occ_alpha, vir_alpha, G_pqrs, norb, h_el_tol, asci_pairs);
 
     // Doubles - BBBB
     append_ss_doubles_asci_contributions<N/2,N/2>( coeff, state, state_beta, 
-      occ_beta, vir_beta, G_pqrs, norb, 1e-12, asci_pairs);
+      occ_beta, vir_beta, G_pqrs, norb, h_el_tol, asci_pairs);
 
     // Doubles - AABB
     append_os_doubles_asci_contributions( coeff, state, state_alpha, state_beta, 
-      occ_alpha, occ_beta, vir_alpha, vir_beta, V_pqrs, norb, 1e-12, asci_pairs );
+      occ_alpha, occ_beta, vir_alpha, vir_beta, V_pqrs, norb, h_el_tol, asci_pairs );
 
     // Prune down the contributions
     if( asci_pairs.size() > 700000000 ) {
@@ -296,10 +297,17 @@ std::vector<std::bitset<N>> asci_search(
     asci_pairs[i].second /= E_ASCI - diag_element;
   }
 
+#if 0
   // Sort pairs by ASCI score
   std::sort( asci_pairs.begin(), asci_pairs.end(), [](auto x, auto y) {
     return std::abs(x.second) > std::abs(y.second);
   });
+#else
+  std::nth_element( asci_pairs.begin(), asci_pairs.begin() + ndets_max,
+    asci_pairs.end(), [](auto x, auto y){ 
+      return std::abs(x.second) > std::abs(y.second);
+    });
+#endif
 
   // Shrink to max search space
   asci_pairs.erase( asci_pairs.begin() + ndets_max, asci_pairs.end() );
