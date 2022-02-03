@@ -300,4 +300,32 @@ std::vector<std::bitset<N>> asci_search(
   return new_dets;
 }
 
+
+template <size_t N, typename index_t = int32_t>
+double selected_ci_diag( 
+  typename std::vector<std::bitset<N>>::iterator dets_begin,
+  typename std::vector<std::bitset<N>>::iterator dets_end,
+  HamiltonianGenerator<N>&                       ham_gen,
+  double                                         h_el_tol,
+  size_t                                         davidson_max_m,
+  double                                         davidson_res_tol,
+  std::vector<double>&                           C_local,
+  MPI_Comm                                       comm
+) {
+
+  // Generate Hamiltonian
+  auto H = make_dist_csr_hamiltonian<index_t>( comm, dets_begin, dets_end,
+    ham_gen, h_el_tol );
+
+  // Resize eigenvector size
+  C_local.resize( H.local_row_extent() );
+
+  // Solve EVP
+  double E = p_davidson( davidson_max_m, H, davidson_res_tol, C_local.data() );
+
+  return E;
+
+}
+
+
 }

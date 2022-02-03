@@ -287,6 +287,7 @@ int main( int argc, char* argv[] ) {
   auto dets = dbwy::generate_cisd_hilbert_space<nbits>( norb, hf_det );
   std::sort(dets.begin(),dets.end(), bitset_comp );
 
+#if 0
   double EASCI = 0.;
   std::vector<double> X_local;
   {
@@ -296,6 +297,11 @@ int main( int argc, char* argv[] ) {
     X_local.resize( H.local_row_extent() );
     EASCI = p_davidson(100, H, 1e-8, X_local.data() );
   }
+#else
+  std::vector<double> X_local;
+  double EASCI = dbwy::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
+    1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD );
+#endif
   if(world_rank == 0) {
     std::cout << "E(ASCI)   = " << EASCI + ints.core_energy << std::endl;
     std::cout << "E_c(ASCI) = " << EASCI - EHF << std::endl;
@@ -304,27 +310,7 @@ int main( int argc, char* argv[] ) {
   if(world_size != 1) throw "NO MPI";
 
   // Reorder the dets / coefficients
-  #if 0
-  {
-  std::vector<uint32_t> idx( X_local.size() );
-  std::iota( idx.begin(), idx.end(), 0 );
-  std::sort(idx.begin(), idx.end(), [&](auto i, auto j) {
-    return std::abs(X_local[i]) > std::abs(X_local[j]);
-  });
-
-  std::vector<double> tmp( X_local.size() );
-  std::vector<std::bitset<nbits>> tmp_dets(dets.size());
-  for( auto i = 0; i < dets.size(); ++i ) {
-    tmp_dets[i] = dets[idx[i]];
-    tmp[i]      = X_local[idx[i]];
-  }
-
-  dets = std::move(tmp_dets);
-  X_local = std::move(tmp);
-  }
-  #else
   dbwy::reorder_ci_on_coeff( dets, X_local, MPI_COMM_WORLD );
-  #endif
 
   // Find det cutoff
   size_t nkeep = 0;
@@ -336,110 +322,13 @@ int main( int argc, char* argv[] ) {
 
   std::cout << "NKEEP COEFF = " << nkeep << std::endl;
 
-#if 0
-  std::vector<uint32_t> occ_alpha, vir_alpha;
-  std::vector<uint32_t> occ_beta, vir_beta;
 
-  auto st = std::chrono::high_resolution_clock::now();
-  // Loop over kept determinants and expand det space 
-  std::vector<std::pair<std::bitset<nbits>,double>> asci_pairs;
-  for( auto i = 0ul; i < nkeep; ++i ) {
-    
-    // Get occupied nad virtual indices
-    auto state       = dets[i];
-    auto state_alpha = dbwy::truncate_bitset<nbits/2>(state);
-    auto state_beta  = dbwy::truncate_bitset<nbits/2>(state >> (nbits/2));
-    auto coeff       = X_local[i];
-
-    dbwy::bitset_to_occ_vir( norb, state_alpha, occ_alpha, vir_alpha ); 
-    dbwy::bitset_to_occ_vir( norb, state_beta,  occ_beta,  vir_beta  ); 
-
-
-    // Singles - AA
-    dbwy::append_singles_asci_contributions<(nbits/2),0>( coeff, state, state_alpha,
-      occ_alpha, vir_alpha, occ_beta, ham_gen.T_pq_, ham_gen.G_red_.data(),
-      ham_gen.V_red_.data(), norb, 1e-12, asci_pairs );
-
-    // Singles - BB 
-    dbwy::append_singles_asci_contributions<(nbits/2),(nbits/2)>( coeff, state, 
-      state_beta, occ_beta, vir_beta, occ_alpha, ham_gen.T_pq_, 
-      ham_gen.G_red_.data(), ham_gen.V_red_.data(), norb, 1e-12, asci_pairs );
-
-    // Doubles - AAAA
-    dbwy::append_ss_doubles_asci_contributions<nbits/2,0>( coeff, state, 
-      state_alpha, occ_alpha, vir_alpha, ham_gen.G_pqrs_.data(), norb,
-      1e-12, asci_pairs);
-
-    // Doubles - BBBB
-    dbwy::append_ss_doubles_asci_contributions<nbits/2,nbits/2>( coeff, state, 
-      state_beta, occ_beta, vir_beta, ham_gen.G_pqrs_.data(), norb,
-      1e-12, asci_pairs);
-
-    // Doubles - AABB
-    dbwy::append_os_doubles_asci_contributions( coeff, state, state_alpha,
-      state_beta, occ_alpha, occ_beta, vir_alpha, vir_beta, ham_gen.V_pqrs_,
-      norb, 1e-12, asci_pairs );
-      
-  }
-
-  std::sort( asci_pairs.begin(), asci_pairs.end(), 
-    []( auto x, auto y ) {
-      return dbwy::bitset_less(x.first, y.first);
-    });
-
-  
-  auto cur_it = asci_pairs.begin();
-  for( auto it = asci_pairs.begin() + 1; it != asci_pairs.end(); ++it ) {
-    if( it->first != cur_it->first ) {
-      cur_it = it;
-    } else {
-      cur_it->second += it->second;
-      it->second = 0;
-    }
-  }
-
-  auto uit = std::unique( asci_pairs.begin(), asci_pairs.end(), 
-    []( auto x, auto y ) {
-      return x.first == y.first;
-    });
-  asci_pairs.erase(uit,asci_pairs.end());
-  std::cout << "UNIQ = " << asci_pairs.size() << std::endl;
-
-  for( auto i = 0; i < asci_pairs.size(); ++i ) {
-    auto det = asci_pairs[i].first;
-    auto diag_element = ham_gen.matrix_element(det,det);
-    asci_pairs[i].second /= EASCI - diag_element;
-  }
-
-  std::sort( asci_pairs.begin(), asci_pairs.end(), 
-  [](auto x, auto y){ return std::abs(x.second) > std::abs(y.second); });
-
-  asci_pairs.erase(asci_pairs.begin() + ndets_max, asci_pairs.end());
-  asci_pairs.shrink_to_fit();
-
-  auto en = std::chrono::high_resolution_clock::now();
-  std::cout << "DUR  = " << std::chrono::duration<double>(en-st).count() << std::endl;
-
-#if 0
-  for( auto [x,y] : asci_pairs ) {
-    std::cout << x << ", " << y << ", " << std::endl;
-  }
-#endif
-
-
-  // Compute new energy
-  std::vector<std::bitset<nbits>> new_dets; new_dets.reserve( asci_pairs.size() );
-  for( auto [x,y] : asci_pairs ) {
-    new_dets.emplace_back(x);
-  }
-#else
-
-  auto new_dets = asci_search( ndets_max, dets.begin(), dets.begin() + nkeep,
+  dets = asci_search( ndets_max, dets.begin(), dets.begin() + nkeep,
     EASCI, X_local, norb, ham_gen.T_pq_, ham_gen.G_red_.data(), 
     ham_gen.V_red_.data(), ham_gen.G_pqrs_.data(), ham_gen.V_pqrs_, ham_gen );
 
-#endif
 
+#if 0
   {
     auto H = dbwy::make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
       new_dets.begin(), new_dets.end(), ham_gen, 1e-12 );
@@ -447,115 +336,16 @@ int main( int argc, char* argv[] ) {
     X_local.resize( H.local_row_extent() );
     EASCI = p_davidson(100, H, 1e-8, X_local.data() );
   }
+#else
+  EASCI = dbwy::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
+    1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD );
+#endif
   if(world_rank == 0) {
     std::cout << "E(ASCI)   = " << EASCI + ints.core_energy << std::endl;
     std::cout << "E_c(ASCI) = " << EASCI - EHF << std::endl;
   }
 
 
-#if 0
-
-  // Compute weights of determinants already in space
-
-  // Compute Y = H * X = E * X
-  std::vector<double> Y_local( X_local );
-  std::transform( Y_local.begin(), Y_local.end(), Y_local.begin(), 
-    [=](auto x) { return ESCI*x; });
-
-  // Compute A(i) = H(i,j) * X(j) / (H(i,i) - E)
-  //              = Y(i) / (H(i,i) - E)
-  for( auto i = 0; i < dets.size(); ++i ) {
-    auto d = dets[i];
-    Y_local[i] = Y_local[i] / ( ham_gen.matrix_element(d,d) - ESCI );
-  }
-
-#if 0
-  for( auto i = 0; i < dets.size(); ++i ) {
-    std::cout << i << ", " << X_local[i] << ", " << Y_local[i] << std::endl;
-  }
-#endif
-
-#endif
-
-
-#if 0
-  // Expand Search Space
-  std::vector<std::bitset<nbits>> new_dets, sd_i;
-  for( auto i = 1; i < dets.size(); ++i ) {
-
-    // Get all SD states connects to D[i]
-    dbwy::generate_cisd_hilbert_space<nbits>( norb, dets[i], sd_i );
-
-  }
-#endif
-
-
-#if 0
-  // Get doubly connected states
-  std::vector<std::bitset<nbits>> new_dets;
-  for( auto i = 0; i < dets.size(); ++i ) {
-    auto new_dets_i = dbwy::generate_cisd_hilbert_space<nbits>( norb, dets[i] );
-    new_dets.insert(new_dets.end(), new_dets_i.begin()+1, new_dets_i.end());
-  }
-
-  std::sort(new_dets.begin(), new_dets.end(),
-    [](auto x, auto y){ return dbwy::bitset_less(x,y); });
-  {
-    auto it = std::unique(new_dets.begin(), new_dets.end());
-    new_dets.erase(it, new_dets.end());
-    new_dets.shrink_to_fit();
-  }
-
-  
-  {
-    std::vector<std::bitset<nbits>> uniq_dets;
-    std::set_difference( 
-      new_dets.begin(), new_dets.end(),
-      dets.begin(), dets.end(),
-      std::back_inserter(uniq_dets),
-      [](auto x, auto y){ return dbwy::bitset_less(x,y); }
-    );
-    new_dets = std::move( uniq_dets );
-  }
-
-  std::cout << "NEW_NDETS = " << new_dets.size() << std::endl; 
-
-  // Compute PT2 Contributions
-  std::vector<double> PT2(new_dets.size());
-  for( auto i = 0; i < new_dets.size(); ++i ) {
-    double numerator = 0.;
-    for( auto j = 0; j < dets.size(); ++j )
-      numerator += ham_gen.matrix_element(dets[j], new_dets[i]) * X_local[j];
-    numerator *= numerator;
-
-    PT2[i] = numerator / (ESCI - ham_gen.matrix_element(new_dets[i],new_dets[i]));
-  }
-
-  std::vector<uint32_t> new_det_indices( new_dets.size() );
-  std::iota( new_det_indices.begin(), new_det_indices.end(), 0 );
-  std::sort( new_det_indices.begin(), new_det_indices.end(), [&](auto i, auto j) {
-    return std::abs(PT2[i]) > std::abs(PT2[j]);
-  });
-
-  for( auto i : new_det_indices ) {
-    if( dets.size() > ndets_max ) break;
-    if( std::abs(PT2[i]) < pt2_thresh ) break;
-
-    dets.emplace_back( new_dets[i] );
-  }
-  std::sort(dets.begin(),dets.end(),
-    [](auto x, auto y){ return dbwy::bitset_less(x,y); });
-
-
-  auto H_new = dbwy::make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD,
-    dets.begin(), dets.end(), ham_gen, 1e-12 );
-  
-  ESCI = p_davidson(100, H_new, 1e-8, nullptr );
-
-  std::cout << "E(SCI)   = " << ESCI  + ints.core_energy << std::endl;
-  std::cout << "E_c(SCI) = " << ESCI - EHF << std::endl;
-  //std::cout << "E(FCI) - E(SCI) = " << (EFCI - ESCI) << std::endl;
-#endif
   } // CIPSI
 #endif
 
