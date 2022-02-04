@@ -152,8 +152,9 @@ void p_rayleigh_ritz( int64_t N_local, int64_t K, const double* X, int64_t LDX,
 }
 
 
-double p_davidson( int64_t max_m, const sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double,int32_t>>& A, double tol,
-  double* X_local = nullptr ) {
+double p_davidson( int64_t max_m, 
+  const sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double,int32_t>>& A, 
+  double tol, double* X_local = nullptr, bool print = false ) {
 
   //int64_t N = A.n();
   int64_t N_local = A.local_row_extent();
@@ -163,7 +164,7 @@ double p_davidson( int64_t max_m, const sparsexx::dist_sparse_matrix<sparsexx::c
   MPI_Comm_rank( comm, &world_rank );
   MPI_Comm_size( comm, &world_size );
 
-  if( world_rank == 0 ) {
+  if( world_rank == 0 and print ) {
     std::cout << "\nDavidson Eigensolver" << std::endl
               << "  MAX_M = " << max_m << std::endl
               << "  RTOL  = " << tol   << std::endl
@@ -264,7 +265,7 @@ double p_davidson( int64_t max_m, const sparsexx::dist_sparse_matrix<sparsexx::c
     auto res_dot = blas::dot( N_local, R_local, 1, R_local, 1 );
     MPI_Allreduce(MPI_IN_PLACE, &res_dot, 1, MPI_DOUBLE, MPI_SUM, comm );
     auto res_nrm = std::sqrt(res_dot);
-    if( world_rank == 0 ) {
+    if( print and world_rank == 0 ) {
       std::cout << std::scientific << std::setprecision(12);
       std::cout << std::setw(4) << i << ", " << LAM[0] << ", " << res_nrm << std::endl;
     }

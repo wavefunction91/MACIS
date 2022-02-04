@@ -276,8 +276,7 @@ int main( int argc, char* argv[] ) {
 
 #if 1
   // ASCI
-  size_t ndets_max = 100000;
-  double metric_thresh = 1e-6;
+  size_t ndets_max = 200000;
   double coeff_thresh  = 1e-6;
   {
   if(world_size != 1) throw "NO MPI"; // Disable MPI for now
@@ -285,11 +284,12 @@ int main( int argc, char* argv[] ) {
   auto bitset_comp = [](auto x, auto y){ return dbwy::bitset_less(x,y); };
   auto print_asci  = [&](double E) {
     if(world_rank == 0) {
-      std::cout << "E(ASCI)   = " << E + ints.core_energy << std::endl;
-      std::cout << "E_c(ASCI) = " << E - EHF << std::endl;
+      std::cout << "  * E(ASCI)   = " << E + ints.core_energy << " Eh" << std::endl;
+      std::cout << "  * E_c(ASCI) = " << (E - EHF)*1000 << " mEh" << std::endl;
     }
   };
 
+  std::cout << "* Initializing ASCI with CISD" << std::endl;
   // First do CISD
   auto dets = dbwy::generate_cisd_hilbert_space<nbits>( norb, hf_det );
   std::sort(dets.begin(),dets.end(), bitset_comp );
@@ -304,6 +304,7 @@ int main( int argc, char* argv[] ) {
 
   // ASCI Loop
   for( size_t iter = 0; iter < niter_max; ++iter ) {
+    std::cout << "\n* ASCI Iteration: " << iter << std::endl;
     // Reorder the dets / coefficients
     dbwy::reorder_ci_on_coeff( dets, X_local, MPI_COMM_WORLD );
 
@@ -314,8 +315,6 @@ int main( int argc, char* argv[] ) {
         [&](auto x){ return std::abs(x) > coeff_thresh; } );
       nkeep = std::distance( X_local.begin(), it );
     }
-
-    std::cout << "NKEEP COEFF = " << nkeep << std::endl;
 
     // Do ASCI Search
     dets = asci_search( ndets_max, dets.begin(), dets.begin() + nkeep,
@@ -334,6 +333,7 @@ int main( int argc, char* argv[] ) {
       std::cout << "ASCI Converged" << std::endl;
       break;
     }
+    std::cout << "  * dE        = " << (E - EASCI)*1000 << " mEh" << std::endl;
     EASCI = E;
   }
 

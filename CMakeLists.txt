@@ -17,6 +17,18 @@ if( NOT linalg-cmake-modules_POPULATED )
   list( APPEND CMAKE_MODULE_PATH ${linalg-cmake-modules_SOURCE_DIR} )
 endif()
 
+# IPS4O Sort
+FetchContent_Declare( ips4o
+  GIT_REPOSITORY https://github.com/SaschaWitt/ips4o.git 
+)
+FetchContent_GetProperties( ips4o )
+if( NOT ips4o_POPULATED )
+  FetchContent_Populate( ips4o )
+endif()
+add_library( ips4o INTERFACE )
+target_include_directories( ips4o INTERFACE ${ips4o_SOURCE_DIR} )
+target_link_libraries( ips4o INTERFACE atomic )
+
 option( CMZED_ENABLE_OPENMP "Enable OpenMP Bindings" ON )
 
 # find lapack

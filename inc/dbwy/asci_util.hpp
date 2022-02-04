@@ -1,5 +1,6 @@
 #pragma once
 #include "sd_operations.hpp"
+#include <ips4o.hpp>
 
 namespace dbwy {
 
@@ -188,6 +189,47 @@ void append_os_doubles_asci_contributions(
 
 
 
+template <size_t N>
+void sort_and_accumulate_asci_pairs(
+  std::vector< std::pair<std::bitset<N>,double> >& asci_pairs
+) {
+
+  // Sort by bitstring
+  #if 0
+  std::sort( asci_pairs.begin(), asci_pairs.end(), []( auto x, auto y ) {
+    return bitset_less(x.first, y.first);
+  });
+  #else
+  #if 0
+  ips4o::sort( asci_pairs.begin(), asci_pairs.end(), []( auto x, auto y ) {
+    return bitset_less(x.first, y.first);
+  });
+  #else
+  ips4o::parallel::sort( asci_pairs.begin(), asci_pairs.end(), 
+    []( auto x, auto y ) { return bitset_less(x.first, y.first); });
+  #endif
+  #endif
+
+  // Accumulate the ASCI scores into first instance of unique bitstrings
+  auto cur_it = asci_pairs.begin();
+  for( auto it = cur_it + 1; it != asci_pairs.end(); ++it ) {
+    // If iterate is not the one being tracked, update the iterator
+    if( it->first != cur_it->first ) { cur_it = it; }
+
+    // Accumulate
+    else {
+      cur_it->second += it->second;
+      it->second = 0; // Zero out to expose potential bugs
+    }
+  }
+
+  // Remote duplicate bitstrings
+  auto uit = std::unique( asci_pairs.begin(), asci_pairs.end(),
+    [](auto x, auto y){ return x.first == y.first; } );
+  asci_pairs.erase(uit, asci_pairs.end()); // Erase dead space
+
+}
+
 
 
 template <size_t N>
@@ -210,10 +252,32 @@ std::vector<std::bitset<N>> asci_search(
   std::vector<uint32_t> occ_beta, vir_beta;
 
   std::vector< std::pair<std::bitset<N>,double>> asci_pairs;
-  const double h_el_tol = 1e-12;
+
+  const size_t ndets = std::distance(dets_begin, dets_end);
+
+  // Tolerances 
+  const double h_el_tol     = 1e-12;
+  #if 0
+  const double rv_prune_val = 1e-8;
+  const size_t pair_size_cutoff = 2e9;
+  #else
+  const double rv_prune_val = 1e-6;
+  const size_t pair_size_cutoff = 1e9;
+  #endif
+
+  std::cout << "* Performing ASCI Search over " << ndets << " Determinants" 
+    << std::endl;
+  std::cout << "  * Search Knobs:"
+            << "\n    * Hamiltonian Element Tolerance = " << h_el_tol
+            << "\n    * Max ASCI Pair Size            = " << pair_size_cutoff
+            << "\n    * RV Pruning Tolerance          = " << rv_prune_val
+            << std::endl;
+
+  using clock_type = std::chrono::high_resolution_clock;
+  using duration_type = std::chrono::duration<double>;
 
   // Expand Search Space
-  const size_t ndets = std::distance(dets_begin, dets_end);
+  auto pairs_st = clock_type::now();
   for( size_t i = 0; i < ndets; ++i ) {
 
     auto state       = *(dets_begin + i);
@@ -248,66 +312,69 @@ std::vector<std::bitset<N>> asci_search(
       occ_alpha, occ_beta, vir_alpha, vir_beta, V_pqrs, norb, h_el_tol, asci_pairs );
 
     // Prune down the contributions
-    if( asci_pairs.size() > 700000000 ) {
-
-      std::cout << i << " Pruning" << std::endl;
+    if( asci_pairs.size() > pair_size_cutoff  ) {
 
       // Remove small contributions
       auto it = std::partition( asci_pairs.begin(), asci_pairs.end(), 
-        [](auto x){ return std::abs(x.second) > 1e-6; } );
+        [=](auto x){ return std::abs(x.second) > rv_prune_val; } );
       asci_pairs.erase(it,asci_pairs.end());
 
-      std::cout << "NEW SIZE = " << asci_pairs.size() << std::endl;
-
-    }
-  } // Loop over determinants
-
-
-  // Sort the pairs by bitstring
-  std::sort( asci_pairs.begin(), asci_pairs.end(), []( auto x, auto y ) {
-    return bitset_less(x.first, y.first);
-  });
-
-  // Accumulate the ASCI scores into first instance of unique bitstrings
-  {
-    auto cur_it = asci_pairs.begin();
-    for( auto it = cur_it + 1; it != asci_pairs.end(); ++it ) {
-      // If iterate is not the one being tracked, update the iterator
-      if( it->first != cur_it->first ) { cur_it = it; }
-
-      // Accumulate
-      else {
-        cur_it->second += it->second;
-        it->second = 0; // Zero out to expose potential bugs
+      std::cout << "  * Pruning at " << i 
+                << " NSZ = " << asci_pairs.size() << std::endl;
+      // Extra Pruning if not cut down enough
+      if( asci_pairs.size() > pair_size_cutoff ) {
+        std::cout << "    * Removing Duplicates ";
+        sort_and_accumulate_asci_pairs( asci_pairs );
+        std::cout << " NSZ = " << asci_pairs.size() << std::endl;
       }
     }
 
-    // Remote duplicate bitstrings
-    auto uit = std::unique( asci_pairs.begin(), asci_pairs.end(),
-      [](auto x, auto y){ return x.first == y.first; } );
-    asci_pairs.erase(uit, asci_pairs.end()); // Erase dead space
-  }
+  } // Loop over determinants
+  auto pairs_en = clock_type::now();
 
+  std::cout << "  * ASCI Kept " << asci_pairs.size() << " Pairs" << std::endl;
+
+
+  // Accumulate unique score contributions
+  auto bit_sort_st = clock_type::now();
+  sort_and_accumulate_asci_pairs( asci_pairs );
+  auto bit_sort_en = clock_type::now();
+
+  std::cout << "  * ASCI Will Search Over " << asci_pairs.size() 
+            << " Unique Determinants" << std::endl;
+
+  std::cout << "  * Timings: " << std::endl;
+
+  std::cout << "    * Pair Formation    = " 
+            << duration_type(pairs_en - pairs_st).count() << std::endl;
+  std::cout << "    * Bitset Sort/Acc   = " 
+            << duration_type(bit_sort_en - bit_sort_st).count() << std::endl;
+
+  
   // Finish ASCI scores with denominator
   // TODO: this can be done more efficiently
+  auto asci_diagel_st = clock_type::now();
   const size_t nuniq = asci_pairs.size();
   for( size_t i = 0; i < nuniq; ++i ) {
     auto det = asci_pairs[i].first;
     auto diag_element = ham_gen.matrix_element(det,det);
     asci_pairs[i].second /= E_ASCI - diag_element;
   }
+  auto asci_diagel_en = clock_type::now();
+  std::cout << "    * Diagonal Elements = " 
+            << duration_type(asci_diagel_en-asci_diagel_st).count() << std::endl;
 
-#if 0
+
   // Sort pairs by ASCI score
-  std::sort( asci_pairs.begin(), asci_pairs.end(), [](auto x, auto y) {
-    return std::abs(x.second) > std::abs(y.second);
-  });
-#else
+  auto asci_sort_st = clock_type::now();
   std::nth_element( asci_pairs.begin(), asci_pairs.begin() + ndets_max,
     asci_pairs.end(), [](auto x, auto y){ 
       return std::abs(x.second) > std::abs(y.second);
     });
-#endif
+  auto asci_sort_en = clock_type::now();
+  std::cout << "    * Score Sort        = " 
+            << duration_type(asci_sort_en-asci_sort_st).count() << std::endl;
+  std::cout << std::endl;
 
   // Shrink to max search space
   asci_pairs.erase( asci_pairs.begin() + ndets_max, asci_pairs.end() );
@@ -334,15 +401,51 @@ double selected_ci_diag(
   MPI_Comm                                       comm
 ) {
 
+  std::cout << "* Diagonalizing CI Hamiltonian over " 
+            << std::distance(dets_begin,dets_end)
+            << " Determinants" << std::endl;
+
+  std::cout << "  * Hamiltonian Knobs:" << std::endl
+            << "    * Hamiltonian Element Tolerance = " << h_el_tol << std::endl;
+
+  std::cout << "  * Davidson Knobs:" << std::endl
+            << "    * Residual Tol = " << davidson_res_tol << std::endl
+            << "    * Max M        = " << davidson_max_m << std::endl;
+
+  using clock_type = std::chrono::high_resolution_clock;
+  using duration_type = std::chrono::duration<double>;
+
+  MPI_Barrier(comm);
+  auto H_st = clock_type::now();
   // Generate Hamiltonian
   auto H = make_dist_csr_hamiltonian<index_t>( comm, dets_begin, dets_end,
     ham_gen, h_el_tol );
+
+  MPI_Barrier(comm);
+  auto H_en = clock_type::now();
+
+  // Get total NNZ
+  size_t local_nnz = H.nnz();
+  size_t total_nnz;
+  MPI_Allreduce( &local_nnz, &total_nnz, 1, MPI_UINT64_T, MPI_SUM, comm );
+  std::cout << "  * Hamiltonian NNZ = " << total_nnz << std::endl;
+
+  std::cout << "  * Timings:" << std::endl;
+  std::cout << "    * Hamiltonian Construction = " 
+    << duration_type(H_en-H_st).count() << std::endl;
 
   // Resize eigenvector size
   C_local.resize( H.local_row_extent() );
 
   // Solve EVP
+  MPI_Barrier(comm);
+  auto dav_st = clock_type::now();
   double E = p_davidson( davidson_max_m, H, davidson_res_tol, C_local.data() );
+  MPI_Barrier(comm);
+  auto dav_en = clock_type::now();
+  std::cout << "    * Davidson                 = " 
+    << duration_type(dav_en-dav_st).count() << std::endl;
+  std::cout << std::endl;
 
   return E;
 
