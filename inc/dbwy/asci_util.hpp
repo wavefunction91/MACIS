@@ -6,6 +6,12 @@ namespace dbwy {
 
 
 template <size_t N>
+struct asci_contrib {
+  std::bitset<N> state;
+  double         rv;
+};
+
+template <size_t N>
 void reorder_ci_on_coeff( std::vector<std::bitset<N>>& dets, 
   std::vector<double>& C_local, MPI_Comm /* comm: will need for dist*/ ) {
 
@@ -43,7 +49,7 @@ void append_singles_asci_contributions(
   const double*                V_kpq,
   size_t                       norb,
   double                       h_el_tol,
-  std::vector< std::pair<std::bitset<2*N>,double> >& asci_contributions
+  std::vector< asci_contrib<2*N> >& asci_contributions
 ) {
 
   const std::bitset<2*N> one = 1;
@@ -86,7 +92,7 @@ void append_ss_doubles_asci_contributions(
   const double*                G,
   size_t                       norb,
   double                       h_el_tol,
-  std::vector< std::pair<std::bitset<2*N>,double> >& asci_contributions
+  std::vector< asci_contrib<2*N> >& asci_contributions
 ) {
 
   const size_t nocc = occ.size();
@@ -98,14 +104,14 @@ void append_ss_doubles_asci_contributions(
 
     const auto i = occ[ii];
     const auto a = vir[aa];
-    const auto G_ai = G + a + i*norb;
+    const auto G_ai = G + (a + i*norb)*norb*norb;
 
     for( auto jj = ii + 1; jj < nocc; ++jj )
     for( auto bb = aa + 1; bb < nvir; ++bb ) {
       const auto j = occ[jj];
       const auto b = vir[bb];
       const auto jb = b + j*norb;
-      const auto G_aibj = G_ai[jb*norb*norb];
+      const auto G_aibj = G_ai[jb];
 
       if( std::abs(G_aibj) < h_el_tol ) continue;
 
@@ -159,7 +165,7 @@ void append_os_doubles_asci_contributions(
   const double*                V,
   size_t                       norb,
   double                       h_el_tol,
-  std::vector< std::pair<std::bitset<2*N>,double> >& asci_contributions
+  std::vector< asci_contrib<2*N> >& asci_contributions
 ) {
 
   const std::bitset<2*N> one = 1;
@@ -191,22 +197,22 @@ void append_os_doubles_asci_contributions(
 
 template <size_t N>
 void sort_and_accumulate_asci_pairs(
-  std::vector< std::pair<std::bitset<N>,double> >& asci_pairs
+  std::vector< asci_contrib<N> >& asci_pairs
 ) {
 
   // Sort by bitstring
   #if 0
   std::sort( asci_pairs.begin(), asci_pairs.end(), []( auto x, auto y ) {
-    return bitset_less(x.first, y.first);
+    return bitset_less(x.state, y.state);
   });
   #else
   #if 0
   ips4o::sort( asci_pairs.begin(), asci_pairs.end(), []( auto x, auto y ) {
-    return bitset_less(x.first, y.first);
+    return bitset_less(x.state, y.state);
   });
   #else
   ips4o::parallel::sort( asci_pairs.begin(), asci_pairs.end(), 
-    []( auto x, auto y ) { return bitset_less(x.first, y.first); });
+    []( auto x, auto y ) { return bitset_less(x.state, y.state); });
   #endif
   #endif
 
@@ -214,18 +220,18 @@ void sort_and_accumulate_asci_pairs(
   auto cur_it = asci_pairs.begin();
   for( auto it = cur_it + 1; it != asci_pairs.end(); ++it ) {
     // If iterate is not the one being tracked, update the iterator
-    if( it->first != cur_it->first ) { cur_it = it; }
+    if( it->state != cur_it->state ) { cur_it = it; }
 
     // Accumulate
     else {
-      cur_it->second += it->second;
-      it->second = 0; // Zero out to expose potential bugs
+      cur_it->rv += it->rv;
+      it->rv = 0; // Zero out to expose potential bugs
     }
   }
 
   // Remote duplicate bitstrings
   auto uit = std::unique( asci_pairs.begin(), asci_pairs.end(),
-    [](auto x, auto y){ return x.first == y.first; } );
+    [](auto x, auto y){ return x.state == y.state; } );
   asci_pairs.erase(uit, asci_pairs.end()); // Erase dead space
 
 }
@@ -251,7 +257,7 @@ std::vector<std::bitset<N>> asci_search(
   std::vector<uint32_t> occ_alpha, vir_alpha;
   std::vector<uint32_t> occ_beta, vir_beta;
 
-  std::vector< std::pair<std::bitset<N>,double>> asci_pairs;
+  std::vector< asci_contrib<N> > asci_pairs;
 
   const size_t ndets = std::distance(dets_begin, dets_end);
 
@@ -275,6 +281,7 @@ std::vector<std::bitset<N>> asci_search(
 
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
+
 
   // Expand Search Space
   auto pairs_st = clock_type::now();
@@ -316,7 +323,7 @@ std::vector<std::bitset<N>> asci_search(
 
       // Remove small contributions
       auto it = std::partition( asci_pairs.begin(), asci_pairs.end(), 
-        [=](auto x){ return std::abs(x.second) > rv_prune_val; } );
+        [=](auto x){ return std::abs(x.rv) > rv_prune_val; } );
       asci_pairs.erase(it,asci_pairs.end());
 
       std::cout << "  * Pruning at " << i 
@@ -356,9 +363,9 @@ std::vector<std::bitset<N>> asci_search(
   auto asci_diagel_st = clock_type::now();
   const size_t nuniq = asci_pairs.size();
   for( size_t i = 0; i < nuniq; ++i ) {
-    auto det = asci_pairs[i].first;
+    auto det = asci_pairs[i].state;
     auto diag_element = ham_gen.matrix_element(det,det);
-    asci_pairs[i].second /= E_ASCI - diag_element;
+    asci_pairs[i].rv /= E_ASCI - diag_element;
   }
   auto asci_diagel_en = clock_type::now();
   std::cout << "    * Diagonal Elements = " 
@@ -369,7 +376,7 @@ std::vector<std::bitset<N>> asci_search(
   auto asci_sort_st = clock_type::now();
   std::nth_element( asci_pairs.begin(), asci_pairs.begin() + ndets_max,
     asci_pairs.end(), [](auto x, auto y){ 
-      return std::abs(x.second) > std::abs(y.second);
+      return std::abs(x.rv) > std::abs(y.rv);
     });
   auto asci_sort_en = clock_type::now();
   std::cout << "    * Score Sort        = " 
@@ -383,7 +390,7 @@ std::vector<std::bitset<N>> asci_search(
   // Extract new search determinants
   std::vector<std::bitset<N>> new_dets( asci_pairs.size() );
   std::transform( asci_pairs.begin(), asci_pairs.end(), new_dets.begin(),
-    [](auto x){ return x.first; } );
+    [](auto x){ return x.state; } );
 
   return new_dets;
 }

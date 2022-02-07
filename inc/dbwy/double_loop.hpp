@@ -51,7 +51,7 @@ protected:
 
     // Loop over bra determinants
     for( size_t i = 0; i < nbra_dets; ++i ) {
-      //if( (i%1000) == 0 ) std::cout << i << ", " << rowptr[i] << std::endl;
+      ///*if( (i%1000) == 0 )*/ std::cout << i << ", " << rowptr[i] << std::endl;
       const auto bra = *(bra_begin + i);
 
       size_t nrow = 0;

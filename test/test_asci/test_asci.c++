@@ -315,6 +315,7 @@ int main( int argc, char* argv[] ) {
         [&](auto x){ return std::abs(x) > coeff_thresh; } );
       nkeep = std::distance( X_local.begin(), it );
     }
+    nkeep = 1000;
 
     // Do ASCI Search
     dets = asci_search( ndets_max, dets.begin(), dets.begin() + nkeep,
