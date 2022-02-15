@@ -188,7 +188,42 @@ double single_excitation_sign( std::bitset<N> state, unsigned p, unsigned q ) {
   return (mask.count() % 2) ? -1. : 1.;
 }
 
+template <size_t N>
+inline auto single_excitation_sign_indices( std::bitset<N> bra,
+  std::bitset<N> ket, std::bitset<N> ex ) {
 
+  auto o1   = first_occupied_flipped( ket, ex );
+  auto v1   = first_occupied_flipped( bra, ex );
+  auto sign = single_excitation_sign( ket, v1, o1 );
+
+  return std::make_tuple(o1,v1,sign);
+}
+
+template <size_t N>
+inline auto doubles_sign_indices( std::bitset<N> bra, std::bitset<N> ket, 
+  std::bitset<N> ex ) {
+
+    const auto o1 = first_occupied_flipped( ket, ex );
+    const auto v1 = first_occupied_flipped( bra, ex );
+    auto sign = single_excitation_sign(ket, v1, o1);
+
+    ket.flip(o1).flip(v1);
+    ex.flip(o1).flip(v1);
+
+    const auto o2 = first_occupied_flipped( ket, ex );
+    const auto v2 = first_occupied_flipped( bra, ex );
+    sign *= single_excitation_sign(ket, v2, o2);
+
+    return std::make_tuple(o1,v1,o2,v2,sign);
+}
+
+template <size_t N>
+inline auto doubles_sign( std::bitset<N> bra, std::bitset<N> ket, 
+  std::bitset<N> ex ) {
+
+  auto [p,q,r,s,sign] = doubles_sign_indices(bra,ket,ex);
+  return sign;
+}
 
 
 
@@ -236,6 +271,22 @@ void generate_residues( std::bitset<N> state, std::vector<std::bitset<N>>& res )
     res.emplace_back( state & ~mask );
   }
 
+}
+
+
+template <size_t N>
+std::string to_canonical_string( std::bitset<N> state ) {
+  static_assert((N%2)==0, "N Odd");
+  auto state_alpha = truncate_bitset<N/2>(state);
+  auto state_beta  = truncate_bitset<N/2>(state >> (N/2));
+  std::string str;
+  for( auto i = 0; i < N/2; ++i ) {
+    if( state_alpha[i] and state_beta[i] ) str.push_back('2');
+    else if( state_alpha[i] )              str.push_back('u');
+    else if( state_beta[i]  )              str.push_back('d');
+    else                                   str.push_back('0');
+  }
+  return str;
 }
 
 }

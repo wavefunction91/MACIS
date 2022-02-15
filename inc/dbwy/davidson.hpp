@@ -3,6 +3,7 @@
 #include <sparsexx/matrix_types/csr_matrix.hpp>
 #include <sparsexx/spblas/spmbv.hpp>
 #include <sparsexx/spblas/pspmbv.hpp>
+#include <random>
 
 
 void gram_schmidt( int64_t N, int64_t K, const double* V_old, int64_t LDV,
@@ -186,6 +187,7 @@ double p_davidson( int64_t max_m,
 
   // Gather Diagonal
   auto D_local = extract_diagonal_elements( *A_diagonal_tile );
+#if 1
   {
     std::vector<int> remote_counts(world_size), row_starts(world_size+1,0);
     for( auto i = 0; i < world_size; ++i ) {
@@ -208,6 +210,16 @@ double p_davidson( int64_t max_m,
     }
 
   }
+#else
+  std::default_random_engine gen;
+  std::normal_distribution<> dist(0,1);
+  std::generate( V_local.begin(), V_local.end(), [&](){ return dist(gen); } );
+  V_local[0] += 1.;
+  double tmp = 0.;
+  for( auto i = 0; i < V_local.size(); ++i ) tmp += V_local[i] * V_local[i];
+  tmp = std::sqrt(tmp);
+  for( auto i = 0; i < V_local.size(); ++i ) V_local[i] /= tmp;
+#endif
 
   // Generate SPMV info
   auto spmv_info = sparsexx::spblas::generate_spmv_comm_info( A );

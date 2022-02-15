@@ -1,6 +1,7 @@
 #pragma once
 #include "sd_operations.hpp"
 #include <ips4o.hpp>
+#include <sparsexx/matrix_types/dense_conversions.hpp>
 
 namespace dbwy {
 
@@ -120,20 +121,7 @@ void append_ss_doubles_asci_contributions(
       auto ex_det_spin = state_spin ^ full_ex_spin;
 
       // Calculate the sign in a canonical way
-      double sign = 1.;
-      {
-        auto ket = state_spin;
-        auto bra = ex_det_spin;
-        const auto _o1 = first_occupied_flipped( ket, full_ex_spin );
-        const auto _v1 = first_occupied_flipped( bra, full_ex_spin );
-        sign = single_excitation_sign( ket, _v1, _o1 );
-
-        ket ^= (one << _o1) ^ (one << _v1);
-        const auto fx = bra ^ ket;
-        const auto _o2 = first_occupied_flipped( ket, fx );
-        const auto _v2 = first_occupied_flipped( bra, fx );
-        sign *= single_excitation_sign( ket, _v2, _o2 );
-      }
+      double sign = doubles_sign( state_spin, ex_det_spin, full_ex_spin );
 
       // Calculate full excited determinant
       const auto full_ex = expand_bitset<2*N>(full_ex_spin) << NShift;
@@ -262,8 +250,8 @@ std::vector<std::bitset<N>> asci_search(
   const size_t ndets = std::distance(dets_begin, dets_end);
 
   // Tolerances 
-  const double h_el_tol     = 1e-12;
-  #if 0
+  const double h_el_tol     = -1;
+  #if 1
   const double rv_prune_val = 1e-8;
   const size_t pair_size_cutoff = 2e9;
   #else
@@ -374,14 +362,23 @@ std::vector<std::bitset<N>> asci_search(
 
   // Sort pairs by ASCI score
   auto asci_sort_st = clock_type::now();
+  #if 0
   std::nth_element( asci_pairs.begin(), asci_pairs.begin() + ndets_max,
-    asci_pairs.end(), [](auto x, auto y){ 
+    asci_pairs.end(), 
+  #else
+  std::sort( asci_pairs.begin(), asci_pairs.end(),
+  #endif
+    [](auto x, auto y){ 
       return std::abs(x.rv) > std::abs(y.rv);
     });
   auto asci_sort_en = clock_type::now();
   std::cout << "    * Score Sort        = " 
             << duration_type(asci_sort_en-asci_sort_st).count() << std::endl;
   std::cout << std::endl;
+
+  for( auto [s,rv] : asci_pairs ) {
+    std::cout << dbwy::to_canonical_string(s) << " " << rv << std::endl;
+  }
 
   // Shrink to max search space
   asci_pairs.erase( asci_pairs.begin() + ndets_max, asci_pairs.end() );
@@ -447,7 +444,17 @@ double selected_ci_diag(
   // Solve EVP
   MPI_Barrier(comm);
   auto dav_st = clock_type::now();
+  #if 1
   double E = p_davidson( davidson_max_m, H, davidson_res_tol, C_local.data() );
+  #else
+  const size_t ndets = std::distance(dets_begin,dets_end);
+  std::vector<double> H_dense(ndets*ndets);
+  sparsexx::convert_to_dense( H.diagonal_tile(), H_dense.data(), ndets );
+  std::vector<double> W(ndets);
+  lapack::syevd( lapack::Job::NoVec, lapack::Uplo::Lower, ndets, 
+    H_dense.data(), ndets, W.data() );
+  auto E = W[0];
+  #endif
   MPI_Barrier(comm);
   auto dav_en = clock_type::now();
   std::cout << "    * Davidson                 = " 
