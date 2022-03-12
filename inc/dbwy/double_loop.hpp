@@ -26,7 +26,7 @@ public:
   using full_det_iterator = typename base_type::full_det_iterator;
 
   template <typename index_t>
-  using sparse_matrix_type = typename base_type::sparse_matrix_type<index_t>;
+  using sparse_matrix_type = sparsexx::csr_matrix<double,index_t>;
 
 protected:
 

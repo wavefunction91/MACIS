@@ -289,4 +289,21 @@ std::string to_canonical_string( std::bitset<N> state ) {
   return str;
 }
 
+template <size_t N>
+std::bitset<N> from_canonical_string( std::string str ) {
+    std::bitset<N> state_alpha(0), state_beta(0);
+    for( auto i = 0; i < str.length(); ++i ) {
+      if( str[i] == '2' ) {
+        state_alpha.set(i);
+	state_beta.set(i);
+      } else if( str[i] == 'u' ) {
+        state_alpha.set(i);
+      } else if( str[i] == 'd' ) {
+	state_beta.set(i);
+      }
+    }
+    auto state = state_alpha | (state_beta << (N/2));
+    return state;
+}
+
 }

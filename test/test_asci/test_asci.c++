@@ -79,13 +79,14 @@ int main( int argc, char* argv[] ) {
   size_t norb = cmz::ed::getParam<int>( input, "norbs" );
   size_t nalpha  = cmz::ed::getParam<int>( input, "nups"  );
   size_t nbeta  = cmz::ed::getParam<int>( input, "ndos"  );
-  size_t norb_eff = 
-    cmz::ed::getParam<int>( input, "norbseff"  );
   std::string fcidump = 
     cmz::ed::getParam<std::string>( input, "fcidump_file" );
-
-  bool do_fci = cmz::ed::getParam<bool>( input, "fci" );
-
+  bool read_wfn =
+    cmz::ed::getParam<bool>( input, "read_wfn");
+  std::string wfn_file;
+  if( read_wfn )
+    wfn_file = 
+      cmz::ed::getParam<std::string>( input, "wfn_file" );
 
   constexpr size_t nbits = 128;
   if( norb > nbits/2 ) throw std::runtime_error("Not Enough Bits...");
@@ -116,9 +117,34 @@ int main( int argc, char* argv[] ) {
     }
   };
 
-  // ASCI
-  size_t ndets_max     = 1000;
-  size_t niter_max     = 1;
+  if(read_wfn) {
+    // Read WFN
+
+    std::vector<std::bitset<nbits>> dets;
+    {
+      std::ifstream wfn(wfn_file);
+      std::string line;
+      std::getline( wfn, line );
+      while( std::getline(wfn, line) ) {
+        std::stringstream ss{line};
+	std::string coeff, det;
+	ss >> coeff >> det;
+	dets.emplace_back( dbwy::from_canonical_string<nbits>(det));
+      }
+    }
+    std::cout << "NDETS = " << dets.size() << std::endl;
+    for( auto det : dets ) std::cout << det << std::endl;
+    std::vector<double> X_local; // Eigenvectors
+    auto E = dbwy::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
+      1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD );
+    print_asci( E );
+    std::cout << "**** MY PRINT ***" << std::endl;
+    ham_gen.matrix_element(dets[0], dets[1]);
+  } else {
+
+  //  Run ASCI
+  size_t ndets_max     = 10000;
+  size_t niter_max     = 6;
   double coeff_thresh  = 1e-4;
   {
   if(world_size != 1) throw "NO MPI"; // Disable MPI for now
@@ -153,7 +179,7 @@ int main( int argc, char* argv[] ) {
     if( dets.size() > 1 )
       dbwy::reorder_ci_on_coeff( dets, X_local, MPI_COMM_WORLD );
 
-    size_t nkeep = std::min(100ul,dets.size());
+    size_t nkeep = std::min(120ul,dets.size());
 
     // Do ASCI Search
     dets = asci_search( ndets_max, dets.begin(), dets.begin() + nkeep,
@@ -192,6 +218,8 @@ int main( int argc, char* argv[] ) {
 #endif
 
   } // ASCI 
+
+  }
 
   } // MPI Scope
   MPI_Finalize();

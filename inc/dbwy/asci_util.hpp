@@ -248,6 +248,12 @@ std::vector<std::bitset<N>> asci_search(
   std::vector< asci_contrib<N> > asci_pairs;
 
   const size_t ndets = std::distance(dets_begin, dets_end);
+  // Insert all dets with their coefficients as seeds
+  for( size_t i = 0; i < ndets; ++i ) {
+    auto state       = *(dets_begin + i);
+    asci_pairs.push_back({state, C[i]});
+    //std::cout << to_canonical_string(state) << " " << C[i] << std::endl;
+  }
 
   // Tolerances 
   const double h_el_tol     = -1;
@@ -353,12 +359,14 @@ std::vector<std::bitset<N>> asci_search(
   for( size_t i = 0; i < nuniq; ++i ) {
     auto det = asci_pairs[i].state;
     auto diag_element = ham_gen.matrix_element(det,det);
+    //auto alpha = truncate_bitset<N/2>(det);
+    //auto beta  = truncate_bitset<N/2>(det >> (N/2));
+    //std::cout << alpha.to_ulong() << " " << beta.to_ulong() << " " << asci_pairs[i].rv << " "  << (E_ASCI - diag_element) << std::endl;
     asci_pairs[i].rv /= E_ASCI - diag_element;
   }
   auto asci_diagel_en = clock_type::now();
   std::cout << "    * Diagonal Elements = " 
             << duration_type(asci_diagel_en-asci_diagel_st).count() << std::endl;
-
 
   // Sort pairs by ASCI score
   auto asci_sort_st = clock_type::now();
@@ -376,9 +384,15 @@ std::vector<std::bitset<N>> asci_search(
             << duration_type(asci_sort_en-asci_sort_st).count() << std::endl;
   std::cout << std::endl;
 
+#if 0
+  std::cout << std::fixed;
   for( auto [s,rv] : asci_pairs ) {
-    std::cout << dbwy::to_canonical_string(s) << " " << rv << std::endl;
+    //std::cout << dbwy::to_canonical_string(s) << " " << rv << std::endl;
+    auto alpha = truncate_bitset<N/2>(s);
+    auto beta  = truncate_bitset<N/2>(s >> (N/2));
+    std::cout << rv << " " << alpha.to_ulong() << " " << beta.to_ulong() << std::endl;
   }
+#endif
 
   // Shrink to max search space
   asci_pairs.erase( asci_pairs.begin() + ndets_max, asci_pairs.end() );
@@ -450,6 +464,14 @@ double selected_ci_diag(
   const size_t ndets = std::distance(dets_begin,dets_end);
   std::vector<double> H_dense(ndets*ndets);
   sparsexx::convert_to_dense( H.diagonal_tile(), H_dense.data(), ndets );
+
+  //for( auto i = 0; i < ndets; ++i )
+  //for( auto j = 0; j < ndets; ++j ) 
+  //if( std::abs(H_dense[i+j*ndets]) > 1e-8 ) {
+  //  std::cout << i << ", " << j << ", " << H_dense[i + j*ndets] << std::endl;
+  //}
+
+
   std::vector<double> W(ndets);
   lapack::syevd( lapack::Job::NoVec, lapack::Uplo::Lower, ndets, 
     H_dense.data(), ndets, W.data() );

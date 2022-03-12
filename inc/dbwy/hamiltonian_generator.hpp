@@ -3,6 +3,7 @@
 #include "sd_operations.hpp"
 #include <blas.hh>
 #include <lapack.hh>
+#include <sparsexx/matrix_types/csr_matrix.hpp>
 
 namespace dbwy {
 
