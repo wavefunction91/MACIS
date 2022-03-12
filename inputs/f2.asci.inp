@@ -1,0 +1,8 @@
+#fcidump_file /home/dbwy/devel/ASCI/qchem/f2/f2.ccpvdz.fcidump.qchem.dat
+#fcidump_file /home/dbwy/devel/ASCI/qchem/f2/f2.ccpvdz.fcidump.psi4.dat
+fcidump_file /home/dbwy/devel/ASCI/qchem/f2/f2.ccpvdz.fcidump.dat
+norbs 28
+nups 9
+ndos 9
+print T
+read_wfn F
