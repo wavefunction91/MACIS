@@ -170,6 +170,7 @@ int main( int argc, char* argv[] ) {
 #endif
   print_asci( EASCI );
        
+#if 0
   // ASCI Loop
   for( size_t iter = 0; iter < niter_max; ++iter ) {
 
@@ -202,6 +203,19 @@ int main( int argc, char* argv[] ) {
     EASCI = E;
 
   }
+#else
+
+  // Grow wfn w/o refinement
+  std::tie(EASCI, dets, X_local) = dbwy::asci_grow( ndets_max, 120, 8, EASCI,
+    std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
+    print_asci );
+
+  // Refine wfn
+  std::tie(EASCI, dets, X_local) = dbwy::asci_refine( 120, 1e-6, niter_max,
+    EASCI, std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
+    print_asci );
+
+#endif
 
 #if 0
   dbwy::reorder_ci_on_coeff( dets, X_local, MPI_COMM_WORLD );

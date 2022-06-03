@@ -488,5 +488,92 @@ double selected_ci_diag(
 
 }
 
+template <size_t N, typename index_t = int32_t>
+auto asci_iter( size_t ndets, size_t ncdets, double E0, 
+  std::vector<std::bitset<N>> wfn, std::vector<double> X_local, 
+  HamiltonianGenerator<N>& ham_gen, size_t norb,
+  double ham_tol, size_t eig_max_subspace, double eig_res_tol ) {
 
+  // Sort wfn on coefficient weights
+  if( wfn.size() > 1 ) reorder_ci_on_coeff( wfn, X_local, MPI_COMM_WORLD );
+
+  // Sanity check on search determinants
+  size_t nkeep = std::min(ncdets, wfn.size());
+
+  // Perform the ASCI search
+  wfn = asci_search( ndets, wfn.begin(), wfn.begin() + nkeep, E0, X_local,
+    norb, ham_gen.T_pq_, ham_gen.G_red_.data(), ham_gen.V_red_.data(), 
+    ham_gen.G_pqrs_.data(), ham_gen.V_pqrs_, ham_gen );
+
+  // Rediagonalize
+  auto E = selected_ci_diag<N,index_t>( wfn.begin(), wfn.end(), ham_gen, 
+    ham_tol, eig_max_subspace, eig_res_tol, X_local, MPI_COMM_WORLD);
+
+  return std::make_tuple(E, wfn, X_local);
+
+}
+
+template <size_t N, typename index_t = int32_t>
+auto asci_grow( size_t ndets_max, size_t ncdets, size_t grow_factor,
+  double E0, std::vector<std::bitset<N>> wfn, std::vector<double> X_local, 
+  HamiltonianGenerator<N>& ham_gen, size_t norb,
+  double ham_tol, size_t eig_max_subspace, double eig_res_tol,
+  const std::function<void(double)>& print_asci = std::function<void(double)>() ) {
+
+  if( wfn.size() >= ndets_max ) {
+    std::cout << "Wavefunction Already Of Sufficient Size, Skipping Grow"
+      << std::endl;
+  }
+
+  // Grow wfn until max size
+  while( wfn.size() < ndets_max ) {
+    size_t ndets_new = std::min(std::max(100ul,wfn.size() * grow_factor), ndets_max);
+    std::tie(E0, wfn, X_local) = asci_iter<N,index_t>( ndets_new, ncdets, E0,
+      std::move(wfn), std::move(X_local), ham_gen, norb, ham_tol,
+      eig_max_subspace, eig_res_tol);
+    if( print_asci ) print_asci( E0 );
+  }
+
+  return std::make_tuple(E0, wfn, X_local);
+
+}
+
+template <size_t N, typename index_t = int32_t>
+auto asci_refine( size_t ncdets, double asci_tol, size_t max_iter, double E0, 
+  std::vector<std::bitset<N>> wfn, std::vector<double> X_local, 
+  HamiltonianGenerator<N>& ham_gen, size_t norb,
+  double ham_tol, size_t eig_max_subspace, double eig_res_tol,
+  const std::function<void(double)>& print_asci = std::function<void(double)>() ) {
+
+
+  size_t ndets = wfn.size();
+
+  // Refinement Loop
+  for(size_t iter = 0; iter < max_iter; ++iter) {
+
+    std::cout << "\n* ASCI Iteration: " << iter << std::endl;
+    // Do an ASCI iteration
+    double E;
+    std::tie(E, wfn, X_local) = asci_iter<N,index_t>( ndets, ncdets, E0,
+      std::move(wfn), std::move(X_local), ham_gen, norb, ham_tol,
+      eig_max_subspace, eig_res_tol);
+
+    // Print iteration results
+    if( print_asci ) print_asci(E);
+
+    const auto E_delta = E - E0;
+    E0 = E;
+    // Check for convergence
+    if( std::abs(E_delta) < asci_tol ) {
+      std::cout << "ASCI Converged" << std::endl;
+      break;
+    }
+
+    // Print check in energy
+    std::cout << "  * dE        = " << E_delta*1000 << " mEh" << std::endl;
+
+  } // Refinement Loop 
+
+  return std::make_tuple(E0, wfn, X_local);
+}
 }
