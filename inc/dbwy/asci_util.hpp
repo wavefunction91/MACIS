@@ -395,7 +395,8 @@ std::vector<std::bitset<N>> asci_search(
 #endif
 
   // Shrink to max search space
-  asci_pairs.erase( asci_pairs.begin() + ndets_max, asci_pairs.end() );
+  if( asci_pairs.size() > ndets_max )
+    asci_pairs.erase( asci_pairs.begin() + ndets_max, asci_pairs.end() );
   asci_pairs.shrink_to_fit();
 
   // Extract new search determinants
