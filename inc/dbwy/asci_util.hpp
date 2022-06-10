@@ -239,7 +239,8 @@ std::vector<std::bitset<N>> asci_search(
   const double*                         V_red,
   const double*                         G_pqrs,
   const double*                         V_pqrs,
-  HamiltonianGenerator<N>&              ham_gen
+  HamiltonianGenerator<N>&              ham_gen,
+  const bool                            quiet = false
 ) {
 
   std::vector<uint32_t> occ_alpha, vir_alpha;
@@ -265,13 +266,16 @@ std::vector<std::bitset<N>> asci_search(
   const size_t pair_size_cutoff = 1e9;
   #endif
 
-  std::cout << "* Performing ASCI Search over " << ndets << " Determinants" 
-    << std::endl;
-  std::cout << "  * Search Knobs:"
-            << "\n    * Hamiltonian Element Tolerance = " << h_el_tol
-            << "\n    * Max ASCI Pair Size            = " << pair_size_cutoff
-            << "\n    * RV Pruning Tolerance          = " << rv_prune_val
-            << std::endl;
+  if( !quiet )
+  {
+    std::cout << "* Performing ASCI Search over " << ndets << " Determinants" 
+      << std::endl;
+    std::cout << "  * Search Knobs:"
+              << "\n    * Hamiltonian Element Tolerance = " << h_el_tol
+              << "\n    * Max ASCI Pair Size            = " << pair_size_cutoff
+              << "\n    * RV Pruning Tolerance          = " << rv_prune_val
+              << std::endl;
+  }
 
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
@@ -320,20 +324,24 @@ std::vector<std::bitset<N>> asci_search(
         [=](auto x){ return std::abs(x.rv) > rv_prune_val; } );
       asci_pairs.erase(it,asci_pairs.end());
 
-      std::cout << "  * Pruning at " << i 
-                << " NSZ = " << asci_pairs.size() << std::endl;
+      if(!quiet)
+        std::cout << "  * Pruning at " << i 
+                  << " NSZ = " << asci_pairs.size() << std::endl;
       // Extra Pruning if not cut down enough
       if( asci_pairs.size() > pair_size_cutoff ) {
-        std::cout << "    * Removing Duplicates ";
+        if(!quiet)
+          std::cout << "    * Removing Duplicates ";
         sort_and_accumulate_asci_pairs( asci_pairs );
-        std::cout << " NSZ = " << asci_pairs.size() << std::endl;
+        if(!quiet)
+          std::cout << " NSZ = " << asci_pairs.size() << std::endl;
       }
     }
 
   } // Loop over determinants
   auto pairs_en = clock_type::now();
 
-  std::cout << "  * ASCI Kept " << asci_pairs.size() << " Pairs" << std::endl;
+  if(!quiet)
+    std::cout << "  * ASCI Kept " << asci_pairs.size() << " Pairs" << std::endl;
 
 
   // Accumulate unique score contributions
@@ -341,15 +349,18 @@ std::vector<std::bitset<N>> asci_search(
   sort_and_accumulate_asci_pairs( asci_pairs );
   auto bit_sort_en = clock_type::now();
 
-  std::cout << "  * ASCI Will Search Over " << asci_pairs.size() 
-            << " Unique Determinants" << std::endl;
+  if(!quiet)
+  {
+    std::cout << "  * ASCI Will Search Over " << asci_pairs.size() 
+              << " Unique Determinants" << std::endl;
 
-  std::cout << "  * Timings: " << std::endl;
+    std::cout << "  * Timings: " << std::endl;
 
-  std::cout << "    * Pair Formation    = " 
-            << duration_type(pairs_en - pairs_st).count() << std::endl;
-  std::cout << "    * Bitset Sort/Acc   = " 
-            << duration_type(bit_sort_en - bit_sort_st).count() << std::endl;
+    std::cout << "    * Pair Formation    = " 
+              << duration_type(pairs_en - pairs_st).count() << std::endl;
+    std::cout << "    * Bitset Sort/Acc   = " 
+              << duration_type(bit_sort_en - bit_sort_st).count() << std::endl;
+  }
 
   
   // Finish ASCI scores with denominator
@@ -365,8 +376,9 @@ std::vector<std::bitset<N>> asci_search(
     asci_pairs[i].rv /= E_ASCI - diag_element;
   }
   auto asci_diagel_en = clock_type::now();
-  std::cout << "    * Diagonal Elements = " 
-            << duration_type(asci_diagel_en-asci_diagel_st).count() << std::endl;
+  if(!quiet)
+    std::cout << "    * Diagonal Elements = " 
+              << duration_type(asci_diagel_en-asci_diagel_st).count() << std::endl;
 
   // Sort pairs by ASCI score
   auto asci_sort_st = clock_type::now();
@@ -380,9 +392,12 @@ std::vector<std::bitset<N>> asci_search(
       return std::abs(x.rv) > std::abs(y.rv);
     });
   auto asci_sort_en = clock_type::now();
-  std::cout << "    * Score Sort        = " 
-            << duration_type(asci_sort_en-asci_sort_st).count() << std::endl;
-  std::cout << std::endl;
+  if(!quiet)
+  {
+    std::cout << "    * Score Sort        = " 
+              << duration_type(asci_sort_en-asci_sort_st).count() << std::endl;
+    std::cout << std::endl;
+  }
 
 #if 0
   std::cout << std::fixed;
@@ -417,19 +432,23 @@ double selected_ci_diag(
   size_t                                         davidson_max_m,
   double                                         davidson_res_tol,
   std::vector<double>&                           C_local,
-  MPI_Comm                                       comm
+  MPI_Comm                                       comm,
+  const bool                                     quiet = false
 ) {
 
-  std::cout << "* Diagonalizing CI Hamiltonian over " 
-            << std::distance(dets_begin,dets_end)
-            << " Determinants" << std::endl;
+  if( !quiet )
+  {
+    std::cout << "* Diagonalizing CI Hamiltonian over " 
+              << std::distance(dets_begin,dets_end)
+              << " Determinants" << std::endl;
 
-  std::cout << "  * Hamiltonian Knobs:" << std::endl
-            << "    * Hamiltonian Element Tolerance = " << h_el_tol << std::endl;
+    std::cout << "  * Hamiltonian Knobs:" << std::endl
+              << "    * Hamiltonian Element Tolerance = " << h_el_tol << std::endl;
 
-  std::cout << "  * Davidson Knobs:" << std::endl
-            << "    * Residual Tol = " << davidson_res_tol << std::endl
-            << "    * Max M        = " << davidson_max_m << std::endl;
+    std::cout << "  * Davidson Knobs:" << std::endl
+              << "    * Residual Tol = " << davidson_res_tol << std::endl
+              << "    * Max M        = " << davidson_max_m << std::endl;
+  }
 
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
@@ -447,11 +466,14 @@ double selected_ci_diag(
   size_t local_nnz = H.nnz();
   size_t total_nnz;
   MPI_Allreduce( &local_nnz, &total_nnz, 1, MPI_UINT64_T, MPI_SUM, comm );
-  std::cout << "  * Hamiltonian NNZ = " << total_nnz << std::endl;
+  if(!quiet)
+  {
+    std::cout << "  * Hamiltonian NNZ = " << total_nnz << std::endl;
 
-  std::cout << "  * Timings:" << std::endl;
-  std::cout << "    * Hamiltonian Construction = " 
-    << duration_type(H_en-H_st).count() << std::endl;
+    std::cout << "  * Timings:" << std::endl;
+    std::cout << "    * Hamiltonian Construction = " 
+      << duration_type(H_en-H_st).count() << std::endl;
+  }
 
   // Resize eigenvector size
   C_local.resize( H.local_row_extent() );
@@ -480,9 +502,12 @@ double selected_ci_diag(
   #endif
   MPI_Barrier(comm);
   auto dav_en = clock_type::now();
-  std::cout << "    * Davidson                 = " 
-    << duration_type(dav_en-dav_st).count() << std::endl;
-  std::cout << std::endl;
+  if( !quiet )
+  {
+    std::cout << "    * Davidson                 = " 
+      << duration_type(dav_en-dav_st).count() << std::endl;
+    std::cout << std::endl;
+  } 
 
   return E;
 
@@ -492,7 +517,8 @@ template <size_t N, typename index_t = int32_t>
 auto asci_iter( size_t ndets, size_t ncdets, double E0, 
   std::vector<std::bitset<N>> wfn, std::vector<double> X_local, 
   HamiltonianGenerator<N>& ham_gen, size_t norb,
-  double ham_tol, size_t eig_max_subspace, double eig_res_tol ) {
+  double ham_tol, size_t eig_max_subspace, double eig_res_tol,
+  const bool quiet = false ) {
 
   // Sort wfn on coefficient weights
   if( wfn.size() > 1 ) reorder_ci_on_coeff( wfn, X_local, MPI_COMM_WORLD );
@@ -503,11 +529,11 @@ auto asci_iter( size_t ndets, size_t ncdets, double E0,
   // Perform the ASCI search
   wfn = asci_search( ndets, wfn.begin(), wfn.begin() + nkeep, E0, X_local,
     norb, ham_gen.T_pq_, ham_gen.G_red_.data(), ham_gen.V_red_.data(), 
-    ham_gen.G_pqrs_.data(), ham_gen.V_pqrs_, ham_gen );
+    ham_gen.G_pqrs_.data(), ham_gen.V_pqrs_, ham_gen, quiet );
 
   // Rediagonalize
   auto E = selected_ci_diag<N,index_t>( wfn.begin(), wfn.end(), ham_gen, 
-    ham_tol, eig_max_subspace, eig_res_tol, X_local, MPI_COMM_WORLD);
+    ham_tol, eig_max_subspace, eig_res_tol, X_local, MPI_COMM_WORLD, quiet);
 
   return std::make_tuple(E, wfn, X_local);
 
@@ -518,20 +544,25 @@ auto asci_grow( size_t ndets_max, size_t ncdets, size_t grow_factor,
   double E0, std::vector<std::bitset<N>> wfn, std::vector<double> X_local, 
   HamiltonianGenerator<N>& ham_gen, size_t norb,
   double ham_tol, size_t eig_max_subspace, double eig_res_tol,
-  const std::function<void(double)>& print_asci = std::function<void(double)>() ) {
+  const std::function<void(double)>& print_asci = std::function<void(double)>(),
+  const bool quiet = false ) {
 
-  if( wfn.size() >= ndets_max ) {
+  if( wfn.size() >= ndets_max && !quiet ) {
     std::cout << "Wavefunction Already Of Sufficient Size, Skipping Grow"
       << std::endl;
   }
 
-  // Grow wfn until max size
+  // Grow wfn until max size, or until we get stuck
+  size_t prev_size = wfn.size();
   while( wfn.size() < ndets_max ) {
     size_t ndets_new = std::min(std::max(100ul,wfn.size() * grow_factor), ndets_max);
     std::tie(E0, wfn, X_local) = asci_iter<N,index_t>( ndets_new, ncdets, E0,
       std::move(wfn), std::move(X_local), ham_gen, norb, ham_tol,
-      eig_max_subspace, eig_res_tol);
+      eig_max_subspace, eig_res_tol, quiet);
     if( print_asci ) print_asci( E0 );
+    if( std::abs( float(wfn.size() - prev_size) / float(wfn.size())) < 1.E-3 )
+      break;
+    prev_size = wfn.size();
   }
 
   return std::make_tuple(E0, wfn, X_local);
@@ -543,7 +574,8 @@ auto asci_refine( size_t ncdets, double asci_tol, size_t max_iter, double E0,
   std::vector<std::bitset<N>> wfn, std::vector<double> X_local, 
   HamiltonianGenerator<N>& ham_gen, size_t norb,
   double ham_tol, size_t eig_max_subspace, double eig_res_tol,
-  const std::function<void(double)>& print_asci = std::function<void(double)>() ) {
+  const std::function<void(double)>& print_asci = std::function<void(double)>(),
+  const bool quiet = false ) {
 
 
   size_t ndets = wfn.size();
@@ -551,12 +583,13 @@ auto asci_refine( size_t ncdets, double asci_tol, size_t max_iter, double E0,
   // Refinement Loop
   for(size_t iter = 0; iter < max_iter; ++iter) {
 
-    std::cout << "\n* ASCI Iteration: " << iter << std::endl;
+    if(!quiet)
+      std::cout << "\n* ASCI Iteration: " << iter << std::endl;
     // Do an ASCI iteration
     double E;
     std::tie(E, wfn, X_local) = asci_iter<N,index_t>( ndets, ncdets, E0,
       std::move(wfn), std::move(X_local), ham_gen, norb, ham_tol,
-      eig_max_subspace, eig_res_tol);
+      eig_max_subspace, eig_res_tol, quiet);
 
     // Print iteration results
     if( print_asci ) print_asci(E);
@@ -565,12 +598,14 @@ auto asci_refine( size_t ncdets, double asci_tol, size_t max_iter, double E0,
     E0 = E;
     // Check for convergence
     if( std::abs(E_delta) < asci_tol ) {
-      std::cout << "ASCI Converged" << std::endl;
+      if(!quiet)
+        std::cout << "ASCI Converged" << std::endl;
       break;
     }
 
     // Print check in energy
-    std::cout << "  * dE        = " << E_delta*1000 << " mEh" << std::endl;
+    if(!quiet)
+      std::cout << "  * dE        = " << E_delta*1000 << " mEh" << std::endl;
 
   } // Refinement Loop 
 

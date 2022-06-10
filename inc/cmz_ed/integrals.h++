@@ -806,7 +806,7 @@ namespace cmz
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          void read_FCIdump(const string &file)
+          void read_FCIdump(const string &file, const bool quiet = true)
           {
             core_energy = 0.;
             t_store.clear();
@@ -817,7 +817,7 @@ namespace cmz
               throw ("ERROR OPENING FILE " + file);
       
             int world_rank; MPI_Comm_rank( MPI_COMM_WORLD, &world_rank );
-            if( world_rank == 0 ) {
+            if( world_rank == 0 && !quiet) {
               std::cout << "READING FCIDUMP FILE " << file << std::endl;
             }
       
@@ -845,7 +845,7 @@ namespace cmz
                 core_energy = matel;
               else if( i > 0 && j == 0 && a == 0 && b == 0 )
               {
-                if( !ignored )
+                if( !ignored && !quiet )
                 {
                   std::cout << "Ignoring 1-electron energies in FCIdump file" << std::endl;
                   ignored = true;
@@ -864,7 +864,7 @@ namespace cmz
       
               if( bad ) throw ( "Bad integral read of " + file);
             }	
-            if( world_rank == 0 ) {
+            if( world_rank == 0 && !quiet ) {
             std::cout << "Read " << t_store.size() + u_store.size() << " integrals" << std::endl;
             if( core_energy )
               std::cout << "  (also read core energy = " << core_energy << ")" << std::endl;

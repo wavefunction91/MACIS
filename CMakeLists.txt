@@ -1,8 +1,19 @@
 cmake_minimum_required(VERSION 3.14)
 
 # set the project name
-project(CMZed VERSION 1.0 LANGUAGES C CXX)
+project(asci VERSION 1.0 LANGUAGES C CXX)
 
+# Build type, to add right flags
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+if(CMAKE_BUILD_TYPE EQUAL Release)
+  add_compile_options(-O3)
+endif()
+
+find_package( MPI REQUIRED )
+include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 # Pull proper BLAS/LAPACK discovery modules
 include( FetchContent )
 FetchContent_Declare( linalg-cmake-modules
@@ -29,13 +40,13 @@ add_library( ips4o INTERFACE )
 target_include_directories( ips4o INTERFACE ${ips4o_SOURCE_DIR} )
 target_link_libraries( ips4o INTERFACE atomic )
 
-option( CMZED_ENABLE_OPENMP "Enable OpenMP Bindings" ON )
+option( ASCI_ENABLE_OPENMP "Enable OpenMP Bindings" ON )
 
 # find lapack
 find_package(LAPACK REQUIRED)
 
 # Find OpenMP
-if( CMZED_ENABLE_OPENMP )
+if( ASCI_ENABLE_OPENMP )
   find_package(OpenMP) 
 endif()
 

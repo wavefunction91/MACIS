@@ -152,19 +152,31 @@ public:
     const std::vector<uint32_t>& bra_occ_alpha,
     const std::vector<uint32_t>& bra_occ_beta,
     double val, double* ordm, double* trdm);
+  void rdm_contributions_2( spin_det_t bra, spin_det_t ket, spin_det_t ex,
+    const std::vector<uint32_t>& bra_occ_alpha,
+    const std::vector<uint32_t>& bra_occ_beta,
+    double val, double* ordm);
   void rdm_contributions_diag( const std::vector<uint32_t>& occ_alpha,
     const std::vector<uint32_t>& occ_beta, double val, double* ordm, 
     double* trdm );
+  void rdm_contributions_diag( const std::vector<uint32_t>& occ_alpha,
+    const std::vector<uint32_t>& occ_beta, double val, double* ordm );
   
   void rdm_contributions( spin_det_t bra_alpha, spin_det_t ket_alpha,
     spin_det_t ex_alpha, spin_det_t bra_beta, spin_det_t ket_beta,
     spin_det_t ex_beta, const std::vector<uint32_t>& bra_occ_alpha,
     const std::vector<uint32_t>& bra_occ_beta, double val, double* ordm,
     double* trdm);
+  void rdm_contributions( spin_det_t bra_alpha, spin_det_t ket_alpha,
+    spin_det_t ex_alpha, spin_det_t bra_beta, spin_det_t ket_beta,
+    spin_det_t ex_beta, const std::vector<uint32_t>& bra_occ_alpha,
+    const std::vector<uint32_t>& bra_occ_beta, double val, double* ordm);
 
 
   virtual void form_rdms( full_det_iterator, full_det_iterator, full_det_iterator,
     full_det_iterator, double* C, double* ordm, double* trdm ) = 0;
+  virtual void form_rdms( full_det_iterator, full_det_iterator, full_det_iterator,
+    full_det_iterator, double* C, double* ordm ) = 0;
 
 
   void rotate_hamiltonian_ordm( const double* ordm ) {
@@ -412,6 +424,18 @@ void HamiltonianGenerator<N>::rdm_contributions_2(
 
 }
 
+template <size_t N>
+void HamiltonianGenerator<N>::rdm_contributions_2( 
+  spin_det_t bra, spin_det_t ket, spin_det_t ex,
+  const std::vector<uint32_t>& bra_occ_alpha,
+  const std::vector<uint32_t>& bra_occ_beta,
+  double val, double* ordm) {
+
+  auto [o1,v1,sign] = single_excitation_sign_indices(bra,ket,ex);
+
+  ordm[v1 + o1*norb_] += sign * val;
+
+}
 
 
 
@@ -479,6 +503,18 @@ void HamiltonianGenerator<N>::rdm_contributions_diag(
     trdm[p + p*norb_ + q*norb2_ + q*norb3_] += val;
     trdm[q + q*norb_ + p*norb2_ + p*norb3_] += val;
   }
+
+}
+
+template <size_t N>
+void HamiltonianGenerator<N>::rdm_contributions_diag( 
+  const std::vector<uint32_t>& occ_alpha,
+  const std::vector<uint32_t>& occ_beta,
+  double val, double* ordm ) {
+
+  // Just one-electron piece
+  for( auto p : occ_alpha ) ordm[p*(norb_+1)] += val;
+  for( auto p : occ_beta  ) ordm[p*(norb_+1)] += val;
 
 }
 
@@ -561,6 +597,31 @@ void HamiltonianGenerator<N>::rdm_contributions(
       bra_occ_alpha, val, ordm, trdm );
 
   else rdm_contributions_diag( bra_occ_alpha, bra_occ_beta, val, ordm, trdm );
+
+}
+
+template <size_t N>
+void HamiltonianGenerator<N>::rdm_contributions( 
+  spin_det_t bra_alpha, spin_det_t ket_alpha, spin_det_t ex_alpha, 
+  spin_det_t bra_beta, spin_det_t ket_beta, spin_det_t ex_beta, 
+  const std::vector<uint32_t>& bra_occ_alpha,
+  const std::vector<uint32_t>& bra_occ_beta,
+  double val, double* ordm) {
+
+  const uint32_t ex_alpha_count = ex_alpha.count();
+  const uint32_t ex_beta_count  = ex_beta.count();
+
+  if( (ex_alpha_count + ex_beta_count) > 2 ) return;
+
+  if( ex_alpha_count == 2 )
+    rdm_contributions_2( bra_alpha, ket_alpha, ex_alpha, bra_occ_alpha,
+      bra_occ_beta, val, ordm );
+
+  else if( ex_beta_count == 2 )
+    rdm_contributions_2( bra_beta, ket_beta, ex_beta, bra_occ_beta,
+      bra_occ_alpha, val, ordm );
+
+  else rdm_contributions_diag( bra_occ_alpha, bra_occ_beta, val, ordm );
 
 }
 

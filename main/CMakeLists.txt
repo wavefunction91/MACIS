@@ -8,7 +8,7 @@ add_executable(cmzed_main cmzed_main.c++)
 
 # links
 target_link_libraries(cmzed_main PUBLIC 
-                      CMZed 
+                      ASCI 
                       ${LAPACK_LIBRARIES}
                       Eigen3::Eigen
                      )

@@ -1,5 +1,6 @@
 #pragma once
 #include "bitset_operations.hpp"
+#include "cmz_ed/combins.h++"
 #include <cassert>
 
 namespace dbwy {
@@ -170,6 +171,28 @@ std::vector<std::bitset<N>> generate_cisd_hilbert_space( size_t norb,
   return dets;
 }
 
+template <size_t N>
+std::vector<std::bitset<N> > generate_full_hilbert_space( 
+  size_t norb,
+  size_t nalpha,
+  size_t nbeta )
+{
+  std::vector<std::bitset<N> > dets;
+  // Make all possible states of Norbs with Nups and Ndos
+  // bits set.
+  std::vector<unsigned long> up_stts = cmz::ed::BuildCombs( norb, nalpha );
+  std::vector<unsigned long> do_stts = cmz::ed::BuildCombs( norb, nbeta );
+
+  for( size_t iup = 0; iup < up_stts.size(); iup++ )
+    for( size_t ido = 0; ido < do_stts.size(); ido++ )
+    {
+      std::bitset<N> st = (std::bitset<N>(do_stts[ido]) << (N/2)) 
+                          | std::bitset<N>(up_stts[iup]);
+      dets.emplace_back( st );
+    }
+
+  return dets;
+}
 
 template <size_t N>
 uint32_t first_occupied_flipped( std::bitset<N> state, std::bitset<N> ex ) {
@@ -234,10 +257,12 @@ void generate_residues( std::bitset<N> state, std::vector<std::bitset<N>>& res )
   auto state_alpha = truncate_bitset<N/2>(state);
   auto state_beta  = truncate_bitset<N/2>(state >> (N/2));
 
-  auto occ_alpha = bits_to_indices(state_alpha, occ_alpha);
+  //auto occ_alpha = bits_to_indices(state_alpha, occ_alpha);
+  auto occ_alpha = bits_to_indices(state_alpha);
   const int nalpha = occ_alpha.size();
 
-  auto occ_beta = bits_to_indices(state_beta, occ_beta);
+  //auto occ_beta = bits_to_indices(state_beta, occ_beta);
+  auto occ_beta = bits_to_indices(state_beta);
   const int nbeta  = occ_beta.size();
 
   std::bitset<N> state_alpha_full = expand_bitset<N>(state_alpha);

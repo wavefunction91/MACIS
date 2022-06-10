@@ -13,12 +13,14 @@ list( APPEND TEST_DIRECTORIES
       test_c2
       test_parallel_new
       test_asci
+      test_asci_throughFunc
+      test_ed_func
     )
 foreach( testdir ${TEST_DIRECTORIES} )
     # add executable
     add_executable( ${testdir}.x ${testdir}/${testdir}.c++ )
     # links
-    target_link_libraries( ${testdir}.x CMZed lobpcgxx sparsexx ips4o )
+    target_link_libraries( ${testdir}.x asci lobpcgxx sparsexx ips4o )
     # if applicable, copy input file
     if( EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${testdir}/input.in.in" )
       configure_file(${testdir}/input.in.in ${testdir}/input.in)

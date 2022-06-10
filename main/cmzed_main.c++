@@ -8,8 +8,8 @@ using namespace cmz::ed;
 
 int main( int argn, char* argv[] )
 {
-  std::cout << argv[0] << ": CMZed -- Version " << CMZed_VERSION_MAJOR << "."
-                       << CMZed_VERSION_MINOR << std::endl;
+  std::cout << argv[0] << ": ASCI-CI -- Version " << asci_VERSION_MAJOR << "."
+                       << asci_VERSION_MINOR << std::endl;
 
   return 1;
 }
