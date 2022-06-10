@@ -15,6 +15,7 @@ list( APPEND TEST_DIRECTORIES
       test_asci
       test_asci_throughFunc
       test_ed_func
+      test_bandlan
     )
 foreach( testdir ${TEST_DIRECTORIES} )
     # add executable

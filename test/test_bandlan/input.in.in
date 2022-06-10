@@ -1,0 +1,4 @@
+norbs 2
+nups 1
+ndos 1
+fcidump_file @PATH_TO_TEST@/test_bandlan/FCIDUMP.fcidump
