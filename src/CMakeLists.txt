@@ -8,6 +8,7 @@ list(APPEND SOURCES_CXX
      cmz_ed/ed.c++
      cmz_ed/rdms.c++
      cmz_ed/utils.c++
+     dbwy/gf.c++
     )
 
 add_library(asci ${SOURCES_CXX})

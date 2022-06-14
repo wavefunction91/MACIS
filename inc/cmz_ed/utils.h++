@@ -412,6 +412,32 @@ namespace cmz
     
     /**
      * @brief Template for parameter consultation in input dictionary. 
+     *        Type std::vector<double>
+     *
+     * @param [in] Input_t &input
+     * @param [in] const std::string key: Parameter key 
+     *
+     * @returns std::vector<double>: Parameter value.
+     *
+     * @author Carlos Mejuto Zaera
+     * @date 01/03/2022
+     */
+    template<>
+    inline VecD getParam<VecD>(const Input_t &input, const string key)
+    {
+      if(input.find(key) == input.end())
+        throw ("Input did not specify parameter " + key);
+      
+      std::istringstream iss( input.at(key) );
+      VecD res;
+      double tmp;
+      while( iss >> tmp )
+        res.push_back(tmp);
+      return res;
+    }
+    
+    /**
+     * @brief Template for parameter consultation in input dictionary. 
      *        Type string
      *
      * @param [in] Input_t &input
@@ -429,6 +455,32 @@ namespace cmz
         throw ("Input did not specify parameter " + key);
       
       return input.at(key);
+    }
+
+    /**
+     * @brief Template for parameter consultation in input dictionary. 
+     *        Type std::vector<std::string>, separated by spaces
+     *
+     * @param [in] Input_t &input
+     * @param [in] const std::string key: Parameter key 
+     *
+     * @returns std::vector<std::string>: Parameter value.
+     *
+     * @author Carlos Mejuto Zaera
+     * @date 01/03/2022
+     */
+    template<>
+    inline std::vector<std::string> getParam<std::vector<std::string> >(const Input_t &input, const string key)
+    {
+      if(input.find(key) == input.end())
+        throw ("Input did not specify parameter " + key);
+      
+      std::istringstream iss( input.at(key) );
+      std::vector<std::string> res;
+      std::string tmp;
+      while( iss >> tmp )
+        res.push_back( tmp );
+      return res;
     }
     
     /**
@@ -454,6 +506,32 @@ namespace cmz
     
     /**
      * @brief Template for parameter consultation in input dictionary. 
+     *        Type std::vector<int>
+     *
+     * @param [in] Input_t &input
+     * @param [in] const std::string key: Parameter key 
+     *
+     * @returns std::vector<int>: Parameter value.
+     *
+     * @author Carlos Mejuto Zaera
+     * @date 01/03/2022
+     */
+    template<>
+    inline VecInt getParam<VecInt>(const Input_t &input, const string key)
+    {
+      if(input.find(key) == input.end())
+        throw ("Input did not specify parameter " + key);
+      
+      std::istringstream iss( input.at(key) );
+      VecInt res;
+      int tmp;
+      while( iss >> tmp )
+        res.push_back(tmp);
+      return res;
+    }
+    
+    /**
+     * @brief Template for parameter consultation in input dictionary. 
      *        Type bool
      *
      * @param [in] Input_t &input
@@ -473,6 +551,36 @@ namespace cmz
       if(input.at(key) != "T" && input.at(key) != "F")
         throw ("Boolean input parameter " + key + " ill defined! You have to specify T of F!");
       return input.at(key) == "T";
+    }
+    
+    /**
+     * @brief Template for parameter consultation in input dictionary. 
+     *        Type std::vector<bool>
+     *
+     * @param [in] Input_t &input
+     * @param [in] const std::string key: Parameter key 
+     *
+     * @returns std::vector<bool>: Parameter value.
+     *
+     * @author Carlos Mejuto Zaera
+     * @date 01/03/2022
+     */
+    template<>
+    inline std::vector<bool> getParam<std::vector<bool> >(const Input_t &input, const string key)
+    {
+      if(input.find(key) == input.end())
+        throw ("Input did not specify parameter " + key);
+      
+      std::istringstream iss( input.at(key) );
+      std::vector<bool> res;
+      std::string tmp;
+      while( iss >> tmp )
+      { 
+        if(tmp != "T" && tmp != "F")
+          throw ("Boolean vector input parameter " + key + " ill defined! You have to specify chain of T's and/or F's separated by spaces !");
+        res.push_back( (tmp == "T")  );
+      }
+      return res;
     }
 
   }// namespace ed

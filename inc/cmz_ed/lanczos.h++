@@ -11,6 +11,9 @@
 #include "cmz_ed/utils.h++"
 #include "cmz_ed/eigsolver.h++"
 #include<omp.h>
+#include <sparsexx/matrix_types/csr_matrix.hpp>
+#include <sparsexx/spblas/spmbv.hpp>
+#include <sparsexx/spblas/pspmbv.hpp>
 
 namespace cmz
 {
@@ -107,6 +110,65 @@ namespace cmz
          * @date 05/04/2021
          */
         int64_t rows() const {return mat->rows();}
+    };
+    
+    /**
+     * @brief Wrapper class for sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double, int32_t>, to be used in 
+     *        the Lanczos code. Just needs to implement a matrix-
+     *        vector product dot, and a function rows() to return the
+     *        nr. of rows in the matrix.
+     *
+     * @author Carlos Mejuto Zaera
+     * @date 13/06/2021
+     */
+    class SparsexDistSpMatOp
+    {
+      private:
+        const sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double, int32_t> > *mat;
+        sparsexx::spblas::spmv_info<int32_t> spmv_info;
+      public:
+        /**
+         * @brief Constructor, takes sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double, int32_t> and keeps
+         *        pointer to it.
+         *
+         * @param [in] const sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double, int32_t> &A: Matrix to wrap.
+         *
+         * @author Carlos Mejuto Zaera
+         * @date 05/04/2021
+         */
+        SparsexDistSpMatOp(const sparsexx::dist_sparse_matrix< sparsexx::csr_matrix<double, int32_t> > &A)
+        {
+          mat = &A;
+          spmv_info = sparsexx::spblas::generate_spmv_comm_info( A );
+        }
+        /**
+         * @brief Simple matrix-vector product. 
+         *
+         * @param [in] const Eigen::VectorXd &vec: Input vector.
+         *
+         * @returns Eigen::VectorXd: A * vec.
+         *
+         * @author Carlos Mejuto Zaera
+         * @date 05/04/2021
+         */
+        VectorXd dot(const VectorXd &vec) const
+        {
+          std::vector<double> vin( &vec[0], vec.data()+vec.cols()*vec.rows());
+          std::vector<double> vout(vec.size(), 0.);
+          sparsexx::spblas::pgespmv( 1., *mat, vin.data(), 
+                                     0., vout.data(), spmv_info );
+          Eigen::VectorXd vec_out = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(vout.data(), vout.size());
+          return vec_out;
+        }
+        /**
+         * @brief Returns nr. of rows in the wrapped matrix. 
+         *
+         * @returns int: Nr. of rows.
+         *
+         * @author Carlos Mejuto Zaera
+         * @date 05/04/2021
+         */
+        int64_t rows() const {return mat->m();}
     };
     
     /**

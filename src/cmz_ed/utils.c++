@@ -118,7 +118,9 @@ namespace cmz
       while(getline(ifile, line)){
         if(line[0] == '#' || line[0] == '!' || line[0] == '%') continue;
         istringstream iss(line);
-        iss >> key >> val;
+        iss >> key;
+        iss >> std::ws;
+        std::getline(iss, val);
         if(input.find(key) == input.end()){
           input[key] = val;
         }

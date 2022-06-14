@@ -25,6 +25,7 @@ list(APPEND DBWY_SOURCES_HXX
      dbwy/hamiltonian_generator.hpp
      dbwy/residue_arrays.hpp
      dbwy/sd_operations.hpp
+     dbwy/gf.h++
     )
 install(FILES ${ASCI_SOURCES_HXX} DESTINATION include/cmz_ed)
 install(FILES ${DBWY_SOURCES_HXX} DESTINATION include/dbwy)
