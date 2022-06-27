@@ -38,9 +38,9 @@ void bitset_to_occ_vir_as( size_t norb, std::bitset<N> state,
   for( const auto i : as_orbs )
     if( state[i] ) occ.emplace_back(i);
   const auto nocc = occ.size();
-  assert( nocc < norb );
+  assert( nocc <= norb );
 
-  const auto nvir = norb - nocc;
+  const auto nvir = as_orbs.size() - nocc;
   vir.resize(nvir);
   auto it = vir.begin();
   for( const auto i : as_orbs )

@@ -213,17 +213,9 @@ namespace cmz
         //CHECK WHETHER IT CORRESPONDS TO this GF: a_i^+|wfn> OR a_i|wfn>
         bool ingf = false;
         if( is_part && !old_basis[iii][sporb]) // PARTICLE
-        {
-          //if( (!old_basis[iii].IsOccUp(norb1) &&  sp_up) ||
-          //    (!old_basis[iii].IsOccDo(norb1) && !sp_up))
             ingf = true;
-        }
         else if( !is_part && old_basis[iii][sporb]) // HOLE
-        {
-         // if( (old_basis[iii].IsOccUp(norb1) &&  sp_up) ||
-         //     (old_basis[iii].IsOccDo(norb1) && !sp_up))
             ingf = true;
-        }
 	if( ingf )
         {
           //YES, ADD TO LIST
@@ -260,17 +252,9 @@ namespace cmz
         //CHECK, CAN ndet COME FROM ai^+|GS> / ai|wfn> WITH THE ORBITAL *orb?
         bool fromwfn = false;
         if( is_part && founddets[ndet][sporb])
-        {
-          //if( (founddets[ndet].IsOccUp(norb) &&  sp_up) ||
-          //    (founddets[ndet].IsOccDo(norb) && !sp_up))
             fromwfn = true;
-        }
         else if ( !is_part && !founddets[ndet][sporb] )
-        {
-          //if( (!founddets[ndet].IsOccUp(norb) &&  sp_up) ||
-          //    (!founddets[ndet].IsOccDo(norb) && !sp_up))
             fromwfn = true;
-        }
         if( fromwfn )
         {
           //YES, CHECK WHETHER THE GENERATING STATE COMES FROM THE BASE DETERMINANT SPACE
@@ -292,13 +276,12 @@ namespace cmz
       size_t orig_nterms = cgf+1;
     
       int startSD = 0, endSD = orig_nterms-1, GFseed = 0;
-      for(int nSD = 1; nSD <= tot_SD and cgf <= trunc_size; nSD++){
-        for(int iii = startSD; iii <= endSD and cgf <= trunc_size; iii++){
+      for(int nSD = 1; nSD <= tot_SD && cgf <= trunc_size; nSD++){
+        for(int iii = startSD; iii <= endSD && cgf <= trunc_size; iii++){
           if(nSD == 1) if(abs(b(iii)) < GFseedThreshold) continue; //FROM THE ORIGINAL SET, ONLY CONSIDER THE MOST IMPORTANT ONES
           //GET SINGLES
           GFseed += (nSD == 1) ? 1 : 0;
           std::vector<std::bitset<nbits> > tdets;
-          //tdets = founddets[iii].GetSingles( as_orbs );
           dbwy::generate_singles_spin_as( norbs, founddets[iii], tdets, as_orbs );
 
           for(size_t jjj = 0; jjj < tdets.size(); jjj++){
@@ -318,18 +301,6 @@ namespace cmz
       //NOW THAT WE FOUND THE BASIS, JUST STORE IT
       new_basis.resize(cgf+1);
       new_basis.assign(founddets.begin(), founddets.end());
-    }
-
-    template<size_t nbits, typename index_t=int32_t>
-    auto BuildHamil4GF(
-      dbwy::HamiltonianGenerator<nbits> &Hgen, 
-      std::vector<std::bitset<nbits> > &dets, 
-      MPI_Comm comm,
-      double h_el_tol,
-      bool print )
-    {
-      return dbwy::make_dist_csr_hamiltonian<index_t>( comm, dets.begin(), dets.end(),
-                                                        Hgen, h_el_tol );
     }
 
     /**
@@ -388,17 +359,9 @@ namespace cmz
           //CHECK, CAN ndet COME FROM ai^+|GS> *OR* ai|GS> WITH THE ORBITAL orb?
           bool in_gf = false;
 	  if( is_part && GF_dets[ndet][sporb]) // PARTICLE
-          {
-            //if( (GF_dets[ndet].IsOccUp(orb) &&  sp_up) ||
-            //    (GF_dets[ndet].IsOccDo(orb) && !sp_up))
               in_gf = true;
-          }
           else if( !is_part && !GF_dets[ndet][sporb] ) // HOLE
-          {
-            //if( (!GF_dets[ndet].IsOccUp(orb) &&  sp_up) ||
-            //    (!GF_dets[ndet].IsOccDo(orb) && !sp_up))
               in_gf = true;
-          }
           if( in_gf )
           {
             //YES, CHECK WHETHER THE GENERATING STATE COMES FROM THE BASE DETERMINANT SPACE
@@ -511,7 +474,7 @@ namespace cmz
       try{ nLanIts = getParam<int>( input, "nLanIts" ); } catch(...){ nLanIts = 1000; } 
       bool print, writeGF;
       try{ print = getParam<bool>( input, "nLanIts" ); } catch(...){ print = false;}
-      try{ writeGF = getParam<bool>( input, "writeGF" ); } catch(...){ writeGF = true;}
+      try{ writeGF = getParam<bool>( input, "writeGF" ); } catch(...){ writeGF = false;}
 
       time_t loop1 = time(NULL), loop2 = time(NULL);
       auto loop1C = Clock::now(), loop2C = Clock::now();
@@ -520,39 +483,27 @@ namespace cmz
       //FIRST, BUILD THE BASIS SEQUENTIALLY BY FORMING THE BASES OF EACH ORBITAL AND
       //ADDING THEM TOGETHER
       std::vector<std::bitset<nbits> > gf_dets, gf_dets_tmp;
-      //std::vector<DetStateType> gf_dets_stts;
       for(size_t iorb = 0; iorb < GF_orbs_basis.size(); iorb++){
         get_GF_basis_AS_1El<nbits, index_t>( GF_orbs_basis[iorb], is_up_basis[iorb], is_part, wfn0, base_dets, 
                                                     gf_dets_tmp, occs, input );
-        //for(size_t ib = 0; ib < gf_dets_tmp.size(); ib++)
-        //    gf_dets_stts.push_back( gf_dets_tmp[ib].GetState() );
         gf_dets.insert( gf_dets.end(), gf_dets_tmp.begin(),
                                        gf_dets_tmp.end() );
 
         gf_dets_tmp.clear();
-        //std::sort(gf_dets_stts.begin(), gf_dets_stts.end());
         ips4o::parallel::sort( gf_dets.begin(), gf_dets.end(), 
           []( auto x, auto y ) { return dbwy::bitset_less(x, y); });
-        //typename std::vector<DetStateType>::iterator b_it = std::unique(gf_dets_stts.begin(), gf_dets_stts.end());
         typename std::vector<std::bitset<nbits> >::iterator b_it = std::unique(gf_dets.begin(), gf_dets.end());
-        //gf_dets_stts.resize(std::distance(gf_dets_stts.begin(), b_it)); 
         gf_dets.resize(std::distance(gf_dets.begin(), b_it)); 
-        //std::cout << "---> BASIS HAS NOW: " << gf_dets_stts.size() << " ELMENTS!! BY ORBITAL " << iorb + 1 << "/" << GF_orbs_basis.size() << std::endl;
         std::cout << "---> BASIS HAS NOW: " << gf_dets.size() << " ELMENTS!! BY ORBITAL " << iorb + 1 << "/" << GF_orbs_basis.size() << std::endl;
       }
     
-      //size_t nterms = gf_dets_stts.size();
       size_t nterms = gf_dets.size();
       cout << "---> FINAL ADD BASIS HAS " << nterms << " ELEMENTS" << endl;
-      //for(size_t ist = 0; ist < nterms; ist++){
-      //  DetType tmp( gf_dets_stts[ist], Norbs );
-      //  gf_dets.push_back( tmp );
-      //}
-      //gf_dets_stts.clear();
     
       loop1 = time(NULL);
       loop1C = Clock::now();
-      auto hamil = BuildHamil4GF<nbits>( Hgen, gf_dets, MPI_COMM_WORLD, h_el_tol, print );
+      auto hamil = dbwy::make_dist_csr_hamiltonian<index_t>( MPI_COMM_WORLD, gf_dets.begin(), 
+                                                             gf_dets.end(), Hgen, h_el_tol );
       loop2 = time(NULL);
       loop2C = Clock::now();
       std::cout << setprecision(3)<<"Building " << (is_part ? "*PARTICLE*" : "*HOLE*") << " Hamiltonian: " << double(std::chrono::duration_cast<std::chrono::milliseconds>(loop2C - loop1C).count())/1000 << std::endl;

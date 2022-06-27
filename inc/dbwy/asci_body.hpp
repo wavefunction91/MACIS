@@ -1,6 +1,8 @@
 #pragma once
 #include <mpi.h>
 #include <iostream>
+#include <algorithm>
+#include <functional>
 #include "cmz_ed/utils.h++"
 #include "dbwy/csr_hamiltonian.hpp"
 #include "dbwy/davidson.hpp"
@@ -9,6 +11,7 @@
 #include "cmz_ed/hamil.h++"
 #include "cmz_ed/lanczos.h++"
 #include "cmz_ed/rdms.h++"
+#include "dbwy/gf.h++"
 
 #include <bitset>
 
@@ -58,6 +61,129 @@ std::vector<std::bitset<N>> build_hilbert_space(
 
   return states;
  
+}
+
+template< size_t nbits>
+auto run_asci_w_GF(
+  const cmz::ed::Input_t &input
+) {
+
+  double Eret = 0.;
+  std::vector<double> X_local; // Eigenvectors
+  std::vector<std::bitset<nbits>> dets;
+  vector<vector<vector<complex<double> > > > GF;
+  int world_rank; MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
+  int world_size; MPI_Comm_size(MPI_COMM_WORLD,&world_size);
+
+  // Get Parameters
+  size_t norb = cmz::ed::getParam<int>( input, "norbs" );
+  size_t nalpha  = cmz::ed::getParam<int>( input, "nups"  );
+  size_t nbeta  = cmz::ed::getParam<int>( input, "ndos"  );
+  bool   quiet  = cmz::ed::getParam<bool>( input, "quiet" );
+  std::string fcidump = 
+    cmz::ed::getParam<std::string>( input, "fcidump_file" );
+  
+  if( norb > nbits/2 ) throw std::runtime_error("Not Enough Bits...");
+  
+  
+  // Read in the integrals 
+  cmz::ed::intgrls::integrals ints(norb, fcidump);
+  MPI_Barrier(MPI_COMM_WORLD);
+  
+  // Hamiltonian Matrix Element Generator
+  dbwy::DoubleLoopHamiltonianGenerator<nbits> 
+    ham_gen( norb, ints.u.data(), ints.t.data() );
+  //dbwy::ResidueArraysHamiltonianGenerator<nbits> 
+  //  ham_gen( norb, ints.u.data(), ints.t.data() );
+  
+  // Compute HF Energy
+  const std::bitset<nbits> hf_det = 
+    dbwy::canonical_hf_determinant<nbits>(nalpha,nbeta);
+  const double EHF = ham_gen.matrix_element(hf_det, hf_det);
+  if( world_rank == 0 && !quiet ) {
+    std::cout << std::scientific << std::setprecision(12);
+    std::cout << "E(HF) = " << EHF + ints.core_energy << std::endl;
+  }
+  
+  
+  auto print_asci  = [&](double E) {
+    if( world_rank == 0 && !quiet ) {
+      std::cout << "  * E(ASCI)   = " << E + ints.core_energy << " Eh" << std::endl;
+      std::cout << "  * E_c(ASCI) = " << (E - EHF)*1000 << " mEh" << std::endl;
+    }
+  };
+  
+  //  Run ASCI
+  size_t ntdets_max    = cmz::ed::getParam<int>( input, "ntdets_max" );
+  size_t ncdets_max    = cmz::ed::getParam<int>( input, "ncdets_max" );
+  size_t niter_max     = cmz::ed::getParam<int>( input, "niter_max" );
+  double coeff_thresh  = cmz::ed::getParam<int>( input, "coeff_thresh" );
+  {
+  if(world_size != 1) throw "NO MPI"; // Disable MPI for now
+  
+  auto bitset_comp = [](auto x, auto y){ return dbwy::bitset_less(x,y); };
+  
+  // Staring with HF
+  if(world_rank == 0 && !quiet)
+    std::cout << "* Initializing ASCI with HF" << std::endl;
+  dets.push_back(hf_det);
+  X_local = {1.0};
+  auto EASCI = EHF;
+  print_asci( EASCI );
+       
+  // Grow wfn w/o refinement
+  std::tie(EASCI, dets, X_local) = dbwy::asci_grow( ntdets_max, ncdets_max, 8, EASCI,
+    std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
+    print_asci, quiet );
+  
+  // Refine wfn
+  std::tie(EASCI, dets, X_local) = dbwy::asci_refine( ncdets_max, 1e-6, niter_max,
+    EASCI, std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
+    print_asci, quiet );
+  
+  Eret = EASCI + ints.core_energy;
+  } // ASCI 
+
+  // Green's function calculation
+  { 
+    double EASCI = Eret - ints.core_energy;
+    Eigen::VectorXd psi0  = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>( X_local.data(), X_local.size() );
+    std::vector<double> ordm( norb*norb, 0. );
+    ham_gen.form_rdms( dets.begin(), dets.end(), 
+                       dets.begin(), dets.end(),
+                       X_local.data(), ordm.data() );
+
+    std::vector<double> occs(norb, 0.);
+    for( int i = 0; i < norb; i++ )
+      occs[i] += ordm[i + i * norb] / 2.;
+
+    std::cout << "Occs: ";
+    for( const auto oc : occs )
+      std::cout << oc << ", ";
+    std::cout << endl;
+
+    size_t nws  = cmz::ed::getParam<int>( input, "nws" );
+    double wmin = cmz::ed::getParam<double>( input, "wmin" );
+    double wmax = cmz::ed::getParam<double>( input, "wmax" );
+    double eta  = cmz::ed::getParam<double>( input,  "broad" );
+    std::vector<std::complex<double> > ws(nws);
+    for( int iw = 0; iw < nws; iw++ )
+      ws[iw] = std::complex<double>( wmin + double(iw) * (wmax - wmin) / (double(nws - 1)) , eta );
+
+    // Particle sector
+    bool is_part = true;
+    cmz::ed::RunGFCalc<nbits>( GF, psi0, ham_gen, dets, EASCI, is_part, ws, occs, input );
+
+    // Hole sector
+    is_part = false;
+    std::vector<std::vector<std::vector<std::complex<double> > > > GF_tmp;
+    cmz::ed::RunGFCalc<nbits>( GF_tmp, psi0, ham_gen, dets, EASCI, is_part, ws, occs, input );
+    for( int i = 0; i < GF_tmp.size(); i++ )
+      for( int j = 0; j < GF_tmp[i].size(); j++)
+        for( int k = 0; k < GF_tmp[i][j].size(); k++)
+          GF[i][j][k] += GF_tmp[i][j][k];
+  } // GF
+  return std::tuple( Eret, GF );
 }
 
 template< size_t nbits>

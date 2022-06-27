@@ -125,6 +125,11 @@ int main( int argn, char* argv[] )
       cout << endl;
 
       // GREEN'S FUNCTION CALCULATION
+      std::cout << "About to compute GF for wave function:" << std::endl;
+      auto w = std::setw(20);
+      for( int idet = 0; idet < dets.size(); idet++ )
+         std::cout << psi0(idet) << w << dbwy::to_canonical_string( dets[idet] ) << std::endl; 
+      std::cout << std::endl;
       
       size_t nws  = getParam<int>( input, "nws" );
       double wmin = getParam<double>( input, "wmin" );
