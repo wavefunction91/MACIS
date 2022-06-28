@@ -6,6 +6,7 @@
 #include "cmz_ed/utils.h++"
 #include "dbwy/csr_hamiltonian.hpp"
 #include "dbwy/davidson.hpp"
+#include "dbwy/sd_build.hpp"
 #include "cmz_ed/slaterdet.h++"
 #include "cmz_ed/integrals.h++"
 #include "cmz_ed/hamil.h++"
@@ -87,14 +88,16 @@ auto run_asci_w_GF(
   
   
   // Read in the integrals 
-  cmz::ed::intgrls::integrals ints(norb, fcidump);
+  bool just_singles;
+  cmz::ed::intgrls::integrals ints(norb, fcidump, just_singles);
   MPI_Barrier(MPI_COMM_WORLD);
   
   // Hamiltonian Matrix Element Generator
-  dbwy::DoubleLoopHamiltonianGenerator<nbits> 
-    ham_gen( norb, ints.u.data(), ints.t.data() );
-  //dbwy::ResidueArraysHamiltonianGenerator<nbits> 
+  //dbwy::DoubleLoopHamiltonianGenerator<nbits> 
   //  ham_gen( norb, ints.u.data(), ints.t.data() );
+  dbwy::SDBuildHamiltonianGenerator<nbits> 
+    ham_gen( norb, ints.u.data(), ints.t.data() );
+  ham_gen.SetJustSingles( just_singles );
   
   // Compute HF Energy
   const std::bitset<nbits> hf_det = 
@@ -216,14 +219,16 @@ auto run_asci_w_1rdm(
   
   
   // Read in the integrals 
-  cmz::ed::intgrls::integrals ints(norb, fcidump);
+  bool just_singles;
+  cmz::ed::intgrls::integrals ints(norb, fcidump, just_singles);
   MPI_Barrier(MPI_COMM_WORLD);
   
   // Hamiltonian Matrix Element Generator
-  dbwy::DoubleLoopHamiltonianGenerator<nbits> 
-    ham_gen( norb, ints.u.data(), ints.t.data() );
-  //dbwy::ResidueArraysHamiltonianGenerator<nbits> 
+  //dbwy::DoubleLoopHamiltonianGenerator<nbits> 
   //  ham_gen( norb, ints.u.data(), ints.t.data() );
+  dbwy::SDBuildHamiltonianGenerator<nbits> 
+    ham_gen( norb, ints.u.data(), ints.t.data() );
+  ham_gen.SetJustSingles( just_singles );
   
   // Compute HF Energy
   const std::bitset<nbits> hf_det = 
@@ -365,12 +370,16 @@ auto run_ed_w_1rdm(
   
   
   // Read in the integrals 
-  cmz::ed::intgrls::integrals ints(norb, fcidump);
+  bool just_singles;
+  cmz::ed::intgrls::integrals ints(norb, fcidump, just_singles);
   MPI_Barrier(MPI_COMM_WORLD);
   
   // Hamiltonian Matrix Element Generator
-  dbwy::DoubleLoopHamiltonianGenerator<nbits> 
+  //dbwy::DoubleLoopHamiltonianGenerator<nbits> 
+  //  ham_gen( norb, ints.u.data(), ints.t.data() );
+  dbwy::SDBuildHamiltonianGenerator<nbits> 
     ham_gen( norb, ints.u.data(), ints.t.data() );
+  ham_gen.SetJustSingles( just_singles );
   
   // Compute HF Energy
   const std::bitset<nbits> hf_det = 

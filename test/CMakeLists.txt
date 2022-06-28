@@ -18,6 +18,7 @@ list( APPEND TEST_DIRECTORIES
       test_bandlan
       test_getGFbasis
       test_buildGFHamil
+      test_HamilBuilds
       test_GF
     )
 foreach( testdir ${TEST_DIRECTORIES} )

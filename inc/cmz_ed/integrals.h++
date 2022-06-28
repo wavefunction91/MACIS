@@ -335,7 +335,25 @@ namespace cmz
            */
           integrals( int64_t norbitals, const string &file): integrals(norbitals)
           {
-            read_FCIdump(file);
+            bool tmp = read_FCIdump(file);
+            copy_to_vectors();
+          }
+      
+          /**
+           * @brief Constructor from FCIDUMP file, checks whether the Hamiltonian
+           *        includes non-diagonal doubles. 
+           *
+           * @param [in] int64_t norbitals: Nr. of orbitals.
+           * @param [in] const string &file: FCIDUMP file.
+           * @param [out] bool &just_singles: Does the Hamiltonian include only
+           *              diagonal doubles?
+           *
+           * @author Carlos Mejuto Zaera
+           * @date 28/06/2022
+           */
+          integrals( int64_t norbitals, const string &file, bool &just_singles): integrals(norbitals)
+          {
+            just_singles = read_FCIdump(file);
             copy_to_vectors();
           }
       
@@ -803,14 +821,18 @@ namespace cmz
            *
            * @param [in] const string &file: FCIDUMP file.
            *
-           * @author Stephen J. Cotton
+           * @returns bool: True if the system only contains diagonal
+           *          double excitations. 
+           *
+           * @author Stephen J. Cotton, Carlos Mejuto Zaera
            * @date 05/04/2021
            */
-          void read_FCIdump(const string &file, const bool quiet = true)
+          bool read_FCIdump(const string &file, const bool quiet = true)
           {
             core_energy = 0.;
             t_store.clear();
             u_store.clear();
+            bool just_singles = true;
             
             std::ifstream ifile(file);
             if(!ifile)
@@ -856,7 +878,10 @@ namespace cmz
               else if( j == 0 && b == 0 )
                 t_store.insert( { two_indx( i-1, a-1 ), matel } );
               else if( j > 0 && b > 0 )
+              {
                 u_store.insert( { four_indx( i-1, a-1, j-1, b-1 ), matel } );
+                if( i != a && j != b ) just_singles = false;
+              }
               else if( j == 0 && b != 0 || j != 0 && b == 0 )
                 throw "Indices j and b should either both be zero, or not, in FCIdump file";
               else
@@ -869,6 +894,8 @@ namespace cmz
             if( core_energy )
               std::cout << "  (also read core energy = " << core_energy << ")" << std::endl;
             }
+   
+            return just_singles;
           }
       
           /**

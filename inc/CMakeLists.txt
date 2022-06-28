@@ -22,6 +22,7 @@ list(APPEND DBWY_SOURCES_HXX
      dbwy/csr_hamiltonian.hpp
      dbwy/davidson.hpp
      dbwy/double_loop.hpp
+     dbwy/sd_build.hpp
      dbwy/hamiltonian_generator.hpp
      dbwy/residue_arrays.hpp
      dbwy/sd_operations.hpp
