@@ -260,6 +260,8 @@ public:
     generate_integral_intermediates( norb_, V_pqrs_ );
   
   }
+
+  virtual void SetJustSingles( bool _js ) {}
 };
 
 

@@ -547,6 +547,9 @@ auto asci_grow( size_t ndets_max, size_t ncdets, size_t grow_factor,
   const std::function<void(double)>& print_asci = std::function<void(double)>(),
   const bool quiet = false ) {
 
+  using clock_type = std::chrono::high_resolution_clock;
+  using duration_type = std::chrono::duration<double>;
+
   if( wfn.size() >= ndets_max && !quiet ) {
     std::cout << "Wavefunction Already Of Sufficient Size, Skipping Grow"
       << std::endl;
@@ -559,8 +562,58 @@ auto asci_grow( size_t ndets_max, size_t ncdets, size_t grow_factor,
     std::tie(E0, wfn, X_local) = asci_iter<N,index_t>( ndets_new, ncdets, E0,
       std::move(wfn), std::move(X_local), ham_gen, norb, ham_tol,
       eig_max_subspace, eig_res_tol, quiet);
-    if( print_asci ) print_asci( E0 );
+    if( print_asci && !quiet ) print_asci( E0 );
     if( std::abs( float(wfn.size() - prev_size) / float(wfn.size())) < 1.E-3 )
+      break;
+    prev_size = wfn.size();
+  }
+
+  return std::make_tuple(E0, wfn, X_local);
+
+}
+
+template <size_t N, typename index_t = int32_t>
+auto asci_grow_with_rot( size_t ndets_max, size_t ncdets, size_t grow_factor,
+  double E0, std::vector<std::bitset<N>> wfn, std::vector<double> X_local, 
+  HamiltonianGenerator<N>& ham_gen, size_t norb,
+  double ham_tol, size_t eig_max_subspace, double eig_res_tol,
+  const std::function<void(double)>& print_asci = std::function<void(double)>(),
+  const int nrots = 4, const bool quiet = false ) {
+
+  using clock_type = std::chrono::high_resolution_clock;
+  using duration_type = std::chrono::duration<double>;
+
+  if( wfn.size() >= ndets_max && !quiet ) {
+    std::cout << "Wavefunction Already Of Sufficient Size, Skipping Grow"
+      << std::endl;
+  }
+
+  // Grow wfn until max size, or until we get stuck
+  size_t prev_size = wfn.size();
+  int its = 0;
+  while( wfn.size() < ndets_max || its < nrots ) {
+    size_t ndets_new = std::min(std::max(100ul,wfn.size() * grow_factor), ndets_max);
+    std::tie(E0, wfn, X_local) = asci_iter<N,index_t>( ndets_new, ncdets, E0,
+      std::move(wfn), std::move(X_local), ham_gen, norb, ham_tol,
+      eig_max_subspace, eig_res_tol, quiet);
+    if( print_asci && !quiet ) print_asci( E0 );
+    its++;
+    if( its > 2 && its < nrots )
+    {
+      auto orbrot_st = clock_type::now();
+      std::vector<double> ordm( norb*norb, 0. );
+      ham_gen.form_rdms( wfn.begin(), wfn.end(), 
+                         wfn.begin(), wfn.end(),
+                         X_local.data(), ordm.data() );
+      ham_gen.rotate_hamiltonian_ordm( ordm.data() );
+      ham_gen.SetJustSingles( false );
+      auto orbrot_en = clock_type::now();
+      if( !quiet )
+        std::cout << "\n  * Rotating to natural orbitals: " << 
+                     duration_type(orbrot_en - orbrot_st).count() << std::endl;
+    }
+    if( std::abs( float(wfn.size() - prev_size) / float(wfn.size())) < 1.E-3
+        && its >= nrots  )
       break;
     prev_size = wfn.size();
   }

@@ -342,7 +342,7 @@ public:
   SDBuildHamiltonianGenerator(Args&&... args) :
     HamiltonianGenerator<N>(std::forward<Args>(args)...), just_singles(false) { }
 
-  void SetJustSingles( bool _js ){ just_singles = _js; }
+  void SetJustSingles( bool _js ) override{ just_singles = _js; }
 
 };
 

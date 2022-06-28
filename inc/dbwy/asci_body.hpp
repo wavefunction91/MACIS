@@ -121,6 +121,8 @@ auto run_asci_w_GF(
   size_t ncdets_max    = cmz::ed::getParam<int>( input, "ncdets_max" );
   size_t niter_max     = cmz::ed::getParam<int>( input, "niter_max" );
   double coeff_thresh  = cmz::ed::getParam<int>( input, "coeff_thresh" );
+  int    n_orb_rots    = 0;
+  try{ n_orb_rots = cmz::ed::getParam<int>( input, "n_orb_rots" ); } catch(...){ }
   {
   if(world_size != 1) throw "NO MPI"; // Disable MPI for now
   
@@ -135,9 +137,14 @@ auto run_asci_w_GF(
   print_asci( EASCI );
        
   // Grow wfn w/o refinement
-  std::tie(EASCI, dets, X_local) = dbwy::asci_grow( ntdets_max, ncdets_max, 8, EASCI,
-    std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
-    print_asci, quiet );
+  if( n_orb_rots > 0 )
+    std::tie(EASCI, dets, X_local) = dbwy::asci_grow_with_rot( ntdets_max, ncdets_max, 8, EASCI,
+      std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
+      print_asci, n_orb_rots, quiet );
+  else
+    std::tie(EASCI, dets, X_local) = dbwy::asci_grow( ntdets_max, ncdets_max, 8, EASCI,
+      std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
+      print_asci, quiet );
   
   // Refine wfn
   std::tie(EASCI, dets, X_local) = dbwy::asci_refine( ncdets_max, 1e-6, niter_max,
@@ -277,6 +284,8 @@ auto run_asci_w_1rdm(
   size_t ncdets_max    = cmz::ed::getParam<int>( input, "ncdets_max" );
   size_t niter_max     = cmz::ed::getParam<int>( input, "niter_max" );
   double coeff_thresh  = cmz::ed::getParam<int>( input, "coeff_thresh" );
+  int    n_orb_rots    = 0;
+  try{ n_orb_rots = cmz::ed::getParam<int>( input, "n_orb_rots" ); } catch(...) { }
   {
   if(world_size != 1) throw "NO MPI"; // Disable MPI for now
   
@@ -291,9 +300,14 @@ auto run_asci_w_1rdm(
   print_asci( EASCI );
        
   // Grow wfn w/o refinement
-  std::tie(EASCI, dets, X_local) = dbwy::asci_grow( ntdets_max, ncdets_max, 8, EASCI,
-    std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
-    print_asci, quiet );
+  if( n_orb_rots > 0 )
+    std::tie(EASCI, dets, X_local) = dbwy::asci_grow_with_rot( ntdets_max, ncdets_max, 8, EASCI,
+      std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
+      print_asci, n_orb_rots, quiet );
+  else
+    std::tie(EASCI, dets, X_local) = dbwy::asci_grow( ntdets_max, ncdets_max, 8, EASCI,
+      std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
+      print_asci, quiet );
   
   // Refine wfn
   std::tie(EASCI, dets, X_local) = dbwy::asci_refine( ncdets_max, 1e-6, niter_max,
