@@ -91,9 +91,7 @@ protected:
         spin_det_t exd_beta  = truncate_bitset<N/2>( ex_diag >> (N/2) );
 
         // Compute Matrix Element
-        const auto h_eld = this->matrix_element( bra_alpha, bra_alpha,
-          exd_alpha, bra_beta, bra_beta, exd_beta, bra_occ_alpha,
-          bra_occ_beta );
+        const auto h_eld = this->matrix_element_diag( bra_occ_alpha, bra_occ_beta );
 
         if( std::abs(h_eld) > H_thresh ) {
           nrow++;
@@ -111,23 +109,21 @@ protected:
             spin_det_t ket_beta  = truncate_bitset<N/2>( pos_ket >> (N/2));
 
             full_det_t ex_total = bra ^ pos_ket;
-            if( ex_total.count() <= 4 ) {
             
-              spin_det_t ex_alpha = truncate_bitset<N/2>( ex_total );
-              spin_det_t ex_beta  = truncate_bitset<N/2>( ex_total >> (N/2) );
+            spin_det_t ex_alpha = truncate_bitset<N/2>( ex_total );
+            spin_det_t ex_beta  = truncate_bitset<N/2>( ex_total >> (N/2) );
 
-              // Compute Matrix Element
-              const auto h_el = this->matrix_element( bra_alpha, ket_alpha,
-                ex_alpha, bra_beta, ket_beta, ex_beta, bra_occ_alpha,
-                bra_occ_beta );
+            // Compute Matrix Element
+            const auto h_el = this->matrix_element( bra_alpha, ket_alpha,
+              ex_alpha, bra_beta, ket_beta, ex_beta, bra_occ_alpha,
+              bra_occ_beta );
 
-              if( std::abs(h_el) > H_thresh ) {
-                nrow++;
-                colind.emplace_back(j);
-                nzval.emplace_back(h_el);
-              }
+            if( std::abs(h_el) > H_thresh ) {
+              nrow++;
+              colind.emplace_back(j);
+              nzval.emplace_back(h_el);
+            }
 
-            } // Possible non-zero connection (Hamming distance)
             
           } // Non-zero ket determinant
         } // Loop over ket determinants

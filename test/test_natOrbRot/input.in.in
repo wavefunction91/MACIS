@@ -1,0 +1,10 @@
+#FCIDUMP FILE
+fcidump_file @PATH_TO_TEST@/test_natOrbRot/imp10orbs.fcidump
+#NR OF ORBITALS
+norbs 10
+#NR OF SPIN UP ELECTRONS
+nups 5
+#NR OF SPIN DOWN ELECTRONS
+ndos 5
+#PRINT INFO
+print T

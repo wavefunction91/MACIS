@@ -20,6 +20,7 @@ list( APPEND TEST_DIRECTORIES
       test_buildGFHamil
       test_HamilBuilds
       test_GF
+      test_natOrbRot
     )
 foreach( testdir ${TEST_DIRECTORIES} )
     # add executable
