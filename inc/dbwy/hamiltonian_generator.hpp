@@ -104,6 +104,78 @@ public:
     spin_det_t ex_beta, const std::vector<uint32_t>& bra_occ_alpha,
     const std::vector<uint32_t>& bra_occ_beta );
 
+  ////////////////////////////////////////////////
+  //    Routines for fast diagonal elements     //
+  ////////////////////////////////////////////////
+  inline double single_orbital_en( 
+                int orb,
+                const std::vector<uint32_t>& ss_occ,
+                const std::vector<uint32_t>& os_occ ) const
+  {
+    // One electron component
+    double orb_en = T_pq_[ orb + orb*norb_ ];
+
+    // Same-spin two-body term
+    for( auto q : ss_occ )
+      orb_en += G2_red_[orb + q*norb_] + G2_red_[q + orb*norb_];
+    orb_en -= G2_red_[orb + orb*norb_];
+
+    // Opposite-spin two-body term
+    for( auto q : os_occ  )
+      orb_en += V2_red_[orb + q*norb_];
+
+    return orb_en;
+  }
+
+  inline double fast_diag_single( 
+                const std::vector<uint32_t>& ss_occ, // Refers to original determinant
+                const std::vector<uint32_t>& os_occ, // Refers to original determinant
+                int orb_hol,
+                int orb_par,
+                double orig_det_Hii ) const
+  {
+    return orig_det_Hii
+         + single_orbital_en( orb_par, ss_occ, os_occ ) - single_orbital_en( orb_hol, ss_occ, os_occ )
+         - G2_red_[ orb_par + norb_*orb_hol ] - G2_red_[ orb_hol + norb_*orb_par ];
+  }
+
+  inline double fast_diag_ss_double( 
+                const std::vector<uint32_t>& ss_occ, // Refers to original determinant
+                const std::vector<uint32_t>& os_occ, // Refers to original determinant
+                int orb_hol1, int orb_hol2,
+                int orb_par1, int orb_par2,
+                double orig_det_Hii ) const
+  {
+    return orig_det_Hii
+         + single_orbital_en( orb_par1, ss_occ, os_occ ) + single_orbital_en( orb_par2, ss_occ, os_occ )
+         - single_orbital_en( orb_hol1, ss_occ, os_occ ) - single_orbital_en( orb_hol2, ss_occ, os_occ )
+         + G2_red_[ orb_hol1 + norb_*orb_hol2 ] + G2_red_[ orb_hol2 + norb_*orb_hol1 ]
+         + G2_red_[ orb_par1 + norb_*orb_par2 ] + G2_red_[ orb_par2 + norb_*orb_par1 ]
+         - G2_red_[ orb_par1 + norb_*orb_hol1 ] - G2_red_[ orb_hol1 + norb_*orb_par1 ]
+         - G2_red_[ orb_par2 + norb_*orb_hol1 ] - G2_red_[ orb_hol1 + norb_*orb_par2 ]
+         - G2_red_[ orb_par1 + norb_*orb_hol2 ] - G2_red_[ orb_hol2 + norb_*orb_par1 ]
+         - G2_red_[ orb_par2 + norb_*orb_hol2 ] - G2_red_[ orb_hol2 + norb_*orb_par2 ];
+  }
+
+  inline double fast_diag_os_double( 
+                const std::vector<uint32_t>& up_occ, // Refers to original determinant
+                const std::vector<uint32_t>& do_occ, // Refers to original determinant
+                int orb_holu, int orb_hold,
+                int orb_paru, int orb_pard,
+                double orig_det_Hii ) const
+  {
+    return orig_det_Hii
+         + single_orbital_en( orb_paru, up_occ, do_occ ) + single_orbital_en( orb_pard, do_occ, up_occ )
+         - single_orbital_en( orb_holu, up_occ, do_occ ) - single_orbital_en( orb_hold, do_occ, up_occ )
+         + V2_red_[ orb_holu + norb_*orb_hold ] + V2_red_[ orb_paru + norb_*orb_pard ]
+         - G2_red_[ orb_paru + norb_*orb_holu ] - G2_red_[ orb_holu + norb_*orb_paru ]
+         - G2_red_[ orb_pard + norb_*orb_hold ] - G2_red_[ orb_hold + norb_*orb_pard ]
+         - V2_red_[ orb_paru + norb_*orb_hold ] - V2_red_[ orb_holu + norb_*orb_pard ];
+  }
+  /////////////////////////////////////////////////////
+  //   END - Routines for fast diagonal elements     //
+  /////////////////////////////////////////////////////
+
   inline double matrix_element( full_det_t bra, full_det_t ket ) {
     auto bra_alpha = truncate_bitset<N/2>(bra);
     auto ket_alpha = truncate_bitset<N/2>(ket);
@@ -262,6 +334,7 @@ public:
   }
 
   virtual void SetJustSingles( bool _js ) {}
+  virtual bool GetJustSingles( ){ return false; }
 };
 
 

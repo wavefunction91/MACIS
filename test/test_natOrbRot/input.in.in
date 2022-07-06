@@ -1,5 +1,5 @@
 #FCIDUMP FILE
-fcidump_file @PATH_TO_TEST@/test_natOrbRot/imp10orbs.fcidump
+fcidump_file @PATH_TO_TEST@/test_natOrbRot/Fe2S2.fcidump
 #NR OF ORBITALS
 norbs 10
 #NR OF SPIN UP ELECTRONS

@@ -2,6 +2,8 @@
 #include "bitset_operations.hpp"
 #include "cmz_ed/combins.h++"
 #include <cassert>
+#include <numeric>
+#include <algorithm>
 
 namespace dbwy {
 
@@ -10,6 +12,23 @@ std::bitset<N> canonical_hf_determinant( uint32_t nalpha, uint32_t nbeta ) {
   static_assert( (N%2) == 0, "N Must Be Even");
   std::bitset<N> alpha = full_mask<N>(nalpha);
   std::bitset<N> beta  = full_mask<N>(nbeta) << (N/2);
+  return alpha | beta;
+}
+
+template <size_t N>
+std::bitset<N> canonical_hf_determinant( uint32_t nalpha, uint32_t nbeta, const std::vector<double> &orb_ens ) {
+  static_assert( (N%2) == 0, "N Must Be Even");
+  // First, find the sorted indices for the orbital energies
+  std::vector<size_t> idx(orb_ens.size());
+  std::iota(idx.begin(), idx.end(), 0);
+  std::stable_sort(idx.begin(), idx.end(),
+       [&orb_ens](size_t i1, size_t i2) {return orb_ens[i1] < orb_ens[i2];});
+  // Next, fill the electrons by energy
+  std::bitset<N> alpha(0), beta(0);
+  for( int i = 0; i < nalpha; i++ )
+    alpha.flip( idx[i] );
+  for( int i = 0; i < nbeta; i++ )
+    beta.flip( idx[i] + N/2 );
   return alpha | beta;
 }
 

@@ -21,6 +21,8 @@ list( APPEND TEST_DIRECTORIES
       test_HamilBuilds
       test_GF
       test_natOrbRot
+      test_hfbyen
+      test_fast_diags
     )
 foreach( testdir ${TEST_DIRECTORIES} )
     # add executable
