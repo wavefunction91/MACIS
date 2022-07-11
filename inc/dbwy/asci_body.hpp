@@ -81,6 +81,7 @@ auto run_asci_w_GF(
   size_t nalpha  = cmz::ed::getParam<int>( input, "nups"  );
   size_t nbeta  = cmz::ed::getParam<int>( input, "ndos"  );
   bool   quiet  = cmz::ed::getParam<bool>( input, "quiet" );
+  bool real_ints = cmz::ed::getParam<bool>( input, "real_ints" ); 
   std::string fcidump = 
     cmz::ed::getParam<std::string>( input, "fcidump_file" );
   
@@ -89,7 +90,7 @@ auto run_asci_w_GF(
   
   // Read in the integrals 
   bool just_singles;
-  cmz::ed::intgrls::integrals ints(norb, fcidump, just_singles);
+  cmz::ed::intgrls::integrals ints(norb, fcidump, just_singles, real_ints);
   MPI_Barrier(MPI_COMM_WORLD);
   
   // Hamiltonian Matrix Element Generator
@@ -213,6 +214,7 @@ auto run_asci_w_1rdm(
   size_t nalpha  = cmz::ed::getParam<int>( input, "nups"  );
   size_t nbeta  = cmz::ed::getParam<int>( input, "ndos"  );
   bool   quiet  = cmz::ed::getParam<bool>( input, "quiet" );
+  bool real_ints = cmz::ed::getParam<bool>( input, "real_ints" );
   std::string fcidump = 
     cmz::ed::getParam<std::string>( input, "fcidump_file" );
   bool read_wfn =
@@ -227,7 +229,7 @@ auto run_asci_w_1rdm(
   
   // Read in the integrals 
   bool just_singles;
-  cmz::ed::intgrls::integrals ints(norb, fcidump, just_singles);
+  cmz::ed::intgrls::integrals ints(norb, fcidump, just_singles, real_ints);
   MPI_Barrier(MPI_COMM_WORLD);
   
   // Hamiltonian Matrix Element Generator
@@ -369,6 +371,7 @@ auto run_ed_w_1rdm(
   size_t nalpha  = cmz::ed::getParam<int>( input, "nups"  );
   size_t nbeta  = cmz::ed::getParam<int>( input, "ndos"  );
   bool   quiet  = cmz::ed::getParam<bool>( input, "quiet" );
+  bool real_ints = cmz::ed::getParam<bool>( input, "real_ints" );
   if( norb > 16 )
     throw( std::runtime_error("Error in run_ed_w_1rdm! Asked for ED with more than 16 orbitals!") );
   std::string fcidump = 
@@ -385,7 +388,7 @@ auto run_ed_w_1rdm(
   
   // Read in the integrals 
   bool just_singles;
-  cmz::ed::intgrls::integrals ints(norb, fcidump, just_singles);
+  cmz::ed::intgrls::integrals ints(norb, fcidump, just_singles, real_ints);
   MPI_Barrier(MPI_COMM_WORLD);
   
   // Hamiltonian Matrix Element Generator

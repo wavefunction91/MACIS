@@ -58,9 +58,9 @@ namespace cmz
       
           int64_t i,j,a,b;
       
-          four_indx(int64_t i, int64_t a, int64_t j, int64_t b): i(i), j(j), a(a), b(b)
+          four_indx(int64_t i, int64_t a, int64_t j, int64_t b, bool real = true): i(i), j(j), a(a), b(b)
           {
-            order();
+            if(real) order();
           }
       
           /**
@@ -121,12 +121,12 @@ namespace cmz
       
           /**
            * @brief Orders each pair of virt/occ orbital indices by magnitude.
-           *        Assumes real orbitals.
+           *        Assumes hermiticity.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          void order() //Apply symmetry, assuming real integrals
+          void order() //Apply symmetry, assuming hermiticity
           {
             if(i < a) std::swap(i,a);
           }
@@ -303,6 +303,7 @@ namespace cmz
           int64_t n_sorbitals; //Nr. of secondary orbitals
           std::vector<int> iorbs, aorbs, sorbs; //Lists of orbitals, for iterations
           intgrls::indexer indexer;
+          bool real;
       
           double core_energy = 0.;
       
@@ -322,18 +323,19 @@ namespace cmz
            * @author Carlos Mejuto Zaera
            * @date 05/04/2021
            */
-          integrals( int64_t norbitals ): norbitals(norbitals), n_iorbitals(0), n_aorbitals(norbitals), n_sorbitals(0), indexer(norbitals) { init_orb_lists();}
+          integrals( int64_t norbitals, bool _real = true ): norbitals(norbitals), n_iorbitals(0), n_aorbitals(norbitals), n_sorbitals(0), indexer(norbitals), real(_real) { init_orb_lists();}
       
           /**
            * @brief Constructor from FCIDUMP file. 
            *
            * @param [in] int64_t norbitals: Nr. of orbitals.
            * @param [in] const string &file: FCIDUMP file.
+           * @param [in] bool _real: Assume real orbitals for 2-body integrals.
            *
            * @author Stephen J. Cotton
            * @date 05/04/2021
            */
-          integrals( int64_t norbitals, const string &file): integrals(norbitals)
+          integrals( int64_t norbitals, const string &file, bool _real = true): integrals(norbitals, _real)
           {
             bool tmp = read_FCIdump(file);
             copy_to_vectors();
@@ -347,11 +349,12 @@ namespace cmz
            * @param [in] const string &file: FCIDUMP file.
            * @param [out] bool &just_singles: Does the Hamiltonian include only
            *              diagonal doubles?
+           * @param [in] bool _real: Assume real orbitals for 2-body integrals.
            *
            * @author Carlos Mejuto Zaera
            * @date 28/06/2022
            */
-          integrals( int64_t norbitals, const string &file, bool &just_singles): integrals(norbitals)
+          integrals( int64_t norbitals, const string &file, bool &just_singles, bool _real = true): integrals(norbitals, _real)
           {
             just_singles = read_FCIdump(file);
             copy_to_vectors();
@@ -363,12 +366,13 @@ namespace cmz
            * @param [in] int64_t norbitals: Nr. of orbitals.
            * @param [in] const iterable &t_in: One-body integrals.
            * @param [in] const iterable &u_in: Two-body integrals.
+           * @param [in] bool _real: Assume real orbitals for 2-body integrals.
            *
            * @author Carlos Mejuto Zaera
            * @date 05/04/2021
            */
           template<class iterable>
-          integrals( int64_t norbitals, const iterable &t_in, const iterable &u_in) : integrals(norbitals)
+          integrals( int64_t norbitals, const iterable &t_in, const iterable &u_in, bool _real = true) : integrals(norbitals, _real)
           {
             buildFromIterables(t_in, u_in);
             updateStoredInts();
@@ -456,7 +460,7 @@ namespace cmz
             i %= norbitals; j %= norbitals;
             a %= norbitals; b %= norbitals;
       
-            try { double x = u_store.at( four_indx( i,a,j,b ) ); return x; }
+            try { double x = u_store.at( four_indx( i,a,j,b, real ) ); return x; }
             catch( ... ) { return 0; }
           }
         
@@ -879,7 +883,7 @@ namespace cmz
                 t_store.insert( { two_indx( i-1, a-1 ), matel } );
               else if( j > 0 && b > 0 )
               {
-                u_store.insert( { four_indx( i-1, a-1, j-1, b-1 ), matel } );
+                u_store.insert( { four_indx( i-1, a-1, j-1, b-1, real ), matel } );
                 if( i != a && j != b ) just_singles = false;
               }
               else if( j == 0 && b != 0 || j != 0 && b == 0 )
@@ -939,7 +943,7 @@ namespace cmz
               for (int64_t j = 0; j < norbitals; j++)
                 for (int64_t a = 0; a < norbitals; a++)
                   for (int64_t b = 0; b < norbitals; b++)
-                    u_store.insert_or_assign( four_indx(i,a,j,b), u[ indexer(i,j,a,b) ] );
+                    u_store.insert_or_assign( four_indx(i,a,j,b, real), u[ indexer(i,j,a,b) ] );
             }
           }
       

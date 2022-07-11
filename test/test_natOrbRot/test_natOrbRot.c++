@@ -81,7 +81,7 @@ int main( int argn, char* argv[] )
            cout << "## " << dbwy::to_canonical_string( det ) << endl;
 
       bool just_singles = false;
-      intgrls::integrals ints(Norbs, fcidump, just_singles);
+      intgrls::integrals ints(Norbs, fcidump, just_singles, true);
       double U = ints.getChem(0, 0, 0, 0);
 
       cout << "####################################################" << endl;
