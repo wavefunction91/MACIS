@@ -335,6 +335,7 @@ public:
 
   virtual void SetJustSingles( bool _js ) {}
   virtual bool GetJustSingles( ){ return false; }
+  virtual size_t GetNimp() const { return N/2; } 
 };
 
 

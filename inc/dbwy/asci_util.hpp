@@ -463,7 +463,7 @@ std::vector<std::bitset<N>> asci_search(
   //}
 
   // Tolerances 
-  const double h_el_tol     = -1;
+  const double h_el_tol     = 1e-8;//-1;
   #if 1
   const double rv_prune_val = 1e-8;
   const size_t pair_size_cutoff = 2e9;
@@ -514,6 +514,16 @@ std::vector<std::bitset<N>> asci_search(
 
     if( !ham_gen.GetJustSingles() )
     {
+      // In case they are defined, consider doubles only between impurity orbitals.
+      size_t nimp = ham_gen.GetNimp();
+      if( nimp < N/2 )
+      {
+        std::vector<uint32_t> imp_orbs( nimp, 0 );
+        for( int ii = 0; ii < nimp; ii++ )
+          imp_orbs[ii] = ii;
+        bitset_to_occ_vir_as( norb, state_alpha, occ_alpha, vir_alpha, imp_orbs ); 
+        bitset_to_occ_vir_as( norb, state_beta,  occ_beta,  vir_beta,  imp_orbs  ); 
+      }
       // Doubles - AAAA
       append_ss_doubles_asci_contributions<N/2,0>( coeff, state, state_alpha, 
         occ_alpha, vir_alpha, occ_beta, G_pqrs, norb, h_el_tol, hdiag, E_ASCI, 

@@ -151,6 +151,20 @@ void generate_singles_as( size_t norb, std::bitset<N> state,
 }
 
 template <size_t N>
+void generate_singles_doubles_as( size_t norb, std::bitset<N> state, 
+  std::vector<std::bitset<N>>& singles, std::vector<std::bitset<N>>& doubles,
+  const std::vector<uint32_t> &as_orbs ) {
+
+  std::vector<uint32_t> occ_orbs, vir_orbs;
+  bitset_to_occ_vir_as<N>( norb, state, occ_orbs, vir_orbs, as_orbs );
+
+  singles.clear(); doubles.clear();
+  append_singles(  state, occ_orbs, vir_orbs, singles );
+  append_doubles(  state, occ_orbs, vir_orbs, doubles );
+
+}
+
+template <size_t N>
 void generate_singles_spin_as( size_t norb, std::bitset<N> state, 
   std::vector<std::bitset<N>>& singles, const std::vector<uint32_t> as_orbs ) {
 
@@ -181,6 +195,68 @@ void generate_singles_spin_as( size_t norb, std::bitset<N> state,
     auto s_state = expand_bitset<N>(s_beta) << (N/2);
     s_state = s_state | state_alpha_expand;
     singles.emplace_back(s_state);
+  }
+
+}
+
+template <size_t N>
+void generate_singles_doubles_spin_as( size_t norb, std::bitset<N> state, 
+  std::vector<std::bitset<N>>& singles, std::vector<std::bitset<N>>& doubles,
+  const std::vector<uint32_t> &as_orbs ) {
+
+  auto state_alpha = truncate_bitset<N/2>(state);
+  auto state_beta  = truncate_bitset<N/2>(state >> (N/2));
+
+  std::vector<std::bitset<N/2>> singles_alpha, singles_beta;
+  std::vector<std::bitset<N/2>> doubles_alpha, doubles_beta;
+
+  // Generate Spin-Specific singles / doubles
+  generate_singles_doubles_as( norb, state_alpha, singles_alpha, doubles_alpha, as_orbs );
+  generate_singles_doubles_as( norb, state_beta,  singles_beta,  doubles_beta,  as_orbs );
+
+  auto state_alpha_expand = expand_bitset<N>(state_alpha);
+  auto state_beta_expand  = expand_bitset<N>(state_beta) << (N/2);
+
+  // Generate Singles in full space
+  singles.clear();
+
+  // Single Alpha + No Beta
+  for( auto s_alpha : singles_alpha ) {
+    auto s_state = expand_bitset<N>(s_alpha);
+    s_state = s_state | state_beta_expand;
+    singles.emplace_back(s_state);
+  }
+
+  // No Alpha + Single Beta
+  for( auto s_beta : singles_beta ) {
+    auto s_state = expand_bitset<N>(s_beta) << (N/2);
+    s_state = s_state | state_alpha_expand;
+    singles.emplace_back(s_state);
+  }
+
+  // Generate Doubles in full space
+  doubles.clear();
+
+  // Double Alpha + No Beta
+  for( auto d_alpha : doubles_alpha ) {
+    auto d_state = expand_bitset<N>(d_alpha);
+    d_state = d_state | state_beta_expand;
+    doubles.emplace_back(d_state);
+  }
+
+  // No Alpha + Double Beta
+  for( auto d_beta : doubles_beta ) {
+    auto d_state = expand_bitset<N>(d_beta) << (N/2);
+    d_state = d_state | state_alpha_expand;
+    doubles.emplace_back(d_state);
+  }
+
+  // Single Alpha + Single Beta
+  for( auto s_alpha : singles_alpha )
+  for( auto s_beta  : singles_beta  ) {
+    auto d_state_alpha = expand_bitset<N>(s_alpha);
+    auto d_state_beta  = expand_bitset<N>(s_beta) << (N/2);
+    doubles.emplace_back( d_state_alpha | d_state_beta );
   }
 
 }
