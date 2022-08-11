@@ -830,7 +830,7 @@ auto asci_grow_with_rot( size_t ndets_max, size_t ncdets, size_t grow_factor,
       eig_max_subspace, eig_res_tol, quiet);
     if( print_asci && !quiet ) print_asci( E0 );
     its++;
-    if( its > 2 && its < nrots )
+    if( its > 4 && its < nrots )
     {
       auto orbrot_st = clock_type::now();
       std::vector<double> ordm( norb*norb, 0. );
