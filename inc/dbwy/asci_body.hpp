@@ -101,8 +101,13 @@ auto run_asci_w_GF(
   ham_gen.SetJustSingles( just_singles );
   
   // Compute HF Energy
+  std::vector<double> orb_ens( norb );
+  for( int i = 0; i < norb; i++ )
+    orb_ens[i] = ints.get( i, i ); 
   const std::bitset<nbits> hf_det = 
-    dbwy::canonical_hf_determinant<nbits>(nalpha,nbeta);
+    dbwy::canonical_hf_determinant<nbits>( nalpha,nbeta, orb_ens );
+  //const std::bitset<nbits> hf_det = 
+  //  dbwy::canonical_hf_determinant<nbits>(nalpha,nbeta);
   const double EHF = ham_gen.matrix_element(hf_det, hf_det);
   if( world_rank == 0 && !quiet ) {
     std::cout << std::scientific << std::setprecision(12);
@@ -240,8 +245,13 @@ auto run_asci_w_1rdm(
   ham_gen.SetJustSingles( just_singles );
   
   // Compute HF Energy
+  std::vector<double> orb_ens( norb );
+  for( int i = 0; i < norb; i++ )
+    orb_ens[i] = ints.get( i, i ); 
   const std::bitset<nbits> hf_det = 
-    dbwy::canonical_hf_determinant<nbits>(nalpha,nbeta);
+    dbwy::canonical_hf_determinant<nbits>( nalpha,nbeta, orb_ens );
+  //const std::bitset<nbits> hf_det = 
+  //  dbwy::canonical_hf_determinant<nbits>(nalpha,nbeta);
   const double EHF = ham_gen.matrix_element(hf_det, hf_det);
   if( world_rank == 0 && !quiet ) {
     std::cout << std::scientific << std::setprecision(12);
@@ -399,8 +409,13 @@ auto run_ed_w_1rdm(
   ham_gen.SetJustSingles( just_singles );
   
   // Compute HF Energy
+  std::vector<double> orb_ens( norb );
+  for( int i = 0; i < norb; i++ )
+    orb_ens[i] = ints.get( i, i ); 
   const std::bitset<nbits> hf_det = 
-    dbwy::canonical_hf_determinant<nbits>(nalpha,nbeta);
+    dbwy::canonical_hf_determinant<nbits>( nalpha,nbeta, orb_ens );
+  //const std::bitset<nbits> hf_det = 
+  //  dbwy::canonical_hf_determinant<nbits>(nalpha,nbeta);
   const double EHF = ham_gen.matrix_element(hf_det, hf_det);
   if( world_rank == 0 && !quiet ) {
     std::cout << std::scientific << std::setprecision(12);

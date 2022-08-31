@@ -208,6 +208,15 @@ double p_davidson( int64_t max_m,
     if( world_rank == owner_rank ) {
       V_local[ min_idx - A.local_row_start() ] = 1.;
     }
+    // Starting vector: Normalized random vector.
+    std::default_random_engine gen;
+    std::normal_distribution<> dist(-1.,1.);
+    std::generate( V_local.begin(), V_local.begin()+N_local, [&](){ return dist(gen); } );
+    V_local[0] += 1.;
+    double tmp = 0.;
+    for( auto i = 0; i < N_local; ++i ) tmp += V_local[i] * V_local[i];
+    tmp = std::sqrt(tmp);
+    for( auto i = 0; i < N_local; ++i ) V_local[i] /= tmp;
 
   }
 #else
@@ -220,6 +229,28 @@ double p_davidson( int64_t max_m,
   tmp = std::sqrt(tmp);
   for( auto i = 0; i < V_local.size(); ++i ) V_local[i] /= tmp;
 #endif
+
+  // Debugging
+  //std::default_random_engine gen;
+  //std::normal_distribution<> dist(-1.,1.);
+  //std::generate( V_local.begin(), V_local.begin()+N_local, [&](){ return dist(gen); } );
+  //V_local[0] += 1.;
+  //double tmp = 0.;
+  //for( auto i = 0; i < N_local; ++i ) tmp += V_local[i] * V_local[i];
+  //tmp = std::sqrt(tmp);
+  //for( auto i = 0; i < N_local; ++i ) V_local[i] /= tmp;
+  ////V_local[2130] = 1.;
+  ////std::ifstream ifile( "py_gs.dat", std::ios::in );
+  ////for( int a = 0; a < N_local; a++ )
+  ////  ifile >> V_local[a];
+  ////ifile.close();
+
+  //std::ofstream ofile( "davidson_psi0.dat", std::ios::out );
+  //double *v0 = V_local.data();
+  //for( int a = 0; a < N_local; a++ )
+  //  ofile << *(v0 + a) << std::endl;
+  //ofile.close();
+  // Debugging
 
   // Generate SPMV info
   auto spmv_info = sparsexx::spblas::generate_spmv_comm_info( A );
