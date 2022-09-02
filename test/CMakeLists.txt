@@ -13,6 +13,7 @@ list( APPEND TEST_DIRECTORIES
       test_c2
       test_parallel_new
       test_asci
+      make_ci_ref
     )
 foreach( testdir ${TEST_DIRECTORIES} )
     # add executable

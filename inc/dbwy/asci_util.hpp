@@ -69,7 +69,12 @@ void append_singles_asci_contributions(
     if( std::abs(h_el) < h_el_tol ) continue;
 
     // Calculate Excited Determinant
+#if 0
     auto ex_det = state_full ^ (one << (i+NShift)) ^ (one << (a+NShift));
+#else
+    auto ex_det = state_full;
+    ex_det.flip(i+NShift).flip(a+NShift);
+#endif
 
     // Calculate Excitation Sign in a Canonical Way
     auto sign = single_excitation_sign( state_same, a, i );
@@ -117,7 +122,11 @@ void append_ss_doubles_asci_contributions(
       if( std::abs(G_aibj) < h_el_tol ) continue;
 
       // Calculate excited determinant string (spin)
+#if 0
       const auto full_ex_spin = (one << i) ^ (one << j) ^ (one << a) ^ (one << b);
+#else
+      const std::bitset<N> full_ex_spin = std::bitset<N>(0).flip(i).flip(j).flip(a).flip(b);
+#endif
       auto ex_det_spin = state_spin ^ full_ex_spin;
 
       // Calculate the sign in a canonical way
@@ -171,8 +180,13 @@ void append_os_doubles_asci_contributions(
 
       double sign_beta = single_excitation_sign( state_beta,  b, j );
       double sign = sign_alpha * sign_beta;
+#if 0
       auto ex_det = state_full ^ (one << i) ^ (one << a) ^
                                (((one << j) ^ (one << b)) << N);
+#else
+      auto ex_det = state_full;
+      ex_det.flip(a).flip(i).flip(j+N).flip(b+N);
+#endif
       auto h_el = sign * V_aibj;
 
       asci_contributions.push_back( {ex_det, coeff*h_el} );
@@ -359,9 +373,6 @@ std::vector<std::bitset<N>> asci_search(
   for( size_t i = 0; i < nuniq; ++i ) {
     auto det = asci_pairs[i].state;
     auto diag_element = ham_gen.matrix_element(det,det);
-    //auto alpha = truncate_bitset<N/2>(det);
-    //auto beta  = truncate_bitset<N/2>(det >> (N/2));
-    //std::cout << alpha.to_ulong() << " " << beta.to_ulong() << " " << asci_pairs[i].rv << " "  << (E_ASCI - diag_element) << std::endl;
     asci_pairs[i].rv /= E_ASCI - diag_element;
   }
   auto asci_diagel_en = clock_type::now();
@@ -370,7 +381,7 @@ std::vector<std::bitset<N>> asci_search(
 
   // Sort pairs by ASCI score
   auto asci_sort_st = clock_type::now();
-  #if 0
+  #if 1
   std::nth_element( asci_pairs.begin(), asci_pairs.begin() + ndets_max,
     asci_pairs.end(), 
   #else
@@ -465,13 +476,6 @@ double selected_ci_diag(
   std::vector<double> H_dense(ndets*ndets);
   sparsexx::convert_to_dense( H.diagonal_tile(), H_dense.data(), ndets );
 
-  //for( auto i = 0; i < ndets; ++i )
-  //for( auto j = 0; j < ndets; ++j ) 
-  //if( std::abs(H_dense[i+j*ndets]) > 1e-8 ) {
-  //  std::cout << i << ", " << j << ", " << H_dense[i + j*ndets] << std::endl;
-  //}
-
-
   std::vector<double> W(ndets);
   lapack::syevd( lapack::Job::NoVec, lapack::Uplo::Lower, ndets, 
     H_dense.data(), ndets, W.data() );
@@ -551,6 +555,7 @@ auto asci_refine( size_t ncdets, double asci_tol, size_t max_iter, double E0,
   for(size_t iter = 0; iter < max_iter; ++iter) {
 
     std::cout << "\n* ASCI Iteration: " << iter << std::endl;
+
     // Do an ASCI iteration
     double E;
     std::tie(E, wfn, X_local) = asci_iter<N,index_t>( ndets, ncdets, E0,
