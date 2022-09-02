@@ -69,7 +69,12 @@ void append_singles_asci_contributions(
     if( std::abs(h_el) < h_el_tol ) continue;
 
     // Calculate Excited Determinant
+#if 0
     auto ex_det = state_full ^ (one << (i+NShift)) ^ (one << (a+NShift));
+#else
+    auto ex_det = state_full;
+    ex_det.flip(i+NShift).flip(a+NShift);
+#endif
 
     // Calculate Excitation Sign in a Canonical Way
     auto sign = single_excitation_sign( state_same, a, i );
@@ -168,7 +173,11 @@ void append_ss_doubles_asci_contributions(
       if( std::abs(G_aibj) < h_el_tol ) continue;
 
       // Calculate excited determinant string (spin)
+#if 0
       const auto full_ex_spin = (one << i) ^ (one << j) ^ (one << a) ^ (one << b);
+#else
+      const std::bitset<N> full_ex_spin = std::bitset<N>(0).flip(i).flip(j).flip(a).flip(b);
+#endif
       auto ex_det_spin = state_spin ^ full_ex_spin;
 
       // Calculate the sign in a canonical way
@@ -330,8 +339,13 @@ void append_os_doubles_asci_contributions(
 
       double sign_beta = single_excitation_sign( state_beta,  b, j );
       double sign = sign_alpha * sign_beta;
+#if 0
       auto ex_det = state_full ^ (one << i) ^ (one << a) ^
                                (((one << j) ^ (one << b)) << N);
+#else
+      auto ex_det = state_full;
+      ex_det.flip(a).flip(i).flip(j+N).flip(b+N);
+#endif
       auto h_el = sign * V_aibj;
 
       // Evaluate fast diagonal element
@@ -614,7 +628,7 @@ std::vector<std::bitset<N>> asci_search(
 
   // Sort pairs by ASCI score
   auto asci_sort_st = clock_type::now();
-  #if 0
+  #if 1
   std::nth_element( asci_pairs.begin(), asci_pairs.begin() + ndets_max,
     asci_pairs.end(), 
   #else
@@ -719,13 +733,6 @@ double selected_ci_diag(
   const size_t ndets = std::distance(dets_begin,dets_end);
   std::vector<double> H_dense(ndets*ndets);
   sparsexx::convert_to_dense( H.diagonal_tile(), H_dense.data(), ndets );
-
-  //for( auto i = 0; i < ndets; ++i )
-  //for( auto j = 0; j < ndets; ++j ) 
-  //if( std::abs(H_dense[i+j*ndets]) > 1e-8 ) {
-  //  std::cout << i << ", " << j << ", " << H_dense[i + j*ndets] << std::endl;
-  //}
-
 
   std::vector<double> W(ndets);
   lapack::syevd( lapack::Job::NoVec, lapack::Uplo::Lower, ndets, 
