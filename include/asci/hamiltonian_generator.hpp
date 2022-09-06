@@ -144,31 +144,19 @@ public:
     const std::vector<uint32_t>& bra_occ_alpha,
     const std::vector<uint32_t>& bra_occ_beta,
     double val, double* ordm, double* trdm);
-  void rdm_contributions_2( spin_det_t bra, spin_det_t ket, spin_det_t ex,
-    const std::vector<uint32_t>& bra_occ_alpha,
-    const std::vector<uint32_t>& bra_occ_beta,
-    double val, double* ordm);
   void rdm_contributions_diag( const std::vector<uint32_t>& occ_alpha,
     const std::vector<uint32_t>& occ_beta, double val, double* ordm, 
     double* trdm );
-  void rdm_contributions_diag( const std::vector<uint32_t>& occ_alpha,
-    const std::vector<uint32_t>& occ_beta, double val, double* ordm );
   
   void rdm_contributions( spin_det_t bra_alpha, spin_det_t ket_alpha,
     spin_det_t ex_alpha, spin_det_t bra_beta, spin_det_t ket_beta,
     spin_det_t ex_beta, const std::vector<uint32_t>& bra_occ_alpha,
     const std::vector<uint32_t>& bra_occ_beta, double val, double* ordm,
     double* trdm);
-  void rdm_contributions( spin_det_t bra_alpha, spin_det_t ket_alpha,
-    spin_det_t ex_alpha, spin_det_t bra_beta, spin_det_t ket_beta,
-    spin_det_t ex_beta, const std::vector<uint32_t>& bra_occ_alpha,
-    const std::vector<uint32_t>& bra_occ_beta, double val, double* ordm);
 
 
   virtual void form_rdms( full_det_iterator, full_det_iterator, full_det_iterator,
     full_det_iterator, double* C, double* ordm, double* trdm ) = 0;
-  virtual void form_rdms( full_det_iterator, full_det_iterator, full_det_iterator,
-    full_det_iterator, double* C, double* ordm ) = 0;
 
 
   void rotate_hamiltonian_ordm( const double* ordm ); 

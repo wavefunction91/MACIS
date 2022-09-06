@@ -176,62 +176,6 @@ public:
 
   }
   
-  void form_rdms(
-    full_det_iterator bra_begin,
-    full_det_iterator bra_end,
-    full_det_iterator ket_begin,
-    full_det_iterator ket_end,
-    double *C, double* ordm ) override {
-
-    
-    const size_t nbra_dets = std::distance( bra_begin, bra_end );
-    const size_t nket_dets = std::distance( ket_begin, ket_end );
-
-    std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
-
-    // Loop over bra determinants
-    for( size_t i = 0; i < nbra_dets; ++i ) {
-      const auto bra = *(bra_begin + i);
-
-      if( bra.count() ) {
-
-        // Separate out into alpha/beta components 
-        spin_det_t bra_alpha = truncate_bitset<N/2>(bra);
-        spin_det_t bra_beta  = truncate_bitset<N/2>(bra >> (N/2));
-        
-        // Get occupied indices
-        bits_to_indices( bra_alpha, bra_occ_alpha );
-        bits_to_indices( bra_beta, bra_occ_beta );
-
-        // Loop over ket determinants
-        for( size_t j = 0; j < nket_dets; ++j ) {
-          const auto ket = *(ket_begin + j);
-          if( ket.count() ) {
-            spin_det_t ket_alpha = truncate_bitset<N/2>(ket);
-            spin_det_t ket_beta  = truncate_bitset<N/2>(ket >> (N/2));
-
-            full_det_t ex_total = bra ^ ket;
-            if( ex_total.count() <= 2 ) {
-            
-              spin_det_t ex_alpha = truncate_bitset<N/2>( ex_total );
-              spin_det_t ex_beta  = truncate_bitset<N/2>( ex_total >> (N/2) );
-
-              const double val = C[i] * C[j];
-
-              // Compute Matrix Element
-              this->rdm_contributions( bra_alpha, ket_alpha,
-                ex_alpha, bra_beta, ket_beta, ex_beta, bra_occ_alpha,
-                bra_occ_beta, val, ordm );
-
-            } // Possible non-zero connection (Hamming distance)
-            
-          } // Non-zero ket determinant
-        } // Loop over ket determinants
-      
-      } // Non-zero bra determinant
-    } // Loop over bra determinants 
-
-  }
   
 public:
 
