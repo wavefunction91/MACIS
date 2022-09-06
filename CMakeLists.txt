@@ -12,26 +12,26 @@ include( asci-cmake-modules )
 # Packaged Dependencies
 
 # ASCI library
-add_library( asci INTERFACE )
-target_include_directories( asci INTERFACE 
+add_library( asci  src/fcidump.cxx )
+target_include_directories( asci PUBLIC 
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-target_compile_features(asci INTERFACE cxx_std_20)
+target_compile_features(asci PUBLIC cxx_std_20)
 
 # Parallelism
 find_package( MPI REQUIRED )
-target_link_libraries( asci INTERFACE MPI::MPI_CXX )
+target_link_libraries( asci PUBLIC MPI::MPI_CXX )
 if(ASCI_ENABLE_OPENMP)
   find_package(OpenMP REQUIRED)
-  target_link_libraries( asci INTERFACE OpenMP::OpenMP_CXX )
+  target_link_libraries( asci PUBLIC OpenMP::OpenMP_CXX )
 endif()
 
 # Linear Algebra
 find_package(LAPACK REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
-target_link_libraries(asci INTERFACE LAPACK::LAPACK Eigen3::Eigen)
+target_link_libraries(asci PUBLIC LAPACK::LAPACK Eigen3::Eigen)
 
 # Packaged Dependencies
 include( asci-ips4o )
