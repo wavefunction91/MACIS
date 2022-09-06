@@ -22,20 +22,20 @@ public:
 
 public:
 
-  inline auto gen_alpha_mask() { return dbwy::full_mask<N/2,N>(); }
+  inline auto gen_alpha_mask() { return asci::full_mask<N/2,N>(); }
   inline auto gen_beta_mask()  { return gen_alpha_mask() << (N/2); }
 
   inline spin_det_t alpha_string( full_det_t str ) {
-    return dbwy::truncate_bitset<N/2>(str);
+    return asci::truncate_bitset<N/2>(str);
   }
   inline spin_det_t beta_string( full_det_t str ) {
-    return dbwy::truncate_bitset<N/2>(str >> (N/2));
+    return asci::truncate_bitset<N/2>(str >> (N/2));
   }
 
 #if 0
   template <size_t M>
   inline uint32_t first_occ_flipped( std::bitset<M> state, std::bitset<M> ex ) {
-    return dbwy::ffs( state & ex ) - 1u;
+    return asci::ffs( state & ex ) - 1u;
   }
 
   template <size_t M>
@@ -43,9 +43,9 @@ public:
     std::bitset<M> mask = 0ul;
 
     if( p > q ) {
-      mask = state & ( dbwy::full_mask<M>(p)^ dbwy::full_mask<M>(q+1) );
+      mask = state & ( asci::full_mask<M>(p)^ asci::full_mask<M>(q+1) );
     } else {
-      mask = state & ( dbwy::full_mask<M>(q)^ dbwy::full_mask<M>(p+1) );
+      mask = state & ( asci::full_mask<M>(q)^ asci::full_mask<M>(p+1) );
     }
     return (mask.count() % 2) ? -1. : 1.;
 
@@ -79,24 +79,24 @@ public:
   void generate_integral_intermediates(size_t no, const double* V); 
 
 
-  double matrix_element_4( spin_det_t bra, spin_det_t ket, spin_det_t ex ); 
+  double matrix_element_4( spin_det_t bra, spin_det_t ket, spin_det_t ex ) const; 
   double matrix_element_22( spin_det_t bra_alpha, spin_det_t ket_alpha,
     spin_det_t ex_alpha, spin_det_t bra_beta, spin_det_t ket_beta,
-    spin_det_t ex_beta );
+    spin_det_t ex_beta ) const ;
 
   double matrix_element_2( spin_det_t bra, spin_det_t ket, spin_det_t ex,
     const std::vector<uint32_t>& bra_occ_alpha,
-    const std::vector<uint32_t>& bra_occ_beta );
+    const std::vector<uint32_t>& bra_occ_beta ) const ;
 
   double matrix_element_diag( const std::vector<uint32_t>& occ_alpha,
-    const std::vector<uint32_t>& occ_beta );
+    const std::vector<uint32_t>& occ_beta ) const ;
 
   double matrix_element( spin_det_t bra_alpha, spin_det_t ket_alpha,
     spin_det_t ex_alpha, spin_det_t bra_beta, spin_det_t ket_beta,
     spin_det_t ex_beta, const std::vector<uint32_t>& bra_occ_alpha,
-    const std::vector<uint32_t>& bra_occ_beta );
+    const std::vector<uint32_t>& bra_occ_beta ) const ;
 
-  double single_orbital_en( int orb, const std::vector<uint32_t>& ss_occ,
+  double single_orbital_en( uint32_t orb, const std::vector<uint32_t>& ss_occ,
     const std::vector<uint32_t>& os_occ ) const;
 
   double fast_diag_single( const std::vector<uint32_t>& ss_occ, 
@@ -183,4 +183,4 @@ public:
 } // namespace asci 
 
 // Implementation
-#include <hamiltonian_generator/impl.hpp>
+#include <asci/hamiltonian_generator/impl.hpp>

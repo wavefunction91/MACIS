@@ -172,9 +172,10 @@ double HamiltonianGenerator<N>::matrix_element( full_det_t bra, full_det_t ket )
 
 template <size_t N>
 double HamiltonianGenerator<N>::matrix_element_4( 
-  spin_det_t bra, spin_det_t ket, spin_det_t ex ) {
+  spin_det_t bra, spin_det_t ket, spin_det_t ex ) const {
 
   auto [o1,v1,o2,v2,sign] = doubles_sign_indices( bra, ket, ex );
+
   return sign * G_pqrs_[v1 + o1*norb_ + v2*norb2_ + o2*norb3_];
 
 }
@@ -205,7 +206,7 @@ void HamiltonianGenerator<N>::rdm_contributions_4( spin_det_t bra,
 template <size_t N>
 double HamiltonianGenerator<N>::matrix_element_22( 
   spin_det_t bra_alpha, spin_det_t ket_alpha, spin_det_t ex_alpha, 
-  spin_det_t bra_beta, spin_det_t ket_beta, spin_det_t ex_beta ) {
+  spin_det_t bra_beta, spin_det_t ket_beta, spin_det_t ex_beta ) const {
 
   auto [o1,v1,sign_a] = 
     single_excitation_sign_indices( bra_alpha, ket_alpha, ex_alpha );
@@ -245,7 +246,7 @@ template <size_t N>
 double HamiltonianGenerator<N>::matrix_element_2( 
   spin_det_t bra, spin_det_t ket, spin_det_t ex,
   const std::vector<uint32_t>& bra_occ_alpha,
-  const std::vector<uint32_t>& bra_occ_beta ) {
+  const std::vector<uint32_t>& bra_occ_beta ) const{
 
   auto [o1,v1,sign] = single_excitation_sign_indices(bra,ket,ex);
   
@@ -312,7 +313,7 @@ void HamiltonianGenerator<N>::rdm_contributions_2(
 template <size_t N>
 double HamiltonianGenerator<N>::matrix_element_diag( 
   const std::vector<uint32_t>& occ_alpha,
-  const std::vector<uint32_t>& occ_beta ) {
+  const std::vector<uint32_t>& occ_beta ) const {
 
   double h_el = 0;
 
@@ -400,7 +401,7 @@ double HamiltonianGenerator<N>::matrix_element(
   spin_det_t bra_alpha, spin_det_t ket_alpha, spin_det_t ex_alpha, 
   spin_det_t bra_beta, spin_det_t ket_beta, spin_det_t ex_beta, 
   const std::vector<uint32_t>& bra_occ_alpha,
-  const std::vector<uint32_t>& bra_occ_beta ) {
+  const std::vector<uint32_t>& bra_occ_beta ) const {
 
   const uint32_t ex_alpha_count = ex_alpha.count();
   const uint32_t ex_beta_count  = ex_beta.count();
