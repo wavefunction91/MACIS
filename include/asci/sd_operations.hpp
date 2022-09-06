@@ -522,11 +522,13 @@ std::vector<std::bitset<N>> generate_cis_hilbert_space( size_t norb,
 }
 
 
+// TODO: Test this function
 template <size_t N>
 uint32_t first_occupied_flipped( std::bitset<N> state, std::bitset<N> ex ) {
   return ffs( state & ex ) - 1u;
 }
 
+// TODO: Test this function
 template <size_t N>
 double single_excitation_sign( std::bitset<N> state, unsigned p, unsigned q ) {
   std::bitset<N> mask = 0ul;
@@ -539,6 +541,7 @@ double single_excitation_sign( std::bitset<N> state, unsigned p, unsigned q ) {
   return (mask.count() % 2) ? -1. : 1.;
 }
 
+// TODO: Test this function
 template <size_t N>
 inline auto single_excitation_sign_indices( std::bitset<N> bra,
   std::bitset<N> ket, std::bitset<N> ex ) {
@@ -550,6 +553,7 @@ inline auto single_excitation_sign_indices( std::bitset<N> bra,
   return std::make_tuple(o1,v1,sign);
 }
 
+// TODO: Test this function
 template <size_t N>
 inline auto doubles_sign_indices( std::bitset<N> bra, std::bitset<N> ket, 
   std::bitset<N> ex ) {
@@ -568,6 +572,7 @@ inline auto doubles_sign_indices( std::bitset<N> bra, std::bitset<N> ket,
     return std::make_tuple(o1,v1,o2,v2,sign);
 }
 
+// TODO: Test this function
 template <size_t N>
 inline auto doubles_sign( std::bitset<N> bra, std::bitset<N> ket, 
   std::bitset<N> ex ) {
@@ -579,6 +584,7 @@ inline auto doubles_sign( std::bitset<N> bra, std::bitset<N> ket,
 
 
 
+// TODO: Test this function
 template <size_t N>
 void generate_residues( std::bitset<N> state, std::vector<std::bitset<N>>& res ) {
 
