@@ -1,4 +1,4 @@
-#include "catch2/catch.hpp"
+#include "ut_common.hpp"
 #include <asci/fcidump.hpp>
 #include <asci/csr_hamiltonian.hpp>
 #include <asci/hamiltonian_generator/double_loop.hpp>
@@ -13,6 +13,8 @@ const std::string ref_colind_fname  = REF_DATA_PREFIX "/h2o.ccpvdz.cisd.colind.b
 const std::string ref_nzval_fname   = REF_DATA_PREFIX "/h2o.ccpvdz.cisd.nzval.bin";
 
 TEST_CASE("CSR Hamiltonian") {
+
+  ROOT_ONLY(MPI_COMM_WORLD);
 
   size_t norb = asci::read_fcidump_norb(ref_fcidump);
   size_t nocc = 5;

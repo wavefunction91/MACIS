@@ -1,10 +1,13 @@
-#include "catch2/catch.hpp"
+#include "ut_common.hpp"
 #include <asci/fcidump.hpp>
 #include <iostream>
 #include <iomanip>
 
 const std::string ref_file = "/home/dbwy/devel/casscf/ASCI-CI/tests/ref_data/h2o.ccpvdz.fci.dat";
 TEST_CASE("FCIDUMP") {
+
+  ROOT_ONLY(MPI_COMM_WORLD);
+
   SECTION("READ") {
 
     size_t norb_ref = 24;

@@ -1,4 +1,4 @@
-#include "catch2/catch.hpp"
+#include "ut_common.hpp"
 #include <asci/bitset_operations.hpp>
 #include <iostream>
 
@@ -30,6 +30,8 @@ void uint128_conversion_test() {
 template <size_t N> using bs = std::bitset<N>;
 
 TEST_CASE("Bitset Operations") {
+
+  ROOT_ONLY(MPI_COMM_WORLD);
 
   SECTION("INT128") {
     using asci::uint128_t;

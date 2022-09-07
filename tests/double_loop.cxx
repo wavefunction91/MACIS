@@ -1,4 +1,4 @@
-#include "catch2/catch.hpp"
+#include "ut_common.hpp"
 #include <asci/fcidump.hpp>
 #include <asci/read_wavefunction.hpp>
 #include <asci/hamiltonian_generator/double_loop.hpp>
@@ -9,6 +9,8 @@ const std::string ref_fcidump = "/home/dbwy/devel/casscf/ASCI-CI/tests/ref_data/
 const std::string ref_wfn     = "/home/dbwy/devel/casscf/ASCI-CI/tests/ref_data/ch4.wfn.dat";
 
 TEST_CASE("Double Loop") {
+
+  ROOT_ONLY(MPI_COMM_WORLD);
 
   auto norb         = asci::read_fcidump_norb(ref_fcidump);
   const auto norb2  = norb  * norb;
@@ -180,6 +182,8 @@ TEST_CASE("Double Loop") {
 }
 
 TEST_CASE("RDMS") {
+
+  ROOT_ONLY(MPI_COMM_WORLD);
 
   auto norb         = 34;
   const auto norb2  = norb  * norb;

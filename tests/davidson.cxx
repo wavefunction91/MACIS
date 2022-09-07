@@ -1,4 +1,4 @@
-#include "catch2/catch.hpp"
+#include "ut_common.hpp"
 #include <asci/fcidump.hpp>
 #include <asci/csr_hamiltonian.hpp>
 #include <asci/davidson.hpp>
@@ -10,6 +10,8 @@
 const std::string ref_fcidump = REF_DATA_PREFIX "/h2o.ccpvdz.fci.dat";
 
 TEST_CASE("Davidson") {
+
+  ROOT_ONLY(MPI_COMM_WORLD);
 
   size_t norb = asci::read_fcidump_norb(ref_fcidump);
   size_t nocc = 5;

@@ -1,8 +1,10 @@
-#include "catch2/catch.hpp"
+#include "ut_common.hpp"
 #include <asci/sd_operations.hpp>
 #include <iostream>
 
 TEST_CASE("Slater Det Operations") {
+
+  ROOT_ONLY(MPI_COMM_WORLD);
 
   SECTION("HF Determinant") {
     SECTION("Canonical Ordering") {

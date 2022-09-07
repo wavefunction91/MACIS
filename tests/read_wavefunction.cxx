@@ -1,10 +1,12 @@
-#include "catch2/catch.hpp"
+#include "ut_common.hpp"
 #include <asci/read_wavefunction.hpp>
 #include <iostream>
 #include <iomanip>
 
 const std::string ref_file = "/home/dbwy/devel/casscf/ASCI-CI/tests/ref_data/ch4.wfn.dat";
 TEST_CASE("Read Wavefunction") {
+
+  ROOT_ONLY(MPI_COMM_WORLD);
 
   std::vector<std::bitset<64>> states;
   std::vector<double>          coeffs;
