@@ -11,3 +11,6 @@ add_executable( asci_test
   davidson.cxx
 )
 target_link_libraries( asci_test PUBLIC asci Catch2::Catch2 )
+
+add_executable( standalone_driver standalone_driver.cxx ini_input.cxx )
+target_link_libraries( standalone_driver PUBLIC asci )
