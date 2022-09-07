@@ -2,13 +2,11 @@
 #pragma once
 #include <sparsexx/matrix_types/csr_matrix.hpp>
 #include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
-
 #include <asci/hamiltonian_generator.hpp>
+#include <asci/types.hpp>
 
 namespace asci {
 
-template <size_t N>
-using wavefunction_iterator_t = typename std::vector< std::bitset<N> >::iterator;
 
 
 // Base implementation of bitset CSR generation

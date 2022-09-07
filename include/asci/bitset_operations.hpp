@@ -1,13 +1,9 @@
 #pragma once
-#include <bit>
-#include <bitset>
 #include <cassert>
-#include <vector>
 #include <strings.h>
+#include <asci/types.hpp>
 
 namespace asci {
-
-using uint128_t = unsigned __int128;
 
 template <size_t N>
 uint128_t to_uint128( std::bitset<N> bits ) {

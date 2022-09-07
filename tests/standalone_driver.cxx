@@ -2,6 +2,7 @@
 #include <asci/davidson.hpp>
 #include <asci/hamiltonian_generator/double_loop.hpp>
 #include <asci/csr_hamiltonian.hpp>
+#include <asci/util/selected_ci_diag.hpp>
 
 #include <iostream>
 #include <iomanip>
@@ -146,12 +147,11 @@ int main(int argc, char** argv) {
   }
 
 
-  // Diagonalize Full Hamiltonian
+  // Compute Lowest Energy Eigenvalue (ED) 
   auto dets = asci::generate_hilbert_space<nwfn_bits>(n_active, nalpha, nbeta);
-  auto H    = asci::make_dist_csr_hamiltonian<int32_t>(MPI_COMM_WORLD,
-    dets.begin(), dets.end(), ham_gen, 1e-16 );
-  auto spmv_info = sparsexx::spblas::generate_spmv_comm_info( H );
-  auto E0 = asci::p_davidson(15, H, 1e-8, nullptr);
+  std::vector<double> X_local;
+  auto E0 = asci::selected_ci_diag(dets.begin(), dets.end(), ham_gen, 1e-16,
+    15, 1e-8, X_local, MPI_COMM_WORLD );
   
   if(world_rank == 0) {
     std::cout << std::scientific << std::setprecision(12);
