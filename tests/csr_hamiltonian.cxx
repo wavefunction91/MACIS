@@ -59,3 +59,59 @@ TEST_CASE("CSR Hamiltonian") {
     REQUIRE( H.nzval()[i] == Approx(ref_nzval[i]));
   }
 }
+
+
+
+TEST_CASE("Distributed CSR Hamiltonian") {
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  size_t norb = asci::read_fcidump_norb(ref_fcidump);
+  size_t nocc = 5;
+
+  std::vector<double> T(norb*norb);
+  std::vector<double> V(norb*norb*norb*norb);
+  auto E_core = asci::read_fcidump_core(ref_fcidump);
+  asci::read_fcidump_1body(ref_fcidump, T.data(), norb);
+  asci::read_fcidump_2body(ref_fcidump, V.data(), norb);
+
+  
+  using generator_type = asci::DoubleLoopHamiltonianGenerator<64>;
+
+  generator_type ham_gen(norb, V.data(), T.data());
+
+  // Generate configuration space
+  const auto hf_det = asci::canonical_hf_determinant<64>(nocc, nocc);
+  auto dets = asci::generate_cisd_hilbert_space( norb, hf_det );
+
+  // Generate Distributed CSR Hamiltonian
+  auto H_dist = asci::make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD, 
+    dets.begin(), dets.end(), ham_gen, 1e-16 );
+
+  // Generate Replicated CSR Hamiltonian 
+  auto H = asci::make_csr_hamiltonian_block<int32_t>( dets.begin(), dets.end(),
+    dets.begin(), dets.end(), ham_gen, 1e-16 );
+
+  // Distribute replicated matrix
+  decltype(H_dist) H_dist_ref(MPI_COMM_WORLD, H);
+
+  REQUIRE( H_dist.diagonal_tile().rowptr() == H_dist_ref.diagonal_tile().rowptr() );
+  REQUIRE( H_dist.diagonal_tile().colind() == H_dist_ref.diagonal_tile().colind() );
+
+  REQUIRE( H_dist.off_diagonal_tile().rowptr() == H_dist_ref.off_diagonal_tile().rowptr() );
+  REQUIRE( H_dist.off_diagonal_tile().colind() == H_dist_ref.off_diagonal_tile().colind() );
+
+  size_t nnz_local = H_dist.diagonal_tile().nnz();
+  for( auto i = 0ul; i < nnz_local; ++i ) {
+    REQUIRE( H_dist.diagonal_tile().nzval()[i] == 
+             Approx(H_dist_ref.diagonal_tile().nzval()[i] ) );
+  }
+
+  nnz_local = H_dist.off_diagonal_tile().nnz();
+  for( auto i = 0ul; i < nnz_local; ++i ) {
+    REQUIRE( H_dist.off_diagonal_tile().nzval()[i] == 
+             Approx(H_dist_ref.off_diagonal_tile().nzval()[i] ) );
+  }
+
+
+  MPI_Barrier(MPI_COMM_WORLD);
+}

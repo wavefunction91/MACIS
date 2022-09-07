@@ -235,15 +235,15 @@ double p_davidson( int64_t max_m,
     if( world_rank == owner_rank ) {
       V_local[ min_idx - A.local_row_start() ] = 1.;
     }
-    // Starting vector: Normalized random vector.
-    std::default_random_engine gen;
-    std::normal_distribution<> dist(-1.,1.);
-    std::generate( V_local.begin(), V_local.begin()+N_local, [&](){ return dist(gen); } );
-    V_local[0] += 1.;
-    double tmp = 0.;
-    for( auto i = 0; i < N_local; ++i ) tmp += V_local[i] * V_local[i];
-    tmp = std::sqrt(tmp);
-    for( auto i = 0; i < N_local; ++i ) V_local[i] /= tmp;
+    //// Starting vector: Normalized random vector.
+    //std::default_random_engine gen;
+    //std::normal_distribution<> dist(-1.,1.);
+    //std::generate( V_local.begin(), V_local.begin()+N_local, [&](){ return dist(gen); } );
+    //V_local[0] += 1.;
+    //double tmp = 0.;
+    //for( auto i = 0; i < N_local; ++i ) tmp += V_local[i] * V_local[i];
+    //tmp = std::sqrt(tmp);
+    //for( auto i = 0; i < N_local; ++i ) V_local[i] /= tmp;
 
   }
 #else
