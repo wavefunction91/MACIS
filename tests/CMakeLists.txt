@@ -7,5 +7,7 @@ add_executable( asci_test
   fcidump.cxx 
   read_wavefunction.cxx
   double_loop.cxx
+  csr_hamiltonian.cxx
+  davidson.cxx
 )
 target_link_libraries( asci_test PUBLIC asci Catch2::Catch2 )
