@@ -135,7 +135,7 @@ public:
     // Loop over bra determinants
     for( size_t i = 0; i < nbra_dets; ++i ) {
       const auto bra = *(bra_begin + i);
-
+      //if( (i%1000) == 0 ) std::cout << i  << std::endl;
       if( bra.count() ) {
 
         // Separate out into alpha/beta components 
@@ -162,10 +162,11 @@ public:
               const double val = C[i] * C[j];
 
               // Compute Matrix Element
-              this->rdm_contributions( bra_alpha, ket_alpha,
-                ex_alpha, bra_beta, ket_beta, ex_beta, bra_occ_alpha,
-                bra_occ_beta, val, ordm, trdm );
-
+              if(std::abs(val) > 1e-14) {
+                this->rdm_contributions( bra_alpha, ket_alpha,
+                  ex_alpha, bra_beta, ket_beta, ex_beta, bra_occ_alpha,
+                  bra_occ_beta, val, ordm, trdm );
+              }
             } // Possible non-zero connection (Hamming distance)
             
           } // Non-zero ket determinant

@@ -5,6 +5,7 @@ add_executable( asci_test
   bitset_operations.cxx 
   sd_operations.cxx 
   fcidump.cxx 
+  read_wavefunction.cxx
   double_loop.cxx
 )
 target_link_libraries( asci_test PUBLIC asci Catch2::Catch2 )
