@@ -4,6 +4,45 @@
 
 namespace asci {
 
+
+void active_submatrix_1body(size_t nact, size_t ninact,
+  const double* A_full, size_t LDAF, double* A_sub,
+  size_t LDAS) {
+
+
+  for(size_t x = 0; x < nact; ++x)
+  for(size_t y = 0; y < nact; ++y) {
+    const size_t x_off = x + ninact;
+    const size_t y_off = y + ninact;
+    A_sub[x + y*LDAS] = A_full[x_off + y_off*LDAF];
+  }
+
+}
+
+void active_subtensor_2body(size_t nact, size_t ninact,
+  const double* A_full, size_t LDAF, double* A_sub,
+  size_t LDAS) {
+
+  const size_t LDAF2 = LDAF  * LDAF;
+  const size_t LDAF3 = LDAF2 * LDAF;
+  const size_t LDAS2 = LDAS  * LDAS;
+  const size_t LDAS3 = LDAS2 * LDAS;
+
+  for(size_t x = 0; x < nact; ++x)
+  for(size_t y = 0; y < nact; ++y)
+  for(size_t z = 0; z < nact; ++z)
+  for(size_t w = 0; w < nact; ++w) {
+    const size_t x_off = x + ninact;
+    const size_t y_off = y + ninact;
+    const size_t z_off = z + ninact;
+    const size_t w_off = w + ninact;
+
+    A_sub[x + y*LDAS + z*LDAS2 + w*LDAS3] = 
+      A_full[x_off + y_off*LDAF + z_off*LDAF2 + w_off*LDAF3];
+  }
+
+}
+
 double inactive_energy( size_t ninact, const double* T,
   size_t LDT, const double* Fi, size_t LDF ) {
 

@@ -3,6 +3,14 @@
 
 namespace asci {
 
+void active_submatrix_1body(size_t nact, size_t ninact,
+  const double* A_full, size_t LDAF, double* A_sub,
+  size_t LDAS);
+
+void active_subtensor_2body(size_t nact, size_t ninact,
+  const double* A_full, size_t LDAF, double* A_sub,
+  size_t LDAS);
+
 double inactive_energy( size_t ninact, const double* T,
   size_t LDT, const double* Fi, size_t LDF );
 

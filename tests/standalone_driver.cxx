@@ -88,6 +88,7 @@ int main(int argc, char** argv) {
   std::vector<double> V_active(n_active * n_active * n_active * n_active);
 
 
+#if 0
   #define T_ACTIVE(i,j) T_active[i + j*n_active]
   #define T_FULL(i,j)   T[i+n_inactive + (j+n_inactive)*norb]
   for( auto i = 0ul; i < n_active; ++i )
@@ -96,7 +97,12 @@ int main(int argc, char** argv) {
   }
   #undef T_ACTIVE
   #undef T_FULL
+#else
+  asci::active_submatrix_1body(n_active, n_inactive,
+    T.data(), norb, T_active.data(), n_active);
+#endif
   
+#if 0
   #define V_ACTIVE(i,j,k,l) V_active[i + j*n_active + k*n_active2 + l*n_active3]
   #define V_FULL(i,j,k,l)   \
     V[i+n_inactive + (j+n_inactive)*norb + (k+n_inactive)*norb2 + (l+n_inactive)*norb3]
@@ -110,6 +116,10 @@ int main(int argc, char** argv) {
   }
   #undef V_ACTIVE
   #undef V_FULL
+#else
+  asci::active_subtensor_2body(n_active, n_inactive,
+    V.data(), norb, V_active.data(), n_active);
+#endif
 
   // Compute inactive Fock
 #if 0
