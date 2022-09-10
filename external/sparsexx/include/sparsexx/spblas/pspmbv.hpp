@@ -213,14 +213,14 @@ void pgespmv( detail::type_identity_t<ScalarType> ALPHA, const DistSpMatType& A,
               const spmv_info<detail::type_identity_t<IndexType>>& spmv_info) {
 
   using value_type = ScalarType;
-  using index_type = IndexType;
+  //using index_type = IndexType;
 
-  const auto M = A.m();
+  //const auto M = A.m();
   const auto N = A.n();
 
-  auto comm = A.comm();
-  auto comm_size = detail::get_mpi_size(comm);
-  auto comm_rank = detail::get_mpi_rank(comm);
+  //auto comm = A.comm();
+  //auto comm_size = detail::get_mpi_size(comm);
+  //auto comm_rank = detail::get_mpi_rank(comm);
 
   const auto& recv_indices = spmv_info.recv_indices;
   const auto& send_indices = spmv_info.send_indices;

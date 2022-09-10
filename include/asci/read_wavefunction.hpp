@@ -30,6 +30,10 @@ void read_wavefunction( std::string fname, std::vector<std::bitset<N>>& states,
     nalpha = std::stoi(nalpha_);
     nbeta  = std::stoi(nbeta_);
   }
+  (void)nstate;
+  (void)norb;
+  (void)nalpha;
+  (void)nbeta;
 
   states.reserve(nstate);
   coeffs.reserve(nstate);

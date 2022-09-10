@@ -97,19 +97,21 @@ TEST_CASE("Distributed CSR Hamiltonian") {
   REQUIRE( H_dist.diagonal_tile().rowptr() == H_dist_ref.diagonal_tile().rowptr() );
   REQUIRE( H_dist.diagonal_tile().colind() == H_dist_ref.diagonal_tile().colind() );
 
-  REQUIRE( H_dist.off_diagonal_tile().rowptr() == H_dist_ref.off_diagonal_tile().rowptr() );
-  REQUIRE( H_dist.off_diagonal_tile().colind() == H_dist_ref.off_diagonal_tile().colind() );
-
   size_t nnz_local = H_dist.diagonal_tile().nnz();
   for( auto i = 0ul; i < nnz_local; ++i ) {
     REQUIRE( H_dist.diagonal_tile().nzval()[i] == 
              Approx(H_dist_ref.diagonal_tile().nzval()[i] ) );
   }
 
-  nnz_local = H_dist.off_diagonal_tile().nnz();
-  for( auto i = 0ul; i < nnz_local; ++i ) {
-    REQUIRE( H_dist.off_diagonal_tile().nzval()[i] == 
-             Approx(H_dist_ref.off_diagonal_tile().nzval()[i] ) );
+  int mpi_size; MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+  if(mpi_size > 1 ) {
+    REQUIRE( H_dist.off_diagonal_tile().rowptr() == H_dist_ref.off_diagonal_tile().rowptr() );
+    REQUIRE( H_dist.off_diagonal_tile().colind() == H_dist_ref.off_diagonal_tile().colind() );
+    nnz_local = H_dist.off_diagonal_tile().nnz();
+    for( auto i = 0ul; i < nnz_local; ++i ) {
+      REQUIRE( H_dist.off_diagonal_tile().nzval()[i] == 
+               Approx(H_dist_ref.off_diagonal_tile().nzval()[i] ) );
+    }
   }
 
 

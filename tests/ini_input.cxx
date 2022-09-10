@@ -11,7 +11,7 @@ static inline std::string& trim_left(std::string &s) {
     s.erase(s.begin(), std::find_if(s.begin(), s.end(),
             std::not1(std::ptr_fun<int, int>(std::isspace))));
     return s;
-}; // trim_left
+} // trim_left
 
 
 /**
@@ -23,7 +23,7 @@ static inline std::string& trim_right(std::string &s) {
     s.erase(std::find_if(s.rbegin(), s.rend(),
             std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
     return s;
-}; // trim_right
+} // trim_right
 
 
 /**
@@ -33,7 +33,7 @@ static inline std::string& trim_right(std::string &s) {
  */
 static inline std::string &trim(std::string &s) {
     return trim_left(trim_right(s));
-}; // trim
+} // trim
 
 /**
  *  Splits a string into tokens  based on a demiliter
@@ -60,7 +60,7 @@ static inline void split(std::vector<std::string>& tokens,
         // Find next "non-delimiter"
         pos = str.find_first_of(delimiters, lastPos);
     }
-}; // split
+} // split
 
 
 class input_not_found : public std::exception {
@@ -203,7 +203,7 @@ void INIFile::parse() {
       dict_[sectionHeader][dataHeader] += "\n" + line;
     }
     
-  };
+  }
 
 /* Debug code which prints out the contents of the dict_ map
   for(auto &sec : dict_) {
@@ -214,7 +214,7 @@ void INIFile::parse() {
   }
 */
 
-}; // INIFile::parse
+} // INIFile::parse
 
 
 
@@ -247,7 +247,7 @@ std::pair<std::string,std::string> INIFile::splitQuery(
   return 
     std::pair<std::string,std::string>(tokens[0],tokens[1]);
 
-}; // INIFile::splitQuery
+} // INIFile::splitQuery
 
 
 /**
@@ -271,7 +271,7 @@ public:
     msg = "Data ";
     msg += x; 
     msg += " Not Found\n";
-  };
+  }
 
   /**
    *  Specialization of std::exception::what. Outputs the error message
@@ -303,7 +303,7 @@ public:
     msg = "Section ";
     msg += x; 
     msg += " Not Found\n";
-  };
+  }
 
   /**
    *  Specialization of std::exception::what. Outputs the error message
@@ -338,7 +338,7 @@ std::string INIFile::getData(std::string query) {
     else throw data_not_found(query);
   } else throw section_not_found(tokenPair.first);
 
-}; // INIFile::getData<std::string>
+} // INIFile::getData<std::string>
 
 /**
  *  \brief Specialization of getData to return int of query 
@@ -352,7 +352,7 @@ int INIFile::getData(std::string query) {
 
   return std::stoi(getData<std::string>(query));
 
-}; // INIFile::getData<int>
+} // INIFile::getData<int>
 
 /**
  *  \brief Specialization of getData to return bool of query 
@@ -368,7 +368,7 @@ bool INIFile::getData(std::string query) {
   bool b = (not query.compare("TRUE") or not query.compare("ON")); 
   return b;
 
-}; // INIFile::getData<bool>
+} // INIFile::getData<bool>
 
 /**
  *  \brief Specialization of getData to return size_t of query 
@@ -382,7 +382,7 @@ size_t INIFile::getData(std::string query) {
 
   return std::stoul(getData<std::string>(query));
 
-}; // INIFile::getData<size_t>
+} // INIFile::getData<size_t>
 
 /**
  *  \brief Specialization of getData to return size_t of query 
@@ -396,7 +396,7 @@ int64_t INIFile::getData(std::string query) {
 
   return std::stol(getData<std::string>(query));
 
-}; // INIFile::getData<int64_t>
+} // INIFile::getData<int64_t>
 
 /**
  *  \brief Specialization of getData to return double of query 
@@ -410,7 +410,7 @@ double INIFile::getData(std::string query) {
 
   return std::stod(getData<std::string>(query));
 
-}; // INIFile::getData<double>
+} // INIFile::getData<double>
 
 /**
  *  \brief Specialization of getData to return float of query 
@@ -424,4 +424,4 @@ float INIFile::getData(std::string query) {
 
   return std::stof(getData<std::string>(query));
 
-}; // INIFile::getData<float>
+} // INIFile::getData<float>

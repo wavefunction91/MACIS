@@ -4,7 +4,7 @@
 
 template <size_t N>
 void uint128_conversion_test() {
-  using ref_type = unsigned __int128;
+  using ref_type = asci::uint128_t;
   std::bitset<N> one_bs{1};
   std::bitset<N> val_bs{0};
   val_bs |= (one_bs << 4); 
@@ -35,7 +35,7 @@ TEST_CASE("Bitset Operations") {
 
   SECTION("INT128") {
     using asci::uint128_t;
-    using ref_type = unsigned __int128;
+    using ref_type = asci::uint128_t;
 
     SECTION("TYPE") {
       REQUIRE( std::is_same_v<uint128_t,ref_type> );

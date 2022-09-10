@@ -71,7 +71,7 @@ csr_matrix<T,index_t,Alloc>::csr_matrix( const coo_matrix<T,index_t,Alloc>& othe
   // Compute rowptr
   rowptr_.at(0) = other.indexing();
   auto cur_row = 0;
-  for( size_t i = 0; i < nnz_; ++i ) 
+  for( size_type i = 0; i < nnz_; ++i ) 
   if( rowind_coo[i] != (cur_row + indexing_) ) {
     cur_row++;
     rowptr_.at(cur_row) = i + indexing_;

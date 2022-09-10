@@ -111,10 +111,10 @@ TEST_CASE("Double Loop") {
   SECTION("MP2") {
 
     double EMP2 = 0.;
-    for( auto a = nocc; a < norb; ++a )
-    for( auto b = a+1;  b < norb; ++b )
-    for( auto i = 0;    i < nocc; ++i )
-    for( auto j = i+1;  j < nocc; ++j ) {
+    for( size_t a = nocc; a < norb; ++a )
+    for( size_t b = a+1;  b < norb; ++b )
+    for( size_t i = 0;    i < nocc; ++i )
+    for( size_t j = i+1;  j < nocc; ++j ) {
 
       auto state = hf_det;
       state.flip(i).flip(j).flip(a).flip(b);
@@ -127,10 +127,10 @@ TEST_CASE("Double Loop") {
 
     }
 
-    for( auto a = nocc; a < norb; ++a )
-    for( auto b = a+1;  b < norb; ++b )
-    for( auto i = 0;    i < nocc; ++i )
-    for( auto j = i+1;  j < nocc; ++j ) {
+    for( size_t a = nocc; a < norb; ++a )
+    for( size_t b = a+1;  b < norb; ++b )
+    for( size_t i = 0;    i < nocc; ++i )
+    for( size_t j = i+1;  j < nocc; ++j ) {
 
       auto state = hf_det;
       state.flip(i+32).flip(j+32).flip(a+32).flip(b+32);
@@ -142,10 +142,10 @@ TEST_CASE("Double Loop") {
       REQUIRE( ham_gen.matrix_element(state,hf_det) == Approx(h_el));
     }
 
-    for( auto a = nocc; a < norb; ++a )
-    for( auto b = nocc; b < norb; ++b )
-    for( auto i = 0;    i < nocc; ++i )
-    for( auto j = 0;    j < nocc; ++j ) {
+    for( size_t a = nocc; a < norb; ++a )
+    for( size_t b = nocc; b < norb; ++b )
+    for( size_t i = 0;    i < nocc; ++i )
+    for( size_t j = 0;    j < nocc; ++j ) {
 
       auto state = hf_det;
       state.flip(i).flip(j+32).flip(a).flip(b+32);

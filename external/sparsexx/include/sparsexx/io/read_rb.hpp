@@ -23,7 +23,7 @@ csc_matrix<T,index_t,Alloc> read_rb_as_csc( std::string fname ) {
 
   // Get useful meta data
   int64_t m, n, nnz;
-  bool is_sym = false;
+  //bool is_sym;
   {
     std::getline( f_in, line );
     auto tokens = tokenize( line );
@@ -35,7 +35,7 @@ csc_matrix<T,index_t,Alloc> read_rb_as_csc( std::string fname ) {
     nnz = std::stoll( tokens[3] );
     // Whats the last one for??
 
-    is_sym = type[1] == 's' or type[1] == 'S';
+    //is_sym = type[1] == 's' or type[1] == 'S';
     assert( nnz <= m*n );
   }
 

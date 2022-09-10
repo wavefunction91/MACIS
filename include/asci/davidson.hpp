@@ -54,7 +54,7 @@ double davidson( int64_t max_m, const sparsexx::csr_matrix<double,index_t>& A,
 
 
 
-  for( size_t i = 1; i < max_m; ++i ) {
+  for( int64_t i = 1; i < max_m; ++i ) {
 
     // AV(:,i) = A * V(:,i)
     sparsexx::spblas::gespmbv(1, 1., A, V.data()+i*N, N, 0., AV.data()+i*N, N );
@@ -289,7 +289,7 @@ double p_davidson( int64_t max_m,
   std::copy_n(AV_local.data(), N_local, V_local.data()+N_local);
   p_gram_schmidt(N_local, 1, V_local.data(), N_local, V_local.data()+N_local, comm);
 
-  for( size_t i = 1; i < max_m; ++i ) {
+  for( int64_t i = 1; i < max_m; ++i ) {
 
     // AV(:,i) = A * V(:,i)
     sparsexx::spblas::pgespmv( 1., A, V_local.data()+i*N_local, 

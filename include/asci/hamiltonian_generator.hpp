@@ -18,7 +18,7 @@ public:
   template <typename index_t>
   using sparse_matrix_type = sparsexx::csr_matrix<double,index_t>;
 
-  using full_det_iterator = std::vector<full_det_t>::iterator;
+  using full_det_iterator = typename std::vector<full_det_t>::iterator;
 
 public:
 
@@ -161,7 +161,7 @@ public:
 
   void rotate_hamiltonian_ordm( const double* ordm ); 
 
-  virtual void SetJustSingles( bool _js ) {}
+  virtual void SetJustSingles( bool /*_js*/ ) {}
   virtual bool GetJustSingles( ){ return false; }
   virtual size_t GetNimp() const { return N/2; } 
 };

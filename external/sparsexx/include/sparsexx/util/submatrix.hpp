@@ -28,7 +28,7 @@ template <typename IndexType>
 void rowptr_from_rowcnts( size_t nrow, const size_t* rowcnts, IndexType* rowptr,
   size_t indexing) {
   rowptr[0] = indexing;
-  for( auto i = 0; i < nrow; ++i ) rowptr[i+1] = rowptr[i] + rowcnts[i];
+  for( size_t i = 0; i < nrow; ++i ) rowptr[i+1] = rowptr[i] + rowcnts[i];
 }
 
 }
@@ -38,8 +38,8 @@ template <typename SpMatType,
 > SpMatType extract_submatrix( const SpMatType& A, 
   std::pair<int64_t,int64_t> lo, std::pair<int64_t,int64_t> up) {
 
-  const auto M = A.m();
-  const auto N = A.n();
+  //const auto M = A.m();
+  //const auto N = A.n();
 
   const auto* Anz = A.nzval().data();
   const auto* Arp = A.rowptr().data();
@@ -87,7 +87,7 @@ template <typename SpMatType,
           auto* sub_ci_st = sub_ci + sub_j_st;
 
     const auto* Anz_st    = Anz    + Aj_st;
-    const auto* Anz_en    = Anz    + Aj_en;
+    //const auto* Anz_en    = Anz    + Aj_en;
           auto* sub_nz_st = sub_nz + sub_j_st;
 
     // Find the first j >= col_lo
@@ -120,7 +120,7 @@ template <typename SpMatType,
 > SpMatType extract_submatrix_inclrow_exclcol( const SpMatType& A, 
   std::pair<int64_t,int64_t> lo, std::pair<int64_t,int64_t> up) {
 
-  const auto M = A.m();
+  //const auto M = A.m();
   const auto N = A.n();
 
   const auto* Anz = A.nzval().data();

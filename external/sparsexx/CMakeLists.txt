@@ -117,7 +117,7 @@ target_link_libraries     ( sparsexx INTERFACE MPI::MPI_CXX OpenMP::OpenMP_CXX )
 target_link_libraries     ( sparsexx INTERFACE ${SPARSEXX_EXTERNAL_LIBRARIES} )
 target_include_directories( sparsexx INTERFACE ${PROJECT_SOURCE_DIR}/include )
 
-target_compile_options( sparsexx INTERFACE "-Wall" "-Wextra" "-Wpedantic" "-Wnon-virtual-dtor")
+#target_compile_options( sparsexx PRIVATE "-Wall" "-Wextra" "-Wpedantic" "-Wnon-virtual-dtor")
 
 add_subdirectory( examples )
 add_subdirectory( tests )

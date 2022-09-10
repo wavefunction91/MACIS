@@ -1,6 +1,6 @@
 #pragma once
 #include <cassert>
-#include <strings.h>
+#include <bit>
 #include <asci/types.hpp>
 
 namespace asci {
@@ -36,11 +36,12 @@ uint32_t ffs( std::bitset<N> bits ) {
 
   if constexpr (N <= 32)      return ffsl( bits.to_ulong() );
   else if constexpr (N <= 64) return ffsll( bits.to_ullong() );
-  else if constexpr (N <= 128) {
-    if(bits.any()) {
-      return std::countr_zero( to_uint128(bits) ) + 1;
-    } else { return 0; }
-  }else {
+  //else if constexpr (N <= 128) {
+  //  if(bits.any()) {
+  //    return std::countr_zero( to_uint128(bits) ) + 1;
+  //  } else { return 0; }
+  //}
+  else {
     uint32_t ind = 0;
     for( ind = 0; ind < N; ++ind )
     if( bits[ind] ) return (ind+1);

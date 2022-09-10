@@ -15,10 +15,10 @@ include( asci-cmake-modules )
 add_library( asci  src/fcidump.cxx )
 target_include_directories( asci PUBLIC 
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
+    #$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-target_compile_features(asci PUBLIC cxx_std_20)
+target_compile_features(asci PUBLIC cxx_std_17)
 
 # Parallelism
 find_package( MPI REQUIRED )

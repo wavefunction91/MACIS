@@ -1,7 +1,10 @@
 #pragma once
 #include <asci/hamiltonian_generator.hpp>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <blas.hh>
 #include <lapack.hh>
+#pragma GCC diagnostic pop
 
 namespace asci {
 

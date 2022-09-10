@@ -45,7 +45,7 @@ std::vector<IndexType> invert_perm( const std::vector<IndexType>& perm ) {
   std::vector<IndexType> iperm( n );
 
   #pragma omp parallel for
-  for( int64_t i = 0; i < n; ++i ) {
+  for( size_t i = 0; i < n; ++i ) {
     const auto it = std::find( perm.begin(), perm.end(), i );
     if( it == perm.end() ) throw std::runtime_error("Something terrible happened");
     iperm[i] = std::distance( perm.begin(), it );
@@ -258,7 +258,7 @@ detail::enable_if_csr_matrix_t<SpMatType, SpMatType>
     const auto A_j_st = Arp[rperm[i]]   - indexing;
     const auto A_j_en = Arp[rperm[i]+1] - indexing;
     const auto Ap_j_st = Aprp[i]        - indexing;
-    const auto Ap_j_en = Aprp[i+1]      - indexing;
+    //const auto Ap_j_en = Aprp[i+1]      - indexing;
     const auto j_ext  = A_j_en - A_j_st;
 
 
@@ -270,7 +270,7 @@ detail::enable_if_csr_matrix_t<SpMatType, SpMatType>
     auto* Apnz_st = Apnz + Ap_j_st;
 
     auto& ind = ind_th[omp_get_thread_num()];
-    if( ind.size() != j_ext ) {
+    if( (int64_t)ind.size() != j_ext ) {
       ind.resize( j_ext );
       std::iota( ind.begin(), ind.end(), 0 );
     }

@@ -120,7 +120,10 @@ int main(int argc, char** argv) {
            V[i + j*norb3  + p*(norb  + norb2)];
   }
 
-  // Increment T_active
+
+
+
+  // Replace T_active with F_inactive
   for( auto i = 0ul; i < n_active; ++i )
   for( auto j = 0ul; j < n_active; ++j ) {
     T_active[i + j*n_active] = F_inactive[(i+n_inactive) + (j+n_inactive)*norb];
@@ -128,8 +131,10 @@ int main(int argc, char** argv) {
 
   // Compute Inactive energy and increment E_core
   double E_inactive = 0.;
-  for( auto i = 0; i < n_inactive; ++i )
+  for( auto i = 0ul; i < n_inactive; ++i )
     E_inactive += T[i*(norb+1)] + F_inactive[i*(norb+1)];
+  std::cout << std::scientific << std::setprecision(12);
+  std::cout << "E(inactive) = " << E_inactive << std::endl;
   E_core += E_inactive;
   
 
@@ -142,8 +147,8 @@ int main(int argc, char** argv) {
   const auto hf_det = asci::canonical_hf_determinant<nwfn_bits>(nalpha, nbeta);
   const auto EHF    = ham_gen.matrix_element(hf_det, hf_det);  
   if(world_rank == 0) {
-    std::cout << std::scientific << std::setprecision(12);
     std::cout << "E(HF) = " << EHF + E_core << " Eh" << std::endl;
+    //std::cout << "E(HF) = " << EHF  << " Eh" << std::endl;
   }
 
 
@@ -151,12 +156,92 @@ int main(int argc, char** argv) {
   auto dets = asci::generate_hilbert_space<nwfn_bits>(n_active, nalpha, nbeta);
   std::vector<double> X_local;
   auto E0 = asci::selected_ci_diag(dets.begin(), dets.end(), ham_gen, 1e-16,
-    15, 1e-8, X_local, MPI_COMM_WORLD );
+    15, 1e-8, X_local, MPI_COMM_WORLD, true );
   
   if(world_rank == 0) {
     std::cout << std::scientific << std::setprecision(12);
     std::cout << "E(CI) = " << E0 + E_core << " Eh" << std::endl;
   }
+
+  // Compute RDMs
+  std::vector<double> active_ordm(n_active * n_active);
+  std::vector<double> active_trdm( active_ordm.size() * active_ordm.size() );
+  ham_gen.form_rdms( dets.begin(), dets.end(), dets.begin(), dets.end(),
+    X_local.data(), active_ordm.data(), active_trdm.data() );
+
+  // Recompute CI energy
+  double ERDM = blas::dot( active_ordm.size(), active_ordm.data(), 1, T_active.data(), 1 );
+  ERDM += blas::dot( active_trdm.size(), active_trdm.data(), 1, V_active.data(), 1 );
+  std::cout << "E(RDM) = " << ERDM + E_core << std::endl;
+
+
+
+
+  // Compute active Fock
+  std::vector<double> F_active(norb2, 0.0);
+  for( auto m = 0ul; m < norb; ++m )
+  for( auto n = 0ul; n < norb; ++n ) 
+  for( auto v = 0ul; v < n_active; ++v ) 
+  for( auto w = 0ul; w < n_active; ++w ) {
+    F_active[m + n*norb] +=
+      active_ordm[v + w*n_active] * (
+            V[m + n*norb   + (v+n_inactive)*norb2 + (w+n_inactive)*norb3] -
+        0.5*V[m + (w+n_inactive)*norb   + (v+n_inactive)*norb2 + n*norb3]
+      );
+  }
+
+  // Compute Q
+  std::vector<double> Q(n_active * norb, 0.0);
+  #define TRDM(v,q,x,y) active_trdm[v + w*n_active + x*n_active2 + y*n_active3]
+  #define V_full(m,x,y,z) \
+    V[m + (w+n_inactive)*norb + (x+n_inactive)*norb2 + (y+n_inactive)*norb3]
+  for( auto v = 0ul; v < n_active; ++v )
+  for( auto m = 0ul; m < norb;     ++m )
+  for( auto w = 0ul; w < n_active; ++w )
+  for( auto x = 0ul; x < n_active; ++x )
+  for( auto y = 0ul; y < n_active; ++y ) {
+    Q[v + m*n_active] += 2. * TRDM(v,w,x,y) * V_full(m,w,x,y);
+  }
+  #undef TRDM
+  #undef V
+
+  // Compute full generalized Fock matrix
+  std::vector<double> F(norb*norb,0.0);
+
+  // Inactive - General
+  for( auto i = 0ul; i < n_inactive; ++i )
+  for( auto n = 0ul; n < norb;       ++n ) {
+    F[i + n*norb] = 2.*( F_inactive[n + i*norb] + F_active[n + i*norb] );
+  }
+
+  // Active - General
+  std::vector<double> FIDA(norb * n_active);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+    norb, n_active, n_active, 1.0, F_inactive.data() + n_inactive*norb, norb,
+    active_ordm.data(), n_active, 0.0, FIDA.data(), norb );
+  for( auto v = 0ul; v < n_active; ++v )
+  for( auto n = 0ul; n < norb;     ++n ) {
+    F[v+n_inactive + n*norb] = FIDA[n + v*norb] + Q[v + n*n_active];
+  }
+
+  // Recompute Energy again
+  std::vector<double> full_ordm(norb2,0.0);
+  for( auto i = 0ul; i < n_inactive; ++i ) full_ordm[i*(norb+1)] = 2;
+  for( auto x = 0ul; x < n_active; ++x )
+  for( auto y = 0ul; y < n_active; ++y ) {
+    full_ordm[x+n_inactive + (y+n_inactive)*norb] = active_ordm[x + y*n_active];
+  }
+
+  double E_FOCK = 0;
+  for( auto p = 0ul; p < norb; ++p )
+  for( auto q = 0ul; q < norb; ++q ) {
+    E_FOCK += full_ordm[p + q*norb] * T[p + q*norb];
+    if( p == q ) E_FOCK += F[p*(norb+1)];
+  }
+  E_FOCK *= 0.5;
+  std::cout << "E(FOCK) = " << E_FOCK << std::endl;
+
+
   
   } // MPI Scope
 

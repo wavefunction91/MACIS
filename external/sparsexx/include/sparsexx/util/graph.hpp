@@ -21,7 +21,7 @@ detail::enable_if_csr_matrix_t< SpMatType,
   const auto M = A.m();
   //const auto N = A.n();
 
-  const auto* Anz = A.nzval().data();
+  //const auto* Anz = A.nzval().data();
   const auto* Arp = A.rowptr().data();
   const auto* Aci = A.colind().data();
   const auto  indexing = A.indexing();
