@@ -142,7 +142,7 @@ int main(int argc, char** argv) {
     E_inactive += T[i*(norb+1)] + F_inactive[i*(norb+1)];
   std::cout << std::scientific << std::setprecision(12);
   std::cout << "E(inactive) = " << E_inactive << std::endl;
-  E_core += E_inactive;
+  //E_core += E_inactive;
   
 
   
@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
   const auto hf_det = asci::canonical_hf_determinant<nwfn_bits>(nalpha, nbeta);
   const auto EHF    = ham_gen.matrix_element(hf_det, hf_det);  
   if(world_rank == 0) {
-    std::cout << "E(HF) = " << EHF + E_core << " Eh" << std::endl;
+    std::cout << "E(HF) = " << EHF + E_inactive + E_core << " Eh" << std::endl;
     //std::cout << "E(HF) = " << EHF  << " Eh" << std::endl;
   }
 
@@ -163,11 +163,11 @@ int main(int argc, char** argv) {
   auto dets = asci::generate_hilbert_space<nwfn_bits>(n_active, nalpha, nbeta);
   std::vector<double> X_local;
   auto E0 = asci::selected_ci_diag(dets.begin(), dets.end(), ham_gen, 1e-16,
-    15, 1e-8, X_local, MPI_COMM_WORLD, true );
+    15, 1e-8, X_local, MPI_COMM_WORLD );
   
   if(world_rank == 0) {
     std::cout << std::scientific << std::setprecision(12);
-    std::cout << "E(CI)   = " << E0 + E_core << " Eh" << std::endl;
+    std::cout << "E(CI)   = " << E0 + E_inactive + E_core << " Eh" << std::endl;
   }
 
   // Compute RDMs
@@ -176,101 +176,35 @@ int main(int argc, char** argv) {
   ham_gen.form_rdms( dets.begin(), dets.end(), dets.begin(), dets.end(),
     X_local.data(), active_ordm.data(), active_trdm.data() );
 
-  // Recompute CI energy
+  // Compute CI energy from RDMs
   double ERDM = blas::dot( active_ordm.size(), active_ordm.data(), 1, T_active.data(), 1 );
   ERDM += blas::dot( active_trdm.size(), active_trdm.data(), 1, V_active.data(), 1 );
-  std::cout << "E(RDM)  = " << ERDM + E_core << std::endl;
-
-
+  std::cout << "E(RDM)  = " << ERDM + E_inactive + E_core << std::endl;
 
 
   // Compute active Fock
-  std::vector<double> F_active(norb2, 0.0);
-#if 0
-  for( auto m = 0ul; m < norb; ++m )
-  for( auto n = 0ul; n < norb; ++n ) 
-  for( auto v = 0ul; v < n_active; ++v ) 
-  for( auto w = 0ul; w < n_active; ++w ) {
-    F_active[m + n*norb] +=
-      active_ordm[v + w*n_active] * (
-            V[m + n*norb   + (v+n_inactive)*norb2 + (w+n_inactive)*norb3] -
-        0.5*V[m + (w+n_inactive)*norb   + (v+n_inactive)*norb2 + n*norb3]
-      );
-  }
-#else
+  std::vector<double> F_active(norb2);
   asci::active_fock_matrix( norb, n_inactive, n_active,
     V.data(), norb, active_ordm.data(), n_active, 
     F_active.data(), norb );
-#endif
 
   // Compute Q
-  std::vector<double> Q(n_active * norb, 0.0);
-#if 0
-  #define TRDM(v,q,x,y) active_trdm[v + w*n_active + x*n_active2 + y*n_active3]
-  #define V_full(m,x,y,z) \
-    V[m + (w+n_inactive)*norb + (x+n_inactive)*norb2 + (y+n_inactive)*norb3]
-  for( auto v = 0ul; v < n_active; ++v )
-  for( auto m = 0ul; m < norb;     ++m )
-  for( auto w = 0ul; w < n_active; ++w )
-  for( auto x = 0ul; x < n_active; ++x )
-  for( auto y = 0ul; y < n_active; ++y ) {
-    Q[v + m*n_active] += 2. * TRDM(v,w,x,y) * V_full(m,w,x,y);
-  }
-  #undef TRDM
-  #undef V
-#else
+  std::vector<double> Q(n_active * norb);
   asci::aux_q_matrix( n_active, norb, n_inactive, V.data(),
     norb, active_trdm.data(), n_active, Q.data(), n_active );
-#endif
 
   // Compute full generalized Fock matrix
-  std::vector<double> F(norb*norb,0.0);
-
-#if 0
-  // Inactive - General
-  for( auto i = 0ul; i < n_inactive; ++i )
-  for( auto n = 0ul; n < norb;       ++n ) {
-    F[i + n*norb] = 2.*( F_inactive[n + i*norb] + F_active[n + i*norb] );
-  }
-
-  // Active - General
-  std::vector<double> FIDA(norb * n_active);
-  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-    norb, n_active, n_active, 1.0, F_inactive.data() + n_inactive*norb, norb,
-    active_ordm.data(), n_active, 0.0, FIDA.data(), norb );
-  for( auto v = 0ul; v < n_active; ++v )
-  for( auto n = 0ul; n < norb;     ++n ) {
-    F[v+n_inactive + n*norb] = FIDA[n + v*norb] + Q[v + n*n_active];
-  }
-#else
+  std::vector<double> F(norb2);
   asci::generalized_fock_matrix(norb, n_inactive, n_active,
     F_inactive.data(), norb, F_active.data(), norb,
     active_ordm.data(), n_active, Q.data(), n_active,
     F.data(), norb);
-#endif
 
-  // Recompute Energy again
-#if 0
-  std::vector<double> full_ordm(norb2,0.0);
-  for( auto i = 0ul; i < n_inactive; ++i ) full_ordm[i*(norb+1)] = 2;
-  for( auto x = 0ul; x < n_active; ++x )
-  for( auto y = 0ul; y < n_active; ++y ) {
-    full_ordm[x+n_inactive + (y+n_inactive)*norb] = active_ordm[x + y*n_active];
-  }
-
-  double E_FOCK = 0;
-  for( auto p = 0ul; p < norb; ++p )
-  for( auto q = 0ul; q < norb; ++q ) {
-    E_FOCK += full_ordm[p + q*norb] * T[p + q*norb];
-    if( p == q ) E_FOCK += F[p*(norb+1)];
-  }
-  E_FOCK *= 0.5;
-#else
+  // Compute Energy from Generalied Fock Matrix
   auto E_FOCK = asci::energy_from_generalized_fock(
     n_inactive, n_active, T.data(), norb, active_ordm.data(),
     n_active, F.data(), norb);
-#endif
-  std::cout << "E(FOCK) = " << E_FOCK << std::endl;
+  std::cout << "E(FOCK) = " << E_FOCK + E_core << std::endl;
 
 
   

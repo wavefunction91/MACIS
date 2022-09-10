@@ -162,7 +162,7 @@ public:
               const double val = C[i] * C[j];
 
               // Compute Matrix Element
-              if(std::abs(val) > 1e-14) {
+              if(std::abs(val) > 1e-16) {
                 this->rdm_contributions( bra_alpha, ket_alpha,
                   ex_alpha, bra_beta, ket_beta, ex_beta, bra_occ_alpha,
                   bra_occ_beta, val, ordm, trdm );
