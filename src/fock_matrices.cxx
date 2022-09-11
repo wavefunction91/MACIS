@@ -154,6 +154,42 @@ void generalized_fock_matrix( size_t norb, size_t ninact,
 
 }
 
+
+
+void generalized_fock_matrix_comp_mat( size_t norb, 
+  size_t ninact, size_t nact, const double* Fi, size_t LDFi,
+  const double* V_full, size_t LDV, 
+  const double* A1RDM, size_t LDD1, const double* A2RDM,
+  size_t LDD2, double* F, size_t LDF ) {
+
+  const size_t norb2 = norb * norb;
+  
+  // Compute Active Fock Matrix
+  std::vector<double> F_active(norb2);
+  active_fock_matrix( norb, ninact, nact, V_full, LDV,
+    A1RDM, LDD1, F_active.data(), norb);
+
+  // Compute Q
+  std::vector<double> Q(nact * norb);
+  aux_q_matrix(nact, norb, ninact, V_full, LDV, A2RDM, LDD2,
+    Q.data(), nact);
+
+  // Compute Generalized Fock Matrix
+  generalized_fock_matrix(norb, ninact, nact, Fi, LDFi,
+    F_active.data(), norb, A1RDM, LDD1, Q.data(), nact,
+    F, LDF);
+  
+} 
+
+
+
+
+
+
+
+
+
+
 double energy_from_generalized_fock(size_t ninact, size_t nact,
   const double* T, size_t LDT, const double* A1RDM, size_t LDD,
   const double* F, size_t LDF) {

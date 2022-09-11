@@ -88,71 +88,27 @@ int main(int argc, char** argv) {
   std::vector<double> V_active(n_active * n_active * n_active * n_active);
 
 
-#if 0
-  #define T_ACTIVE(i,j) T_active[i + j*n_active]
-  #define T_FULL(i,j)   T[i+n_inactive + (j+n_inactive)*norb]
-  for( auto i = 0ul; i < n_active; ++i )
-  for( auto j = 0ul; j < n_active; ++j ) {
-    T_ACTIVE(i,j) = T_FULL(i,j);
-  }
-  #undef T_ACTIVE
-  #undef T_FULL
-#else
-  asci::active_submatrix_1body(n_active, n_inactive,
-    T.data(), norb, T_active.data(), n_active);
-#endif
-  
-#if 0
-  #define V_ACTIVE(i,j,k,l) V_active[i + j*n_active + k*n_active2 + l*n_active3]
-  #define V_FULL(i,j,k,l)   \
-    V[i+n_inactive + (j+n_inactive)*norb + (k+n_inactive)*norb2 + (l+n_inactive)*norb3]
-  size_t n_active2 = n_active  * n_active;
-  size_t n_active3 = n_active2 * n_active;
-  for( auto i = 0ul; i < n_active; ++i )
-  for( auto j = 0ul; j < n_active; ++j ) 
-  for( auto k = 0ul; k < n_active; ++k ) 
-  for( auto l = 0ul; l < n_active; ++l ) {
-    V_ACTIVE(i,j,k,l) = V_FULL(i,j,k,l);
-  }
-  #undef V_ACTIVE
-  #undef V_FULL
-#else
+  // Extract active two body interaction
   asci::active_subtensor_2body(n_active, n_inactive,
     V.data(), norb, V_active.data(), n_active);
-#endif
 
   // Compute inactive Fock
-#if 0
-  std::vector<double> F_inactive(T);
-  for( auto i = 0ul; i < norb; ++i )
-  for( auto j = 0ul; j < norb; ++j ) 
-  for( auto p = 0ul; p < n_inactive;   ++p ) {
-    F_inactive[i + j*norb] +=
-      2. * V[i + j*norb   + p*(norb2 + norb3)] -
-           V[i + j*norb3  + p*(norb  + norb2)];
-  }
-#else
   std::vector<double> F_inactive(norb2);
   asci::inactive_fock_matrix( norb, n_inactive, T.data(),
     norb, V.data(), norb, F_inactive.data(), norb );
-#endif
 
 
 
 
   // Replace T_active with F_inactive
-  for( auto i = 0ul; i < n_active; ++i )
-  for( auto j = 0ul; j < n_active; ++j ) {
-    T_active[i + j*n_active] = F_inactive[(i+n_inactive) + (j+n_inactive)*norb];
-  }
+  asci::active_submatrix_1body(n_active, n_inactive,
+    F_inactive.data(), norb, T_active.data(), n_active);
 
-  // Compute Inactive energy and increment E_core
-  double E_inactive = 0.;
-  for( auto i = 0ul; i < n_inactive; ++i )
-    E_inactive += T[i*(norb+1)] + F_inactive[i*(norb+1)];
+  // Compute Inactive energy
+  auto E_inactive = asci::inactive_energy(n_inactive, T.data(),
+    norb, F_inactive.data(), norb);
   std::cout << std::scientific << std::setprecision(12);
   std::cout << "E(inactive) = " << E_inactive << std::endl;
-  //E_core += E_inactive;
   
 
   
@@ -192,6 +148,7 @@ int main(int argc, char** argv) {
   std::cout << "E(RDM)  = " << ERDM + E_inactive + E_core << std::endl;
 
 
+#if 0
   // Compute active Fock
   std::vector<double> F_active(norb2);
   asci::active_fock_matrix( norb, n_inactive, n_active,
@@ -209,6 +166,13 @@ int main(int argc, char** argv) {
     F_inactive.data(), norb, F_active.data(), norb,
     active_ordm.data(), n_active, Q.data(), n_active,
     F.data(), norb);
+#else
+  std::vector<double> F(norb2);
+  asci::generalized_fock_matrix_comp_mat(norb, n_inactive, 
+    n_active, F_inactive.data(), norb, V.data(), norb,
+    active_ordm.data(), n_active, active_trdm.data(), 
+    n_active, F.data(), norb);
+#endif
 
   // Compute Energy from Generalied Fock Matrix
   auto E_FOCK = asci::energy_from_generalized_fock(

@@ -32,6 +32,12 @@ void generalized_fock_matrix( size_t norb, size_t ninact,
   size_t LDFa, const double* A1RDM, size_t LDD, 
   const double* Q, size_t LDQ, double* F, size_t LDF ); 
 
+void generalized_fock_matrix_comp_mat( size_t norb, 
+  size_t ninact, size_t nact, const double* Fi, size_t LDFi,
+  const double* V_full, size_t LDV, 
+  const double* A1RDM, size_t LDD1, const double* A2RDM,
+  size_t LDD2, double* F, size_t LDF );
+
 double energy_from_generalized_fock(size_t ninact, size_t nact,
   const double* T, size_t LDT, const double* A1RDM, size_t LDD,
   const double* F, size_t LDF);
