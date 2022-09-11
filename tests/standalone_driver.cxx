@@ -148,28 +148,15 @@ int main(int argc, char** argv) {
   std::cout << "E(RDM)  = " << ERDM + E_inactive + E_core << std::endl;
 
 
+  std::vector<double> F(norb2);
 #if 0
-  // Compute active Fock
-  std::vector<double> F_active(norb2);
-  asci::active_fock_matrix( norb, n_inactive, n_active,
-    V.data(), norb, active_ordm.data(), n_active, 
-    F_active.data(), norb );
-
-  // Compute Q
-  std::vector<double> Q(n_active * norb);
-  asci::aux_q_matrix( n_active, norb, n_inactive, V.data(),
-    norb, active_trdm.data(), n_active, Q.data(), n_active );
-
-  // Compute full generalized Fock matrix
-  std::vector<double> F(norb2);
-  asci::generalized_fock_matrix(norb, n_inactive, n_active,
-    F_inactive.data(), norb, F_active.data(), norb,
-    active_ordm.data(), n_active, Q.data(), n_active,
-    F.data(), norb);
-#else
-  std::vector<double> F(norb2);
-  asci::generalized_fock_matrix_comp_mat(norb, n_inactive, 
+  asci::generalized_fock_matrix_comp_mat1(norb, n_inactive, 
     n_active, F_inactive.data(), norb, V.data(), norb,
+    active_ordm.data(), n_active, active_trdm.data(), 
+    n_active, F.data(), norb);
+#else
+  asci::generalized_fock_matrix_comp_mat2(norb, n_inactive, 
+    n_active, T.data(), norb, V.data(), norb, 
     active_ordm.data(), n_active, active_trdm.data(), 
     n_active, F.data(), norb);
 #endif
