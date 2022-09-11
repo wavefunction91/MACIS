@@ -12,7 +12,7 @@ include( asci-cmake-modules )
 # Packaged Dependencies
 
 # ASCI library
-add_library( asci  src/fcidump.cxx src/fock_matrices.cxx )
+add_library( asci  src/fcidump.cxx src/fock_matrices.cxx src/transform.cxx)
 target_include_directories( asci PUBLIC 
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     #$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>

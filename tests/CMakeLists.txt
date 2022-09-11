@@ -9,6 +9,7 @@ add_executable( asci_test
   double_loop.cxx
   csr_hamiltonian.cxx
   davidson.cxx
+  transform.cxx
 )
 target_link_libraries( asci_test PUBLIC asci Catch2::Catch2 )
 
