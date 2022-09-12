@@ -57,37 +57,27 @@ void numerical_orbital_gradient(size_t norb,
   };
   
   const double dk = 0.001;
-  for(size_t a = 1; a < norb; ++a)
-  for(size_t i = 0; i < a;    ++i) {
+  for(size_t i = 0;   i < norb; ++i) 
+  for(size_t a = i+1; a < norb; ++a) {
     K_map = mat_t::Zero(norb,norb);
-    K_map(i,a) = -dk;
+    // a > i, so K(a,i) >= 0 (Pink book 10.1.8,9)
     K_map(a,i) = dk;
-
-#if 0
-    // Forward
-    U_map = K_map.exp();
-    auto E_fwd = energy();
-  
-    // Backward
-    U_map = (-K_map).exp();
-    auto E_bwd = energy();
-
-    OG_map(i,a) = (E_fwd - E_bwd) / (2*dk);
-#else
-    U_map = (2.*K_map).exp();
-    auto E_p2 = energy();
-
-    U_map = (K_map).exp();
-    auto E_p1 = energy();
-  
-    U_map = (-K_map).exp();
-    auto E_m1 = energy();
+    K_map(i,a) = -dk;
+    // U = EXP[-K] (Pink book 10.1.8)
 
     U_map = (-2.*K_map).exp();
+    auto E_p2 = energy();
+
+    U_map = (-K_map).exp();
+    auto E_p1 = energy();
+  
+    U_map = (K_map).exp();
+    auto E_m1 = energy();
+
+    U_map = (2.*K_map).exp();
     auto E_m2 = energy();
 
-    OG_map(i,a) = (E_m2-E_p2 + 8*(E_p1-E_m1))/(12*dk);
-#endif
+    OG_map(a,i) = (E_m2-E_p2 + 8*(E_p1-E_m1))/(12*dk);
   }
 
 }

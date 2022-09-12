@@ -180,34 +180,34 @@ int main(int argc, char** argv) {
     norb);
 
   std::cout << std::endl;
-  std::cout << "Inactive - Active Orbital Gradient" << std::endl;
-  for(size_t a = 0; a < n_active;   ++a)
-  for(size_t i = 0; i < n_inactive; ++i) {
+  std::cout << "Active - Inactive Orbital Gradient" << std::endl;
+  for(size_t i = 0; i < n_inactive; ++i) 
+  for(size_t a = 0; a < n_active;   ++a){
     auto ia = i + (a+n_inactive)*norb;
     auto ai = (a+n_inactive) + i*norb;
-    auto exact = 2*(F[ia] - F[ai]);
-    auto numer = OGrad[ia];
+    auto exact = 2*(F[ai] - F[ia]);
+    auto numer = OGrad[ai];
     std::cout << "  " << i << " " << a << ": " << exact << ", " << std::abs(exact - numer) << std::endl; 
   }
 
-  std::cout << "Inactive - Virtual Orbital Gradient" << std::endl;
-  for(size_t a = 0; a < n_virtual;  ++a)
-  for(size_t i = 0; i < n_inactive; ++i) {
+  std::cout << "Virtual - Inactive Orbital Gradient" << std::endl;
+  for(size_t i = 0; i < n_inactive; ++i) 
+  for(size_t a = 0; a < n_virtual;  ++a) {
     auto ia = i + (a+n_inactive+n_active)*norb;
     auto ai = (a+n_inactive+n_active) + i*norb;
-    auto exact = 2*(F[ia] - F[ai]);
-    auto numer = OGrad[ia];
+    auto exact = 2*(F[ai] - F[ia]);
+    auto numer = OGrad[ai];
     std::cout << "  " << i << " " << a << ": " << exact << ", " << std::abs(exact - numer) << std::endl; 
   }
 
 
-  std::cout << "Active - Virtual Orbital Gradient" << std::endl;
-  for(size_t a = 0; a < n_virtual;  ++a)
-  for(size_t i = 0; i < n_active; ++i) {
+  std::cout << "Virtual - Active Orbital Gradient" << std::endl;
+  for(size_t i = 0; i < n_active;  ++i) 
+  for(size_t a = 0; a < n_virtual; ++a) {
     auto ia = (i+n_inactive) + (a+n_inactive+n_active)*norb;
     auto ai = (a+n_inactive+n_active) + (i+n_inactive)*norb;
-    auto exact = 2*(F[ia] - F[ai]);
-    auto numer = OGrad[ia];
+    auto exact = 2*(F[ai] - F[ia]);
+    auto numer = OGrad[ai];
     std::cout << "  " << i << " " << a << ": " << exact << ", " << std::abs(exact - numer) << std::endl; 
   }
   
