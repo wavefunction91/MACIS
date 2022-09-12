@@ -172,66 +172,44 @@ int main(int argc, char** argv) {
   std::cout << "E(FOCK) = " << E_FOCK + E_core << std::endl;
 
 
-  // Orbital gradient
-  double dk = 0.001;
-  size_t i = 0; // inactive
-  size_t a = 1; // active
-
-  Eigen::MatrixXd K(norb,norb);
-  std::vector<double> T_trans(norb2), V_trans(norb4);
-  std::vector<double> F_trans(norb2);
-
-  // Forward
-  K = Eigen::MatrixXd::Zero(norb,norb);
-  K(i,a) = -dk;
-  K(a,i) = dk;
-  Eigen::MatrixXd U = K.exp();
-  
-  asci::two_index_transform( norb, norb, T.data(), norb,
-    U.data(), norb, T_trans.data(), norb);
-  asci::four_index_transform(norb,norb,0,V.data(),norb,
-    U.data(), norb, V_trans.data(), norb);
-
-  asci::generalized_fock_matrix_comp_mat2(norb, n_inactive,
-    n_active, T_trans.data(), norb, V_trans.data(), norb,
-    active_ordm.data(), n_active, active_trdm.data(),
-    n_active, F_trans.data(), norb);
-  auto E_fwd = asci::energy_from_generalized_fock(
-    n_inactive, n_active, T_trans.data(), norb, 
-    active_ordm.data(), n_active, F_trans.data(), norb);
-
-  std::cout <<  E_fwd <<std::endl;
-
-  // Backward
-  U = (-K).exp();
-  
-  asci::two_index_transform( norb, norb, T.data(), norb,
-    U.data(), norb, T_trans.data(), norb);
-  asci::four_index_transform(norb,norb,0,V.data(),norb,
-    U.data(), norb, V_trans.data(), norb);
-
-  asci::generalized_fock_matrix_comp_mat2(norb, n_inactive,
-    n_active, T_trans.data(), norb, V_trans.data(), norb,
-    active_ordm.data(), n_active, active_trdm.data(),
-    n_active, F_trans.data(), norb);
-  auto E_bwd = asci::energy_from_generalized_fock(
-    n_inactive, n_active, T_trans.data(), norb, 
-    active_ordm.data(), n_active, F_trans.data(), norb);
-
-  std::cout <<  E_bwd <<std::endl;
-
-  std::cout << (E_fwd - E_bwd)/(2*dk) << std::endl;
-  
+  // Numerical Orbital gradient
   std::vector<double> OGrad(norb*norb);
   asci::numerical_orbital_gradient(norb, n_inactive, n_active,
     T.data(), norb, V.data(), norb, active_ordm.data(), 
     n_active, active_trdm.data(), n_active, OGrad.data(),
     norb);
-  std::cout << OGrad[i + a*norb ] << std::endl;
 
-  std::cout << 2*(F[i + a*norb] - F[a+i*norb]) << std::endl;
-  std::cout << (2*(F[i + a*norb] - F[a+i*norb]) - OGrad[i + a*norb]) << std::endl;
+  std::cout << std::endl;
+  std::cout << "Inactive - Active Orbital Gradient" << std::endl;
+  for(size_t a = 0; a < n_active;   ++a)
+  for(size_t i = 0; i < n_inactive; ++i) {
+    auto ia = i + (a+n_inactive)*norb;
+    auto ai = (a+n_inactive) + i*norb;
+    auto exact = 2*(F[ia] - F[ai]);
+    auto numer = OGrad[ia];
+    std::cout << "  " << i << " " << a << ": " << exact << ", " << std::abs(exact - numer) << std::endl; 
+  }
 
+  std::cout << "Inactive - Virtual Orbital Gradient" << std::endl;
+  for(size_t a = 0; a < n_virtual;  ++a)
+  for(size_t i = 0; i < n_inactive; ++i) {
+    auto ia = i + (a+n_inactive+n_active)*norb;
+    auto ai = (a+n_inactive+n_active) + i*norb;
+    auto exact = 2*(F[ia] - F[ai]);
+    auto numer = OGrad[ia];
+    std::cout << "  " << i << " " << a << ": " << exact << ", " << std::abs(exact - numer) << std::endl; 
+  }
+
+
+  std::cout << "Active - Virtual Orbital Gradient" << std::endl;
+  for(size_t a = 0; a < n_virtual;  ++a)
+  for(size_t i = 0; i < n_active; ++i) {
+    auto ia = (i+n_inactive) + (a+n_inactive+n_active)*norb;
+    auto ai = (a+n_inactive+n_active) + (i+n_inactive)*norb;
+    auto exact = 2*(F[ia] - F[ai]);
+    auto numer = OGrad[ia];
+    std::cout << "  " << i << " " << a << ": " << exact << ", " << std::abs(exact - numer) << std::endl; 
+  }
   
   } // MPI Scope
 
