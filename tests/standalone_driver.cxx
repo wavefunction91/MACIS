@@ -186,41 +186,12 @@ int main(int argc, char** argv) {
   }
   
 
-  // Storate for active RDMs
+  // Storage for active RDMs
   std::vector<double> active_ordm(n_active * n_active);
   std::vector<double> active_trdm( active_ordm.size() * active_ordm.size() );
   
-#if 0
-  // Hamiltonian Matrix Element Generator
-  asci::DoubleLoopHamiltonianGenerator<nwfn_bits>
-    ham_gen( n_active, V_active.data(), T_active.data() );
-
-  // Compute HF Energy
-  const auto hf_det = asci::canonical_hf_determinant<nwfn_bits>(nalpha, nbeta);
-  const auto EHF    = ham_gen.matrix_element(hf_det, hf_det);  
-  if(world_rank == 0) {
-    std::cout << "E(HF) = " << EHF + E_inactive + E_core << " Eh" << std::endl;
-    //std::cout << "E(HF) = " << EHF  << " Eh" << std::endl;
-  }
-
-
-  // Compute Lowest Energy Eigenvalue (ED) 
-  auto dets = asci::generate_hilbert_space<nwfn_bits>(n_active, nalpha, nbeta);
-  std::vector<double> X_local;
-  auto E0 = asci::selected_ci_diag(dets.begin(), dets.end(), ham_gen, 1e-16,
-    15, 1e-8, X_local, MPI_COMM_WORLD );
-  
-  if(world_rank == 0) {
-    std::cout << std::scientific << std::setprecision(12);
-    std::cout << "E(CI)   = " << E0 + E_inactive + E_core << " Eh" << std::endl;
-  }
-
-  // Compute RDMs
-  ham_gen.form_rdms( dets.begin(), dets.end(), dets.begin(), dets.end(),
-    X_local.data(), active_ordm.data(), active_trdm.data() );
-#else
+  // Compute or Read active RDMs
   double EHF, E0;
-  
   if(rdm_fname.size()) {
     std::vector<double> full_ordm(norb2), full_trdm(norb4);
     asci::read_rdms_binary(rdm_fname, norb, full_ordm.data(), norb,
@@ -242,7 +213,6 @@ int main(int argc, char** argv) {
     std::cout << "E(HF)   = " << EHF + E_inactive + E_core << " Eh" << std::endl;
     std::cout << "E(CI)   = " << E0  + E_inactive + E_core << " Eh" << std::endl;
   }
-#endif
 
   // Compute CI energy from RDMs
   double ERDM = blas::dot( active_ordm.size(), active_ordm.data(), 1, T_active.data(), 1 );
@@ -250,13 +220,16 @@ int main(int argc, char** argv) {
   std::cout << "E(RDM)  = " << ERDM + E_inactive + E_core << std::endl;
 
 
+  // Compute Generalized Fock matrix
   std::vector<double> F(norb2);
 #if 0
+  // Compute given inactive Fock
   asci::generalized_fock_matrix_comp_mat1(norb, n_inactive, 
     n_active, F_inactive.data(), norb, V.data(), norb,
     active_ordm.data(), n_active, active_trdm.data(), 
     n_active, F.data(), norb);
 #else
+  // Compute directly from full MO tensors and active RDMs
   asci::generalized_fock_matrix_comp_mat2(NumOrbital(norb), 
     NumInactive(n_inactive), NumActive(n_active), T.data(), 
     norb, V.data(), norb, active_ordm.data(), n_active, 
@@ -268,7 +241,6 @@ int main(int argc, char** argv) {
     NumInactive(n_inactive), NumActive(n_active), T.data(), 
     norb, active_ordm.data(), n_active, F.data(), norb);
   std::cout << "E(FOCK) = " << E_FOCK + E_core << std::endl;
-
 
   // Numerical Orbital gradient
   std::vector<double> OGrad(norb*norb);

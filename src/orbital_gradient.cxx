@@ -6,6 +6,22 @@
 
 namespace asci {
 
+void compute_orbital_rotation(NumOrbital _norb, double alpha, const double* K, 
+  size_t LDK, double* U, size_t LDU) {
+
+  const size_t norb = _norb.get();
+  using mat_t = Eigen::MatrixXd;
+  using map_t = Eigen::Map<mat_t>;
+  using cmap_t = Eigen::Map<const mat_t>;
+
+  cmap_t K_map(K, LDK, norb);
+  map_t  U_map(U, LDU, norb);
+
+  // U = EXP[-K] (Pink book 10.1.8)
+  U_map.block(0,0,norb,norb) = (-alpha * K_map.block(0,0,norb,norb)).exp();
+
+}
+
 
 void orbital_rotated_generalized_fock(NumOrbital _norb, NumInactive _ninact, 
   NumActive _nact, const double* T, size_t LDT,
@@ -72,8 +88,6 @@ void numerical_orbital_gradient(NumOrbital _norb,
   size_t LDD1, const double* A2RDM, size_t LDD2,
   double* OG, size_t LDOG ) { 
 
-  using mat_t = Eigen::MatrixXd;
-  using map_t = Eigen::Map<mat_t>;
 
   const auto norb = _norb.get();
 
@@ -82,9 +96,11 @@ void numerical_orbital_gradient(NumOrbital _norb,
   std::vector<double> F(norb2), T_trans(norb2), 
     V_trans(norb4), K(norb2), U(norb2);
 
-  map_t K_map(K.data(), norb, norb);
-  map_t U_map(U.data(), norb, norb);
-  map_t OG_map(OG, LDOG, norb);
+  //using mat_t = Eigen::MatrixXd;
+  //using map_t = Eigen::Map<mat_t>;
+  //map_t K_map(K.data(), norb, norb);
+  //map_t U_map(U.data(), norb, norb);
+  //map_t OG_map(OG, LDOG, norb);
 
   auto energy = [&]() {
     return orbital_rotated_energy(_norb, ninact, nact, 
@@ -96,25 +112,35 @@ void numerical_orbital_gradient(NumOrbital _norb,
   const double dk = 0.001;
   for(size_t i = 0;   i < norb; ++i) 
   for(size_t a = i+1; a < norb; ++a) {
+  #if 0
     K_map = mat_t::Zero(norb,norb);
     // a > i, so K(a,i) >= 0 (Pink book 10.1.8,9)
     K_map(a,i) = dk;
     K_map(i,a) = -dk;
-    // U = EXP[-K] (Pink book 10.1.8)
+  #else
+    std::fill(K.begin(), K.end(), 0);
+    K[a + i*norb] = dk;
+    K[i + a*norb] = -dk;
+  #endif
 
-    U_map = (-2.*K_map).exp();
+    //U_map = (-2.*K_map).exp();
+    compute_orbital_rotation(_norb, 2.0, K.data(), norb, U.data(), norb);
     auto E_p2 = energy();
 
-    U_map = (-K_map).exp();
+    //U_map = (-K_map).exp();
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
     auto E_p1 = energy();
   
-    U_map = (K_map).exp();
+    //U_map = (K_map).exp();
+    compute_orbital_rotation(_norb, -1.0, K.data(), norb, U.data(), norb);
     auto E_m1 = energy();
 
-    U_map = (2.*K_map).exp();
+    //U_map = (2.*K_map).exp();
+    compute_orbital_rotation(_norb, -2.0, K.data(), norb, U.data(), norb);
     auto E_m2 = energy();
 
-    OG_map(a,i) = (E_m2-E_p2 + 8*(E_p1-E_m1))/(12*dk);
+    //OG_map(a,i) = (E_m2-E_p2 + 8*(E_p1-E_m1))/(12*dk);
+    OG[a + i*norb] = (E_m2-E_p2 + 8*(E_p1-E_m1))/(12*dk);
   }
 
 }
