@@ -7,12 +7,16 @@
 namespace asci {
 
 
-double orbital_rotated_energy(size_t norb, size_t ninact, 
-  size_t nact, const double* T, size_t LDT,
+void orbital_rotated_generalized_fock(NumOrbital _norb, NumInactive _ninact, 
+  NumActive _nact, const double* T, size_t LDT,
   const double* V, size_t LDV, const double* A1RDM,
   size_t LDD1, const double* A2RDM, size_t LDD2, 
   const double* U, size_t LDU, double* T_trans, size_t LDTT, 
   double* V_trans, size_t LDVT, double* F, size_t LDF) {
+
+  const auto norb   = _norb.get();
+  const auto nact   = _nact.get();
+  const auto ninact = _ninact.get();
 
   // Transform Integrals
   two_index_transform( norb, norb, T, LDT, U, LDU,
@@ -21,24 +25,57 @@ double orbital_rotated_energy(size_t norb, size_t ninact,
     V_trans, LDVT);
 
   // Compute Fock Matrix
-  generalized_fock_matrix_comp_mat2(norb, ninact, nact,
+  generalized_fock_matrix_comp_mat2(_norb, _ninact, _nact,
     T_trans, LDTT, V_trans, LDVT, A1RDM, LDD1, A2RDM,
     LDD2, F, LDF);
+
+}
+
+
+double orbital_rotated_energy(NumOrbital norb, NumInactive ninact, 
+  NumActive nact, const double* T, size_t LDT,
+  const double* V, size_t LDV, const double* A1RDM,
+  size_t LDD1, const double* A2RDM, size_t LDD2, 
+  const double* U, size_t LDU, double* T_trans, size_t LDTT, 
+  double* V_trans, size_t LDVT, double* F, size_t LDF) {
+
+  orbital_rotated_generalized_fock(norb, ninact, nact, T, LDT,
+    V, LDV, A1RDM, LDD1, A2RDM, LDD2, U, LDU, T_trans, LDTT,
+    V_trans, LDVT, F, LDF);
 
   // Compute energy
   return energy_from_generalized_fock(ninact, nact,
     T_trans, LDTT, A1RDM, LDD1, F, LDF);
+}
+
+double orbital_rotated_energy(NumOrbital _norb, NumInactive ninact, 
+  NumActive nact, const double* T, size_t LDT,
+  const double* V, size_t LDV, const double* A1RDM,
+  size_t LDD1, const double* A2RDM, size_t LDD2, 
+  const double* U, size_t LDU) {
+
+  const auto norb = _norb.get();
+  size_t norb2 = norb  * norb;
+  size_t norb4 = norb2 * norb2;
+  std::vector<double> T_trans(norb2), V_trans(norb4),
+    F(norb2);
+
+  return orbital_rotated_energy(_norb, ninact, nact, T, LDT,
+    V, LDV, A1RDM, LDD1, A2RDM, LDD2, U, LDU, T_trans.data(), 
+    norb, V_trans.data(), norb, F.data(), norb);
 
 }
 
-void numerical_orbital_gradient(size_t norb, 
-  size_t ninact, size_t nact, const double* T, size_t LDT,
+void numerical_orbital_gradient(NumOrbital _norb, 
+  NumInactive ninact, NumActive nact, const double* T, size_t LDT,
   const double* V, size_t LDV, const double* A1RDM,
   size_t LDD1, const double* A2RDM, size_t LDD2,
   double* OG, size_t LDOG ) { 
 
   using mat_t = Eigen::MatrixXd;
   using map_t = Eigen::Map<mat_t>;
+
+  const auto norb = _norb.get();
 
   const size_t norb2 = norb  * norb;
   const size_t norb4 = norb2 * norb2;
@@ -50,7 +87,7 @@ void numerical_orbital_gradient(size_t norb,
   map_t OG_map(OG, LDOG, norb);
 
   auto energy = [&]() {
-    return orbital_rotated_energy(norb, ninact, nact, 
+    return orbital_rotated_energy(_norb, ninact, nact, 
       T, LDT, V, LDV, A1RDM, LDD1, A2RDM, LDD2, U.data(), norb,
       T_trans.data(), norb, V_trans.data(), norb, F.data(),
       norb);

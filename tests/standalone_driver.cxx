@@ -91,26 +91,33 @@ int main(int argc, char** argv) {
   std::vector<double> T_active(n_active * n_active);
   std::vector<double> V_active(n_active * n_active * n_active * n_active);
 
+  using asci::NumOrbital;
+  using asci::NumInactive;
+  using asci::NumActive;
+  using asci::NumVirtual;
 
   // Extract active two body interaction
-  asci::active_subtensor_2body(n_active, n_inactive,
-    V.data(), norb, V_active.data(), n_active);
+  asci::active_subtensor_2body(NumActive(n_active), 
+    NumInactive(n_inactive), V.data(), norb, 
+    V_active.data(), n_active);
 
   // Compute inactive Fock
   std::vector<double> F_inactive(norb2);
-  asci::inactive_fock_matrix( norb, n_inactive, T.data(),
-    norb, V.data(), norb, F_inactive.data(), norb );
+  asci::inactive_fock_matrix( NumOrbital(norb), 
+    NumInactive(n_inactive), T.data(), norb, 
+    V.data(), norb, F_inactive.data(), norb );
 
 
 
 
   // Replace T_active with F_inactive
-  asci::active_submatrix_1body(n_active, n_inactive,
-    F_inactive.data(), norb, T_active.data(), n_active);
+  asci::active_submatrix_1body(NumActive(n_active), 
+    NumInactive(n_inactive), F_inactive.data(), norb, 
+    T_active.data(), n_active);
 
   // Compute Inactive energy
-  auto E_inactive = asci::inactive_energy(n_inactive, T.data(),
-    norb, F_inactive.data(), norb);
+  auto E_inactive = asci::inactive_energy(NumInactive(n_inactive), 
+    T.data(), norb, F_inactive.data(), norb);
   std::cout << std::scientific << std::setprecision(12);
   std::cout << "E(inactive) = " << E_inactive << std::endl;
   
@@ -159,22 +166,23 @@ int main(int argc, char** argv) {
     active_ordm.data(), n_active, active_trdm.data(), 
     n_active, F.data(), norb);
 #else
-  asci::generalized_fock_matrix_comp_mat2(norb, n_inactive, 
-    n_active, T.data(), norb, V.data(), norb, 
-    active_ordm.data(), n_active, active_trdm.data(), 
-    n_active, F.data(), norb);
+  asci::generalized_fock_matrix_comp_mat2(NumOrbital(norb), 
+    NumInactive(n_inactive), NumActive(n_active), T.data(), 
+    norb, V.data(), norb, active_ordm.data(), n_active, 
+    active_trdm.data(), n_active, F.data(), norb);
 #endif
 
   // Compute Energy from Generalied Fock Matrix
   auto E_FOCK = asci::energy_from_generalized_fock(
-    n_inactive, n_active, T.data(), norb, active_ordm.data(),
-    n_active, F.data(), norb);
+    NumInactive(n_inactive), NumActive(n_active), T.data(), 
+    norb, active_ordm.data(), n_active, F.data(), norb);
   std::cout << "E(FOCK) = " << E_FOCK + E_core << std::endl;
 
 
   // Numerical Orbital gradient
   std::vector<double> OGrad(norb*norb);
-  asci::numerical_orbital_gradient(norb, n_inactive, n_active,
+  asci::numerical_orbital_gradient(NumOrbital(norb), 
+    NumInactive(n_inactive), NumActive(n_active),
     T.data(), norb, V.data(), norb, active_ordm.data(), 
     n_active, active_trdm.data(), n_active, OGrad.data(),
     norb);
