@@ -10,4 +10,9 @@ double read_fcidump_core( std::string fname );
 void read_fcidump_1body( std::string fname, double* T, size_t LDT );
 void read_fcidump_2body( std::string fname, double* V, size_t LDV );
 
+void read_rdms_binary(std::string fname, size_t norb, double* ORDM, size_t LDD1,
+  double* TRDM, size_t LDD2);
+void write_rdms_binary(std::string fname, size_t norb, const double* ORDM, 
+  size_t LDD1, const double* TRDM, size_t LDD2); 
+
 }

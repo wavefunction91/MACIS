@@ -12,6 +12,11 @@ void active_subtensor_2body(NumActive nact, NumInactive ninact,
   const double* A_full, size_t LDAF, double* A_sub,
   size_t LDAS);
 
+void active_hamiltonian(NumOrbital norb, NumActive nact, NumInactive ninact,
+  const double* T_full, size_t LDTF, const double* V_full, size_t LDVF,
+  double* Fi, size_t LDFi, double* T_active, size_t LDTA, double* V_active,
+  size_t LDVA);
+
 double inactive_energy( NumInactive ninact, const double* T,
   size_t LDT, const double* Fi, size_t LDF );
 

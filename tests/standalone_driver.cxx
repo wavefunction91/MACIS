@@ -15,7 +15,43 @@
 #include <Eigen/Core>
 #include <unsupported/Eigen/MatrixFunctions>
 
+template <typename T>
+T vec_sum(const std::vector<T>& x) {
+  return std::accumulate(x.begin(), x.end(), T(0));
+}
+
+template <size_t nbits>
+auto compute_casci_rdms(asci::NumOrbital norb, size_t nalpha, size_t nbeta,
+  double* T, double* V, double* ORDM, double* TRDM, MPI_Comm comm) {
+
+  int rank; MPI_Comm_rank(comm, &rank);
+
+  // Hamiltonian Matrix Element Generator
+  asci::DoubleLoopHamiltonianGenerator<nbits> ham_gen( norb.get(), V, T );
+
+  // Compute HF Energy
+  const auto hf  = asci::canonical_hf_determinant<nbits>(nalpha, nbeta);
+  double     EHF = ham_gen.matrix_element(hf, hf);
+  
+  // Compute Lowest Energy Eigenvalue (ED)
+  std::vector<double> C;
+  auto dets = asci::generate_hilbert_space<nbits>(norb.get(), nalpha, nbeta);
+  double E0 = asci::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
+    1e-16, 20, 1e-8, C, comm);
+
+  // Compute RDMs
+  ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
+    C.data(), ORDM, TRDM);
+
+  return std::make_pair(EHF, E0);
+}
+
+
+
+
 int main(int argc, char** argv) {
+
+  std::cout << std::scientific << std::setprecision(12);
 
   constexpr size_t nwfn_bits = 64;
 
@@ -72,10 +108,17 @@ int main(int argc, char** argv) {
 
   size_t n_virtual = norb - n_active - n_inactive;
 
+  std::string rdm_fname;
+  if(input.containsData("CI.RDMFILE")) {
+    rdm_fname = input.getData<std::string>("CI.RDMFILE");
+  }
+
   if( !world_rank ) {
     std::cout << "Wavefunction Data:" << std::endl
-              << "  * FCIDUMP = " << fcidump_fname << std::endl
-              << "  * N_ALPHA = " << nalpha        << std::endl
+              << "  * FCIDUMP = " << fcidump_fname << std::endl;
+    if(rdm_fname.size())
+    std::cout << "  * RDMFILE = " << rdm_fname     << std::endl;
+    std::cout << "  * N_ALPHA = " << nalpha        << std::endl
               << "  * N_BETA  = " << nbeta         << std::endl
               << std::endl
               << "Active Space: " << std::endl
@@ -83,7 +126,13 @@ int main(int argc, char** argv) {
               << "  * N_INACTIVE = " << n_inactive << std::endl
               << "  * N_ACTIVE   = " << n_active   << std::endl
               << "  * N_VIRTUAL  = " << n_virtual  << std::endl
-              << std::endl;
+              << std::endl << std::endl;
+
+    std::cout << "READ " << T.size() << " 1-body integrals and " << V.size() << " 2-body integrals " << std::endl;
+    std::cout << "ECORE = " << E_core << std::endl;
+    std::cout << "TSUM = " << vec_sum(T) << std::endl;
+    std::cout << "VSUM = " << vec_sum(V) << std::endl;
+     
   }
 
 
@@ -96,33 +145,52 @@ int main(int argc, char** argv) {
   using asci::NumActive;
   using asci::NumVirtual;
 
-  // Extract active two body interaction
+  std::vector<double> F_inactive(norb2);
+#if 0
+  // Extract active two body interaction from V
   asci::active_subtensor_2body(NumActive(n_active), 
     NumInactive(n_inactive), V.data(), norb, 
     V_active.data(), n_active);
 
-  // Compute inactive Fock
-  std::vector<double> F_inactive(norb2);
+  // Compute inactive Fock in full MO space
   asci::inactive_fock_matrix( NumOrbital(norb), 
     NumInactive(n_inactive), T.data(), norb, 
     V.data(), norb, F_inactive.data(), norb );
 
-
-
-
-  // Replace T_active with F_inactive
+  // Replace T_active with active-active block of F_inactive
   asci::active_submatrix_1body(NumActive(n_active), 
     NumInactive(n_inactive), F_inactive.data(), norb, 
     T_active.data(), n_active);
+#else
+  // Compute active-space Hamiltonian and inactive Fock matrix
+  asci::active_hamiltonian(NumOrbital(norb), NumActive(n_active),
+    NumInactive(n_inactive), T.data(), norb, V.data(), norb,
+    F_inactive.data(), norb, T_active.data(), n_active,
+    V_active.data(), n_active);
+#endif
+
+
+  if(world_rank == 0) {
+    std::cout << "FINACTIVE_SUM = " << vec_sum(F_inactive) << std::endl;
+    std::cout << "VACTIVE_SUM   = " << vec_sum(V_active)   << std::endl;
+    std::cout << "TACTIVE_SUM   = " << vec_sum(T_active)   << std::endl; 
+  }
 
   // Compute Inactive energy
   auto E_inactive = asci::inactive_energy(NumInactive(n_inactive), 
     T.data(), norb, F_inactive.data(), norb);
-  std::cout << std::scientific << std::setprecision(12);
-  std::cout << "E(inactive) = " << E_inactive << std::endl;
+
+  if(world_rank == 0) {
+    std::cout << std::endl;
+    std::cout << "E(inactive) = " << E_inactive << std::endl;
+  }
   
 
+  // Storate for active RDMs
+  std::vector<double> active_ordm(n_active * n_active);
+  std::vector<double> active_trdm( active_ordm.size() * active_ordm.size() );
   
+#if 0
   // Hamiltonian Matrix Element Generator
   asci::DoubleLoopHamiltonianGenerator<nwfn_bits>
     ham_gen( n_active, V_active.data(), T_active.data() );
@@ -148,10 +216,33 @@ int main(int argc, char** argv) {
   }
 
   // Compute RDMs
-  std::vector<double> active_ordm(n_active * n_active);
-  std::vector<double> active_trdm( active_ordm.size() * active_ordm.size() );
   ham_gen.form_rdms( dets.begin(), dets.end(), dets.begin(), dets.end(),
     X_local.data(), active_ordm.data(), active_trdm.data() );
+#else
+  double EHF, E0;
+  
+  if(rdm_fname.size()) {
+    std::vector<double> full_ordm(norb2), full_trdm(norb4);
+    asci::read_rdms_binary(rdm_fname, norb, full_ordm.data(), norb,
+      full_trdm.data(), norb );
+    asci::active_submatrix_1body(NumActive(n_active), NumInactive(n_inactive),
+      full_ordm.data(), norb, active_ordm.data(), n_active);
+    asci::active_subtensor_2body(NumActive(n_active), NumInactive(n_inactive),
+      full_trdm.data(), norb, active_trdm.data(), n_active);
+  } else {
+    std::tie(EHF, E0) = 
+      compute_casci_rdms<nwfn_bits>(NumOrbital(n_active), nalpha, nbeta, 
+        T_active.data(), V_active.data(), active_ordm.data(), active_trdm.data(),
+        MPI_COMM_WORLD);
+  }
+  if(world_rank == 0) {
+    std::cout << "ORDMSUM = " << vec_sum(active_ordm) << std::endl;
+    std::cout << "TRDMSUM = " << vec_sum(active_trdm) << std::endl;
+    std::cout << std::endl;
+    std::cout << "E(HF)   = " << EHF + E_inactive + E_core << " Eh" << std::endl;
+    std::cout << "E(CI)   = " << E0  + E_inactive + E_core << " Eh" << std::endl;
+  }
+#endif
 
   // Compute CI energy from RDMs
   double ERDM = blas::dot( active_ordm.size(), active_ordm.data(), 1, T_active.data(), 1 );

@@ -12,7 +12,10 @@ std::vector<std::string> split(const std::string str, const std::string regex_st
     std::regex regexz(regex_str);
     std::vector<std::string> list(std::sregex_token_iterator(str.begin(), str.end(), regexz, -1),
                                   std::sregex_token_iterator());
-    return list;
+    std::vector<std::string> clean_list;
+    std::copy_if( list.begin(), list.end(), std::back_inserter(clean_list),
+      [](auto& s){ return s.size() > 0; } );
+    return clean_list;
 }
 
 bool is_float( const std::string& str ) {
@@ -155,5 +158,96 @@ void read_fcidump_2body( std::string fname, double* V, size_t LDV ) {
   }
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+void read_rdms_binary(std::string fname, size_t norb, double* ORDM, size_t LDD1,
+  double* TRDM, size_t LDD2) {
+
+  // Zero out rdms in case of sparse data
+  for(size_t i = 0; i < norb; ++i)
+  for(size_t j = 0; j < norb; ++j) {
+    ORDM[i + j*LDD1] = 0;
+  }
+
+  for(size_t i = 0; i < norb; ++i)
+  for(size_t j = 0; j < norb; ++j) 
+  for(size_t k = 0; k < norb; ++k) 
+  for(size_t l = 0; l < norb; ++l) {
+    TRDM[i + j*LDD2 + k*LDD2*LDD2 + l*LDD2*LDD2*LDD2] = 0;
+  }
+
+  std::ifstream in_file(fname, std::ios::binary);
+  if(!in_file) throw std::runtime_error( fname + " not available" );
+
+  int _norb_read;
+  in_file.read((char*)&_norb_read, sizeof(int));
+  if( _norb_read != (int)norb ) 
+    throw std::runtime_error("NORB in RDM file doesn't match " + std::to_string(norb) + " " + std::to_string(_norb_read));
+
+  std::vector<double> raw(norb*norb*norb*norb);
+
+  // Read 1RDM
+  in_file.read( (char*)raw.data(), norb*norb * sizeof(double) );
+  for(size_t i = 0; i < norb; ++i)
+  for(size_t j = 0; j < norb; ++j) {
+    ORDM[i + j*LDD1] = raw[i + j*norb];
+  }
+
+  // Read 2RDM
+  in_file.read( (char*)raw.data(), norb*norb*norb*norb * sizeof(double) );
+  for(size_t i = 0; i < norb; ++i)
+  for(size_t j = 0; j < norb; ++j) 
+  for(size_t k = 0; k < norb; ++k) 
+  for(size_t l = 0; l < norb; ++l) {
+    TRDM[i + j*LDD2 + k*LDD2*LDD2 + l*LDD2*LDD2*LDD2] = 
+      raw[i + j*norb + k*norb*norb + l*norb*norb*norb]; 
+  }
+
+}
+
+
+
+void write_rdms_binary(std::string fname, size_t norb, const double* ORDM, 
+  size_t LDD1, const double* TRDM, size_t LDD2) {
+
+  std::ofstream out_file(fname, std::ios::binary);
+  if(!out_file) throw std::runtime_error( fname + " not available" );
+
+  int _norb_write = norb;
+  out_file.write((char*)&_norb_write, sizeof(int));
+
+
+  std::vector<double> raw(norb*norb*norb*norb);
+
+  // Pack and Write 1RDM
+  for(size_t i = 0; i < norb; ++i)
+  for(size_t j = 0; j < norb; ++j) {
+    raw[i + j*norb] = ORDM[i + j*LDD1];
+  }
+  out_file.write( (char*)raw.data(), norb*norb * sizeof(double) );
+
+  // Pack and Write 2RDM
+  for(size_t i = 0; i < norb; ++i)
+  for(size_t j = 0; j < norb; ++j) 
+  for(size_t k = 0; k < norb; ++k) 
+  for(size_t l = 0; l < norb; ++l) {
+    raw[i + j*norb + k*norb*norb + l*norb*norb*norb] = 
+      TRDM[i + j*LDD2 + k*LDD2*LDD2 + l*LDD2*LDD2*LDD2];
+  }
+  out_file.write( (char*)raw.data(), norb*norb*norb*norb * sizeof(double) );
+
+}
+
 
 }

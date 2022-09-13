@@ -48,6 +48,22 @@ void active_subtensor_2body(NumActive _nact, NumInactive _ninact,
 
 }
 
+void active_hamiltonian(NumOrbital norb, NumActive nact, NumInactive ninact,
+  const double* T_full, size_t LDTF, const double* V_full, size_t LDVF,
+  double* Fi, size_t LDFi, double* T_active, size_t LDTA, double* V_active,
+  size_t LDVA) {
+
+  // Extact all-active subblock of V
+  active_subtensor_2body(nact, ninact, V_full, LDVF, V_active, LDVA);
+
+  // Compute inactive Fock in full MO space
+  inactive_fock_matrix(norb, ninact, T_full, LDTF, V_full, LDVF, Fi, LDFi);
+
+  // Set T_active as the active-active block of inactive Fock
+  active_submatrix_1body(nact, ninact, Fi, LDFi, T_active, LDTA);
+  
+}
+
 double inactive_energy( NumInactive _ninact, const double* T,
   size_t LDT, const double* Fi, size_t LDF ) {
 
