@@ -310,8 +310,6 @@ void optimize_orbitals(NumOrbital norb, NumInactive ninact, NumActive nact,
   Eigen::VectorXd K0(nv*(na+ni) + na*ni);
   K0.fill(0.);
 
-  std::cout << "Initial Grad Norm = " << op.grad(K0).norm() << std::endl;
-
   // Optimize Orbitals
   K0 = bfgs::bfgs(op, K0, H0);
 

@@ -3,6 +3,10 @@
 #include "bfgs_hessian.hpp"
 #include "line_search.hpp"
 
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/stopwatch.h>
+
 namespace bfgs {
 
 template <typename Functor>
@@ -14,11 +18,17 @@ detail::arg_type_t<Functor> bfgs(
 
   using arg_type  = detail::arg_type_t<Functor>;
   using ret_type  = detail::ret_type_t<Functor>;
+  auto logger = spdlog::stdout_color_mt("bfgs");
+  auto ls_logger = spdlog::stdout_color_mt("line_search");
 
   // Initialize BFGS
   arg_type x   = x0;
   ret_type fx  = op.eval(x);
   arg_type gfx = op.grad(x);
+
+  logger->info("Starting BFGS Iterations");
+  logger->info("|X0| = {:15.12e}, F(X0) = {:15.12f}, |gF(X0)| = {:15.12e}",
+    Functor::norm(x), fx, Functor::norm(gfx));
 
   // Initial Hessian
   arg_type p = gfx; Functor::scal(-1.0, p);
@@ -58,8 +68,12 @@ detail::arg_type_t<Functor> bfgs(
     x   = x_new;
     gfx = gfx_new;
     step = 1.0;
-    std::cout << iter << ", " <<  fx <<  ", " << fx-f_sav << ", " 
-              << Functor::norm(gfx)  << std::endl;
+    //std::cout << iter << ", " <<  fx <<  ", " << fx-f_sav << ", " 
+    //          << Functor::norm(gfx)  << std::endl;
+
+    logger->info(
+      "iter {:4}, F(X) = {:15.12f}, dF = {:20.12e}, |gF(X)| = {:20.12e}",
+      iter, fx, fx - f_sav, Functor::norm(gfx));
 
     // Check for convergence
     if( Functor::norm(gfx) < 5e-6 /** Functor::norm(x)*/ ) {
@@ -72,6 +86,7 @@ detail::arg_type_t<Functor> bfgs(
     p = B.apply(gfx); Functor::scal(-1.0, p);
 
   }
+  if(converged) logger->info("BFGS Converged!");
 
   if(!converged) throw std::runtime_error("BFGS Did Not Converge");
   return x;

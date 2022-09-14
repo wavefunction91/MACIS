@@ -1,6 +1,7 @@
 #pragma once
 #include "bfgs_traits.hpp"
 #include <iostream>
+#include <spdlog/spdlog.h>
 
 namespace bfgs {
 
@@ -29,18 +30,27 @@ void backtracking_line_search(
 #if 1
 
     constexpr auto c   = 0.5;
-    constexpr auto tau = 0.5;
+    constexpr auto tau = 1./1.618033988749894;
 
     const auto test_t = -dg0 * c;  
 
     //std::cout << "IN LINE SEARCH" << std::endl;
     //std::cout << "F(X0) = " << fx0 << " t = " << test_t << std::endl;
+    auto logger = spdlog::get("line_search");
+    logger->debug("");
+    logger->debug("Starting Backtracking Line Search");
+    logger->debug("c = {:.4f}, tau = {:.4f}, F(X0) = {:15.12f}, t = {:15.12e}", 
+      c,tau,fx, test_t);
+    
+    const std::string fmt_str =
+      "iter = {:4}, F(X) = {:15.12f}, dF = {:20.12e}, S = {:10.6e}";
     
     // Initialization
     step = 1.0;
     x = x0; Functor::axpy(step, p, x);
     fx = op.eval(x);
     //std::cout << "  " << 0 << " F = " << fx  << " s = " << step << std::endl;
+    logger->debug(fmt_str, 0, fx, fx - fx0, step);
 
     size_t max_iter = 100;
     for(size_t iter = 0; iter < max_iter; ++iter) {
@@ -48,10 +58,13 @@ void backtracking_line_search(
       step *= tau;
       x = x0; Functor::axpy(step, p, x);
       fx = op.eval(x);
+      logger->debug(fmt_str, iter+1, fx, (fx-fx0), step);
       //std::cout << "  " << iter+1 << " F = " << fx  << " s = " << step << std::endl;
     }
 
     gfx = op.grad(x);
+    logger->debug("Line Search Converged with S = {:10.6e}",step);
+    logger->debug("");
 
 #else
     constexpr auto c1 = 1e-4;

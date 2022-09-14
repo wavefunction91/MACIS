@@ -16,6 +16,10 @@
 #include <Eigen/Core>
 #include <unsupported/Eigen/MatrixFunctions>
 
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/stopwatch.h>
+
 template <typename T>
 T vec_sum(const std::vector<T>& x) {
   return std::accumulate(x.begin(), x.end(), T(0));
@@ -53,6 +57,7 @@ auto compute_casci_rdms(asci::NumOrbital norb, size_t nalpha, size_t nbeta,
 int main(int argc, char** argv) {
 
   std::cout << std::scientific << std::setprecision(12);
+  spdlog::set_level(spdlog::level::debug);
 
   constexpr size_t nwfn_bits = 64;
 
@@ -62,6 +67,8 @@ int main(int argc, char** argv) {
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
   MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
   {
+  // Create Logger
+  auto console = spdlog::stdout_color_mt("standalone driver");
 
   // Read Input Options
   std::vector< std::string > opts( argc );
@@ -115,25 +122,22 @@ int main(int argc, char** argv) {
   }
 
   if( !world_rank ) {
-    std::cout << "Wavefunction Data:" << std::endl
-              << "  * FCIDUMP = " << fcidump_fname << std::endl;
-    if(rdm_fname.size())
-    std::cout << "  * RDMFILE = " << rdm_fname     << std::endl;
-    std::cout << "  * N_ALPHA = " << nalpha        << std::endl
-              << "  * N_BETA  = " << nbeta         << std::endl
-              << std::endl
-              << "Active Space: " << std::endl
-              << "  * N_ORB      = " << norb       << std::endl
-              << "  * N_INACTIVE = " << n_inactive << std::endl
-              << "  * N_ACTIVE   = " << n_active   << std::endl
-              << "  * N_VIRTUAL  = " << n_virtual  << std::endl
-              << std::endl << std::endl;
+    console->info("[Wavefunction Data]:");
+    console->info("  * FCIDUMP = {}", fcidump_fname );
+    if( rdm_fname.size() ) console->info("  * RDMFILE = {}", rdm_fname );
+    console->info("  * N_ALPHA = {}", nalpha);
+    console->info("  * N_BETA  = {}", nbeta);
+    console->info("[Active Space]:");
+    console->info("  * N_ORB      = {}", norb);
+    console->info("  * N_INACTIVE = {}", n_inactive);
+    console->info("  * N_ACTIVE   = {}", n_active);
+    console->info("  * N_VIRTUAL  = {}", n_virtual);
 
-    std::cout << "READ " << T.size() << " 1-body integrals and " << V.size() << " 2-body integrals " << std::endl;
-    std::cout << "ECORE = " << E_core << std::endl;
-    std::cout << "TSUM = " << vec_sum(T) << std::endl;
-    std::cout << "VSUM = " << vec_sum(V) << std::endl;
-     
+    console->debug("READ {} 1-body integrals and {} 2-body integrals", 
+      T.size(), V.size());
+    console->debug("ECORE = {:.12f}", E_core); 
+    console->debug("TSUM  = {:.12f}", vec_sum(T));
+    console->debug("VSUM  = {:.12f}", vec_sum(V));
   }
 
 
@@ -172,9 +176,9 @@ int main(int argc, char** argv) {
 
 
   if(world_rank == 0) {
-    std::cout << "FINACTIVE_SUM = " << vec_sum(F_inactive) << std::endl;
-    std::cout << "VACTIVE_SUM   = " << vec_sum(V_active)   << std::endl;
-    std::cout << "TACTIVE_SUM   = " << vec_sum(T_active)   << std::endl; 
+    console->debug("FINACTIVE_SUM = {:.12f}", vec_sum(F_inactive));
+    console->debug("VACTIVE_SUM   = {:.12f}", vec_sum(V_active)  );
+    console->debug("TACTIVE_SUM   = {:.12f}", vec_sum(T_active)  ); 
   }
 
   // Compute Inactive energy
@@ -182,8 +186,7 @@ int main(int argc, char** argv) {
     T.data(), norb, F_inactive.data(), norb);
 
   if(world_rank == 0) {
-    std::cout << std::endl;
-    std::cout << "E(inactive) = " << E_inactive << std::endl;
+    console->info("E(inactive) = {:.12f}", E_inactive);
   }
   
 
@@ -208,17 +211,16 @@ int main(int argc, char** argv) {
         MPI_COMM_WORLD);
   }
   if(world_rank == 0) {
-    std::cout << "ORDMSUM = " << vec_sum(active_ordm) << std::endl;
-    std::cout << "TRDMSUM = " << vec_sum(active_trdm) << std::endl;
-    std::cout << std::endl;
-    std::cout << "E(HF)   = " << EHF + E_inactive + E_core << " Eh" << std::endl;
-    std::cout << "E(CI)   = " << E0  + E_inactive + E_core << " Eh" << std::endl;
+    console->debug("ORDMSUM = {:.12f}", vec_sum(active_ordm));
+    console->debug("TRDMSUM = {:.12f}", vec_sum(active_trdm));
+    console->info("E(HF)   = {:.12f} Eh", EHF + E_inactive + E_core);
+    console->info("E(CI)   = {:.12f} Eh", E0  + E_inactive + E_core);
   }
 
   // Compute CI energy from RDMs
   double ERDM = blas::dot( active_ordm.size(), active_ordm.data(), 1, T_active.data(), 1 );
   ERDM += blas::dot( active_trdm.size(), active_trdm.data(), 1, V_active.data(), 1 );
-  std::cout << "E(RDM)  = " << ERDM + E_inactive + E_core << std::endl;
+  console->info("E(RDM)  = {:.12f} Eh", ERDM + E_inactive + E_core);
 
   // Compute Generalized Fock matrix
   std::vector<double> F(norb2);
@@ -240,7 +242,7 @@ int main(int argc, char** argv) {
   auto E_FOCK = asci::energy_from_generalized_fock(
     NumInactive(n_inactive), NumActive(n_active), T.data(), 
     norb, active_ordm.data(), n_active, F.data(), norb);
-  std::cout << "E(FOCK) = " << E_FOCK + E_core << std::endl;
+  console->info("E(FOCK) = {:.12f} Eh", E_FOCK + E_core);
 
 #if 0
 
