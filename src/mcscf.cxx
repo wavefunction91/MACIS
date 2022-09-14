@@ -54,11 +54,10 @@ void linear_orb_rot_to_matrix(NumInactive _ni, NumActive _na,
 
 void linear_orb_rot_to_matrix(NumInactive ni, NumActive na,
   NumVirtual nv, const double* K_lin, double* K, size_t LDK ) {
-  //const auto K_vi = K_lin;
-  //const auto K_va = K_vi + nv.get() * ni.get();
-  //const auto K_ai = K_va + nv.get() * na.get();
+
   auto [K_vi, K_va, K_ai] = split_linear_orb_rot(ni,na,nv,K_lin);
   linear_orb_rot_to_matrix(ni, na, nv, K_vi, K_va, K_ai, K, LDK);
+
 }
 
 
@@ -103,15 +102,14 @@ void fock_to_linear_orb_grad(NumInactive _ni, NumActive _na,
 
 void fock_to_linear_orb_grad(NumInactive ni, NumActive na,
   NumVirtual nv, const double* F, size_t LDF, double* G_lin ) {
-  //auto G_vi = G_lin;
-  //auto G_va = G_vi + nv.get() * ni.get();
-  //auto G_ai = G_va + nv.get() * na.get();
+
   auto [G_vi, G_va, G_ai] = split_linear_orb_rot(ni,na,nv,G_lin);
   fock_to_linear_orb_grad(ni, na, nv, F, LDF, G_vi, G_va, G_ai);
+
 }
 
 
-void diag_hessian(NumInactive _ni, NumActive _na, NumVirtual _nv,
+void approx_diag_hessian(NumInactive _ni, NumActive _na, NumVirtual _nv,
   const double* Fi, size_t LDFi, const double* Fa, size_t LDFa,
   const double* A1RDM, size_t LDD, const double* F, size_t LDF, 
   double* H_vi, double* H_va, double* H_ai) {
@@ -163,13 +161,13 @@ void diag_hessian(NumInactive _ni, NumActive _na, NumVirtual _nv,
 
 }
 
-void diag_hessian(NumInactive ni, NumActive na, NumVirtual nv,
+void approx_diag_hessian(NumInactive ni, NumActive na, NumVirtual nv,
   const double* Fi, size_t LDFi, const double* Fa, size_t LDFa,
   const double* A1RDM, size_t LDD, const double* F, size_t LDF, 
   double* H_lin) {
 
   auto [H_vi, H_va, H_ai] = split_linear_orb_rot(ni, na, nv, H_lin);
-  diag_hessian(ni, na, nv, Fi, LDFi, Fa, LDFa, A1RDM, LDD, F, LDF,
+  approx_diag_hessian(ni, na, nv, Fi, LDFi, Fa, LDFa, A1RDM, LDD, F, LDF,
     H_vi, H_va, H_ai);
 
 }
@@ -299,11 +297,8 @@ void optimize_orbitals(NumOrbital norb, NumInactive ninact, NumActive nact,
   aux_q_matrix(nact, norb, ninact, V, LDV, A2RDM, LDD2, Q.data(), na);
   generalized_fock_matrix(norb, ninact, nact, FI.data(), no, FA.data(), no,
     A1RDM, LDD1, Q.data(), na, F.data(), no);
-  diag_hessian(ninact, nact, nvirt, FI.data(), no, FA.data(), no,
+  approx_diag_hessian(ninact, nact, nvirt, FI.data(), no, FA.data(), no,
     A1RDM, LDD1, F.data(), no, DH.data());
-
-  std::cout << "DIAGONAL HESSIAN" << std::endl;
-  for( auto x : DH ) std::cout << x << std::endl;
 
   // Create BFGS Functor
   bfgs_mcscf_functor op(norb, ninact, nact, nvirt, E_core, T, V, A1RDM, A2RDM);
