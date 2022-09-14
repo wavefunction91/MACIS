@@ -21,10 +21,10 @@ detail::arg_type_t<Functor> bfgs(
   arg_type gfx = op.grad(x);
 
   // Initial Hessian
-  arg_type p = B.apply(gfx); Functor::scal(-1.0, p);
+  arg_type p = gfx; Functor::scal(-1.0, p);
   ret_type step = 1.; // Initialize step for gradient descent
 
-  size_t max_iter = 3;
+  size_t max_iter = 100;
   bool converged = false;
   for(size_t iter = 0; iter < max_iter; ++iter) {
 
@@ -49,7 +49,7 @@ detail::arg_type_t<Functor> bfgs(
 
       throw std::runtime_error("die die die");
     }
-    std::cout << "  STEP = " << step << std::endl;
+    //std::cout << "STEP = " << step << std::endl;
     
     // Compute update steps
     arg_type s = Functor::subtract(x_new, x);
@@ -64,18 +64,18 @@ detail::arg_type_t<Functor> bfgs(
               << Functor::norm(gfx)  << std::endl;
 
     // Check for convergence
-    if( Functor::norm(gfx) < 1e-6 /** Functor::norm(x)*/ ) {
+    if( Functor::norm(gfx) < 5e-6 /** Functor::norm(x)*/ ) {
         converged = true;
         break;
     }
 
     // Update and apply Hessian
-    std::cout << "X NORM = " << Functor::norm(x_new) << std::endl;
-    std::cout << "S NORM = " << Functor::norm(s) << std::endl;
-    std::cout << "Y NORM = " << Functor::norm(y) << std::endl;
+    //std::cout << "X NORM = " << Functor::norm(x_new) << std::endl;
+    //std::cout << "S NORM = " << Functor::norm(s) << std::endl;
+    //std::cout << "Y NORM = " << Functor::norm(y) << std::endl;
     B.update(s,y);
     p = B.apply(gfx); Functor::scal(-1.0, p);
-    std::cout << "  P NORM = " << Functor::norm(p) << std::endl;
+    //std::cout << "P NORM = " << Functor::norm(p) << std::endl;
 
   }
 
@@ -89,7 +89,7 @@ detail::arg_type_t<Functor> bfgs(
   Functor& op,
   const detail::arg_type_t<Functor>& x0
 ) {
-  auto B = make_updated_scaled_hessian<Functor>();
+  auto B = make_identity_hessian<Functor>();
   return bfgs(op, x0, *B);
 }
 

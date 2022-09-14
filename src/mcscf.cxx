@@ -5,6 +5,15 @@
 
 namespace asci {
 
+template <typename T>
+auto split_linear_orb_rot( NumInactive ni, NumActive na, NumVirtual nv, 
+  T&& V_lin ) {
+  auto V_vi = V_lin;
+  auto V_va = V_vi + nv.get() * ni.get();
+  auto V_ai = V_va + nv.get() * na.get();
+  return std::make_tuple(V_vi, V_va, V_ai);
+}
+
 void linear_orb_rot_to_matrix(NumInactive _ni, NumActive _na,
   NumVirtual _nv, const double* K_vi, const double* K_va, 
   const double* K_ai, double* K, size_t LDK ) {
@@ -45,9 +54,10 @@ void linear_orb_rot_to_matrix(NumInactive _ni, NumActive _na,
 
 void linear_orb_rot_to_matrix(NumInactive ni, NumActive na,
   NumVirtual nv, const double* K_lin, double* K, size_t LDK ) {
-  const auto K_vi = K_lin;
-  const auto K_va = K_vi + nv.get() * ni.get();
-  const auto K_ai = K_va + nv.get() * na.get();
+  //const auto K_vi = K_lin;
+  //const auto K_va = K_vi + nv.get() * ni.get();
+  //const auto K_ai = K_va + nv.get() * na.get();
+  auto [K_vi, K_va, K_ai] = split_linear_orb_rot(ni,na,nv,K_lin);
   linear_orb_rot_to_matrix(ni, na, nv, K_vi, K_va, K_ai, K, LDK);
 }
 
@@ -93,10 +103,75 @@ void fock_to_linear_orb_grad(NumInactive _ni, NumActive _na,
 
 void fock_to_linear_orb_grad(NumInactive ni, NumActive na,
   NumVirtual nv, const double* F, size_t LDF, double* G_lin ) {
-  auto G_vi = G_lin;
-  auto G_va = G_vi + nv.get() * ni.get();
-  auto G_ai = G_va + nv.get() * na.get();
+  //auto G_vi = G_lin;
+  //auto G_va = G_vi + nv.get() * ni.get();
+  //auto G_ai = G_va + nv.get() * na.get();
+  auto [G_vi, G_va, G_ai] = split_linear_orb_rot(ni,na,nv,G_lin);
   fock_to_linear_orb_grad(ni, na, nv, F, LDF, G_vi, G_va, G_ai);
+}
+
+
+void diag_hessian(NumInactive _ni, NumActive _na, NumVirtual _nv,
+  const double* Fi, size_t LDFi, const double* Fa, size_t LDFa,
+  const double* A1RDM, size_t LDD, const double* F, size_t LDF, 
+  double* H_vi, double* H_va, double* H_ai) {
+
+  const auto ni = _ni.get();
+  const auto na = _na.get();
+  const auto nv = _nv.get();
+
+  #define TWO_IDX(A,i,j,LDA) A[i + j*LDA]
+  #define FI(i,j) TWO_IDX(Fi,i,j,LDFi)
+  #define FA(i,j) TWO_IDX(Fa,i,j,LDFa)
+  #define FF(i,j) TWO_IDX(F,i,j,LDF)
+  #define ORDM(i,j) TWO_IDX(A1RDM,i,j,LDD)
+
+  // Virtual - Inactive Block
+  for(size_t i = 0; i < ni; ++i)
+  for(size_t a = 0; a < nv; ++a) {
+    const auto a_off = a + ni + na;
+    H_vi[a + i*nv] = 4. * (
+      FI(a_off,a_off) + FA(a_off,a_off) -
+      FI(i,i)         - FA(i,i)
+    );
+  }
+
+  // Virtual - Active Block
+  for(size_t i = 0; i < na; ++i)
+  for(size_t a = 0; a < nv; ++a) {
+    const auto i_off = i + ni;
+    const auto a_off = a + ni + na;
+    H_va[a + i*nv] = 2. * ORDM(i,i) *(FI(a_off,a_off) + FA(a_off,a_off)) - 
+                     2. * FF(i_off,i_off);
+  }
+
+  // Active - Inactive Block
+  for(size_t i = 0; i < ni; ++i)
+  for(size_t a = 0; a < na; ++a) {
+    const auto a_off = a + ni;
+    H_ai[a + i*na] = 2. * ORDM(a,a) * (FI(i,i) + FA(i,i)) +
+                     4. * (FI(a_off,a_off) + FA(a_off,a_off) -
+                           FI(i,i)         - FA(i,i) ) -
+                     2. * FF(a_off, a_off);
+  }
+  
+  #undef TWO_IDX
+  #undef FI
+  #undef FA
+  #undef FF
+  #undef ORDM
+
+}
+
+void diag_hessian(NumInactive ni, NumActive na, NumVirtual nv,
+  const double* Fi, size_t LDFi, const double* Fa, size_t LDFa,
+  const double* A1RDM, size_t LDD, const double* F, size_t LDF, 
+  double* H_lin) {
+
+  auto [H_vi, H_va, H_ai] = split_linear_orb_rot(ni, na, nv, H_lin);
+  diag_hessian(ni, na, nv, Fi, LDFi, Fa, LDFa, A1RDM, LDD, F, LDF,
+    H_vi, H_va, H_ai);
+
 }
 
 
@@ -215,18 +290,35 @@ void optimize_orbitals(NumOrbital norb, NumInactive ninact, NumActive nact,
   const double* V, size_t LDV, const double* A1RDM, size_t LDD1, 
   const double* A2RDM, size_t LDD2, double *K, size_t LDK) {
 
+  size_t no = norb.get(), ni = ninact.get(), na = nact.get(), nv = nvirt.get();
+  // Compute Diagonal Hessian Approximation
+  std::vector<double> DH(nv*(na+ni) + na*ni);
+  std::vector<double> FA(no*no), FI(no*no), F(no*no), Q(na*no);
+  inactive_fock_matrix(norb, ninact, T, LDT, V, LDV, FI.data(), no);
+  active_fock_matrix(norb, ninact, nact, V, LDV, A1RDM, LDD1, FA.data(), no);
+  aux_q_matrix(nact, norb, ninact, V, LDV, A2RDM, LDD2, Q.data(), na);
+  generalized_fock_matrix(norb, ninact, nact, FI.data(), no, FA.data(), no,
+    A1RDM, LDD1, Q.data(), na, F.data(), no);
+  diag_hessian(ninact, nact, nvirt, FI.data(), no, FA.data(), no,
+    A1RDM, LDD1, F.data(), no, DH.data());
+
+  std::cout << "DIAGONAL HESSIAN" << std::endl;
+  for( auto x : DH ) std::cout << x << std::endl;
+
   // Create BFGS Functor
   bfgs_mcscf_functor op(norb, ninact, nact, nvirt, E_core, T, V, A1RDM, A2RDM);
 
+  // Initial diagonal hessian
+  bfgs::DiagInitializedBFGSHessian<bfgs_mcscf_functor> H0(DH.size(), DH.data());
+
   // Initial guess of K = 0
-  size_t ni = ninact.get(), na = nact.get(), nv = nvirt.get();
   Eigen::VectorXd K0(nv*(na+ni) + na*ni);
   K0.fill(0.);
 
   std::cout << "Initial Grad Norm = " << op.grad(K0).norm() << std::endl;
 
   // Optimize Orbitals
-  K0 = bfgs::bfgs(op, K0);
+  K0 = bfgs::bfgs(op, K0, H0);
 
   // Expand into full matrix
   linear_orb_rot_to_matrix(ninact, nact, nvirt, K0.data(), K, LDK);

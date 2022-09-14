@@ -32,11 +32,15 @@ void backtracking_line_search(
     constexpr auto tau = 0.5;
 
     const auto test_t = -dg0 * c;  
+
+    //std::cout << "IN LINE SEARCH" << std::endl;
+    //std::cout << "F(X0) = " << fx0 << " t = " << test_t << std::endl;
     
     // Initialization
     step = 1.0;
     x = x0; Functor::axpy(step, p, x);
     fx = op.eval(x);
+    //std::cout << "  " << 0 << " F = " << fx  << " s = " << step << std::endl;
 
     size_t max_iter = 100;
     for(size_t iter = 0; iter < max_iter; ++iter) {
@@ -44,6 +48,7 @@ void backtracking_line_search(
       step *= tau;
       x = x0; Functor::axpy(step, p, x);
       fx = op.eval(x);
+      //std::cout << "  " << iter+1 << " F = " << fx  << " s = " << step << std::endl;
     }
 
     gfx = op.grad(x);
