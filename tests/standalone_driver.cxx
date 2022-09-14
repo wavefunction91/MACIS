@@ -123,6 +123,10 @@ int main(int argc, char** argv) {
   if(input.containsData("CI.RDMFILE")) {
     rdm_fname = input.getData<std::string>("CI.RDMFILE");
   }
+  std::string fci_out_fname;
+  if(input.containsData("CI.FCIDUMP_OUT")) {
+    fci_out_fname = input.getData<std::string>("CI.FCIDUMP_OUT");
+  }
 
   if( !world_rank ) {
     console->info("[Wavefunction Data]:");
@@ -213,12 +217,40 @@ int main(int argc, char** argv) {
       compute_casci_rdms<nwfn_bits>(NumOrbital(n_active), nalpha, nbeta, 
         T_active.data(), V_active.data(), active_ordm.data(), active_trdm.data(),
         MPI_COMM_WORLD);
+    console->info("E(HF)   = {:.12f} Eh", EHF + E_inactive + E_core);
+    console->info("E(CI)   = {:.12f} Eh", E0  + E_inactive + E_core);
   }
+
+#if 0
+  std::vector<double> a1rdm(active_ordm.size()), a2rdm(active_trdm.size());
+  compute_casci_rdms<nwfn_bits>(NumOrbital(n_active), nalpha, nbeta, 
+    T_active.data(), V_active.data(), a1rdm.data(), a2rdm.data(),
+    MPI_COMM_WORLD);
+
+  std::vector<double> a1rdm_diff(a1rdm.size());
+  for( auto i = 0, v = 0; v < n_active; ++v) 
+  for( auto w = 0;        w < n_active; ++w, ++i) {
+    a1rdm_diff[i] = a1rdm[i] - active_ordm[i];
+    console->info("A1RDM ({:3},{:3}) {:15.5e} {:15.5e} {:15.5e}",w,v,a1rdm[i],active_ordm[i],a1rdm_diff[i]);
+  }
+
+  std::vector<double> a2rdm_diff(a2rdm.size());
+  for( auto i = 0, v = 0; v < n_active; ++v) 
+  for( auto w = 0;        w < n_active; ++w) 
+  for( auto x = 0;        x < n_active; ++x) 
+  for( auto y = 0;        y < n_active; ++y, ++i) {
+    a2rdm_diff[i] = a2rdm[i] - active_trdm[i];
+    console->info("A2RDM ({:3},{:3},{:3},{:3}) {:15.5e} {:15.5e} {:15.5e}",y,x,w,v,a2rdm[i],active_trdm[i],a2rdm_diff[i]);
+  }
+#endif
+
+
+  
+
+#if 1
   if(world_rank == 0) {
     console->debug("ORDMSUM = {:.12f}", vec_sum(active_ordm));
     console->debug("TRDMSUM = {:.12f}", vec_sum(active_trdm));
-    console->info("E(HF)   = {:.12f} Eh", EHF + E_inactive + E_core);
-    console->info("E(CI)   = {:.12f} Eh", E0  + E_inactive + E_core);
   }
 
   // Compute CI energy from RDMs
@@ -339,8 +371,12 @@ int main(int argc, char** argv) {
     NumVirtual(n_virtual), E_core, T.data(), norb, V.data(), norb, 
     active_ordm.data(), n_active, active_trdm.data(), n_active,
     MPI_COMM_WORLD);
+
+  if(fci_out_fname.size())
+  asci::write_fcidump(fci_out_fname,norb, T.data(), norb, V.data(), norb, E_core);
 #endif
 
+#endif
 #endif
   
   } // MPI Scope

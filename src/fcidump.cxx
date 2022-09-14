@@ -6,6 +6,8 @@
 #include <regex>
 #include <iostream>
 #include <iomanip>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
 
 std::vector<std::string> split(const std::string str, const std::string regex_str) {
@@ -160,6 +162,32 @@ void read_fcidump_2body( std::string fname, double* V, size_t LDV ) {
 }
 
 
+void write_fcidump( std::string fname, size_t norb, const double *T, size_t LDT, 
+  const double* V, size_t LDV, double E_core) {
+
+  auto logger = spdlog::basic_logger_mt("fcidump", fname); 
+  logger->set_pattern("%v");
+  const std::string fmt_string = "{:8} {:8} {:8} {:8} {:25.16e}";
+
+  // Write two body
+  for(size_t i = 0; i < norb; ++i)
+  for(size_t j = 0; j < norb; ++j)
+  for(size_t k = 0; k < norb; ++k)
+  for(size_t l = 0; l < norb; ++l) {
+    logger->info(fmt_string, i+1,j+1,k+1,l+1, 
+      V[i + j*LDV + k*LDV*LDV + l*LDV*LDV*LDV]);
+  }
+
+  // Write one body
+  for(size_t i = 0; i < norb; ++i)
+  for(size_t j = 0; j < norb; ++j) {
+    logger->info(fmt_string, i+1,j+1,0,0, T[i + j*LDT]);
+  }
+
+  // Write core
+  logger->info(fmt_string, 0,0,0,0, E_core);
+
+}
 
 
 

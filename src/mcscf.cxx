@@ -419,6 +419,8 @@ void casscf_bfgs_impl(NumElectron nalpha, NumElectron nbeta, NumOrbital norb,
   const std::string fmt_string = "iter = {:4} E(CI) = {:.10f}, dE = {:18.10e}, |orb_grad| = {:18.10e}";
 
   // Compute Gradient
+  bool converged = false;
+  double grad_tol = 5e-6;
   {
   std::vector<double> F(no2), OG(orb_rot_sz);
   generalized_fock_matrix_comp_mat1( norb, ninact, nact, 
@@ -430,16 +432,15 @@ void casscf_bfgs_impl(NumElectron nalpha, NumElectron nbeta, NumOrbital norb,
   double grad_nrm = std::accumulate(OG.begin(),OG.end(),0.0,
     [](auto a, auto b){ return a + b*b; });
   grad_nrm = std::sqrt(grad_nrm);
+  converged = grad_nrm < grad_tol;
 
   logger->info(fmt_string, 0, E0, 0.0, grad_nrm);
   }
 
   // MCSCF Loop
   size_t max_iter = 100;
-  double grad_tol = 5e-6;
-  bool converged = false;
   for(size_t iter = 0; iter < max_iter; ++iter) {
-
+     if(converged) break;
      // Save old E0
      const double E0_old = E0;
 
@@ -481,14 +482,10 @@ void casscf_bfgs_impl(NumElectron nalpha, NumElectron nbeta, NumOrbital norb,
      grad_nrm = std::sqrt(grad_nrm);
      logger->info(fmt_string, iter+1, E0, E0 - E0_old, grad_nrm);
 
-     if(grad_nrm < grad_tol) {
-       converged = true;
-       break;
-     }
-
-
-     
+     converged = grad_nrm < grad_tol;
   }
+
+  if(converged) logger->info("CASSCF Converged");
 }
 
 
