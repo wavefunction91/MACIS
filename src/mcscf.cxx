@@ -172,6 +172,39 @@ void approx_diag_hessian(NumInactive ni, NumActive na, NumVirtual nv,
 
 }
 
+template <typename... Args>
+void approx_diag_hessian(NumOrbital norb, NumInactive ninact, NumActive nact,
+  NumVirtual nvirt, const double* T, size_t LDT, const double* V, size_t LDV,
+  const double* A1RDM, size_t LDD1, const double* A2RDM, size_t LDD2,
+  Args&&... args) {
+
+  const size_t no = norb.get();
+  const size_t ni = ninact.get();
+  const size_t na = nact.get();
+  const size_t nv = nvirt.get();
+
+  // Compute inactive Fock
+  std::vector<double> Fi(no*no);
+  inactive_fock_matrix(norb, ninact, T, LDT, V, LDV, Fi.data(), no);
+
+  // Compute active fock
+  std::vector<double> Fa(no*no);
+  active_fock_matrix(norb, ninact, nact, V, LDV, A1RDM, LDD1, Fa.data(), no);
+
+  // Compute Q matrix
+  std::vector<double> Q(na*no);
+  aux_q_matrix(nact, norb, ninact, V, LDV, A2RDM, LDD2, Q.data(), na);
+
+  // Compute generalized Fock
+  std::vector<double> F(no*no);
+  generalized_fock_matrix(norb, ninact, nact, Fi.data(), no, Fa.data(), no,
+    A1RDM, LDD1, Q.data(), na, F.data(), no);
+
+  // Compute approximate diagonal hessian
+  approx_diag_hessian(ninact, nact, nvirt, Fi.data(), no, Fa.data(), no,
+    A1RDM, LDD1, F.data(), no, std::forward<Args>(args)... );
+}
+
 
 
 
@@ -291,6 +324,7 @@ void optimize_orbitals(NumOrbital norb, NumInactive ninact, NumActive nact,
   size_t no = norb.get(), ni = ninact.get(), na = nact.get(), nv = nvirt.get();
   // Compute Diagonal Hessian Approximation
   std::vector<double> DH(nv*(na+ni) + na*ni);
+#if 0
   std::vector<double> FA(no*no), FI(no*no), F(no*no), Q(na*no);
   inactive_fock_matrix(norb, ninact, T, LDT, V, LDV, FI.data(), no);
   active_fock_matrix(norb, ninact, nact, V, LDV, A1RDM, LDD1, FA.data(), no);
@@ -299,6 +333,10 @@ void optimize_orbitals(NumOrbital norb, NumInactive ninact, NumActive nact,
     A1RDM, LDD1, Q.data(), na, F.data(), no);
   approx_diag_hessian(ninact, nact, nvirt, FI.data(), no, FA.data(), no,
     A1RDM, LDD1, F.data(), no, DH.data());
+#else
+  approx_diag_hessian(norb, ninact, nact, nvirt, T, LDT, V, LDV, A1RDM, LDD1,
+    A2RDM, LDD2, DH.data() );
+#endif
 
   // Create BFGS Functor
   bfgs_mcscf_functor op(norb, ninact, nact, nvirt, E_core, T, V, A1RDM, A2RDM);
