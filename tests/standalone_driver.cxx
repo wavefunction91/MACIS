@@ -5,6 +5,7 @@
 #include <asci/util/selected_ci_diag.hpp>
 #include <asci/util/fock_matrices.hpp>
 #include <asci/util/transform.hpp>
+#include <asci/util/mcscf.hpp>
 #include <asci/util/orbital_gradient.hpp>
 
 #include <iostream>
@@ -219,7 +220,6 @@ int main(int argc, char** argv) {
   ERDM += blas::dot( active_trdm.size(), active_trdm.data(), 1, V_active.data(), 1 );
   std::cout << "E(RDM)  = " << ERDM + E_inactive + E_core << std::endl;
 
-
   // Compute Generalized Fock matrix
   std::vector<double> F(norb2);
 #if 0
@@ -241,6 +241,8 @@ int main(int argc, char** argv) {
     NumInactive(n_inactive), NumActive(n_active), T.data(), 
     norb, active_ordm.data(), n_active, F.data(), norb);
   std::cout << "E(FOCK) = " << E_FOCK + E_core << std::endl;
+
+#if 0
 
   // Numerical Orbital gradient
   std::vector<double> OGrad(norb*norb);
@@ -281,6 +283,50 @@ int main(int argc, char** argv) {
     auto numer = OGrad[ai];
     std::cout << "  " << i << " " << a << ": " << exact << ", " << std::abs(exact - numer) << std::endl; 
   }
+
+
+  // check orbital rotated energy
+  size_t i = 0, a = 3;
+  double dk = 0.001;
+  double max_k = 0.5;
+  size_t nk = max_k/dk;
+  std::vector<double> K(norb2), U(norb2);
+
+  // Compute K
+  std::fill(K.begin(), K.end(), 0);
+  //K[a + i*norb] =  1.0;
+  //K[i + a*norb] = -1.0;
+  asci::fock_to_gradient(NumOrbital(norb),NumInactive(n_inactive),
+    NumActive(n_active), NumVirtual(n_virtual), F.data(), norb,
+    K.data(), norb);
+  for( auto& x : K ) x = -x;
+  
+
+  for(size_t ik = 0; ik < nk; ++ik) {
+
+    // Compute U = EXP[-alpha * K]
+    asci::compute_orbital_rotation(NumOrbital(norb), ik*dk, K.data(), norb,
+      U.data(), norb);
+
+    // Compute Rotated Energy
+    auto E = asci::orbital_rotated_energy(NumOrbital(norb), NumInactive(n_inactive),
+      NumActive(n_active), T.data(), norb, V.data(), norb, active_ordm.data(),
+      n_active, active_trdm.data(), n_active, U.data(), norb);
+
+    std::cout << ik*dk << ", " << E << ", " << E - E_FOCK << std::endl;
+    
+  }
+
+#else
+
+  // Optimize Orbitals
+  std::vector<double> K(norb2);
+  asci::optimize_orbitals(NumOrbital(norb), NumInactive(n_inactive),
+    NumActive(n_active), NumVirtual(n_virtual), E_core, T.data(), norb,
+    V.data(), norb, active_ordm.data(), n_active, active_trdm.data(),
+    n_active, K.data(), norb);
+
+#endif
   
   } // MPI Scope
 

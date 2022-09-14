@@ -22,6 +22,44 @@ void compute_orbital_rotation(NumOrbital _norb, double alpha, const double* K,
 
 }
 
+void fock_to_gradient(NumOrbital _norb, NumInactive _ninact, NumActive _nact,
+  NumVirtual _nvirt, const double* F, size_t LDF, double* OG, size_t LDOG) {
+
+  const auto norb   = _norb.get();
+  const auto nact   = _nact.get();
+  const auto ninact = _ninact.get();
+  const auto nvirt  = _nvirt.get();
+
+  #define FMAT(i,j) F[i + j*LDF]
+  #define GMAT(i,j) OG[i + j*LDOG]
+
+  // Virtual - Inactive Block
+  for(size_t i = 0; i < ninact; ++i)
+  for(size_t a = 0; a < nvirt;  ++a) {
+    const size_t a_off = a + ninact + nact;
+    GMAT(a_off, i) = 2*(FMAT(a_off, i) - FMAT(i, a_off));
+    GMAT(i, a_off) = -GMAT(a_off, i);
+  }
+
+  // Virtual - Active Block
+  for(size_t x = 0; x < nact;  ++x)
+  for(size_t a = 0; a < nvirt; ++a) {
+    const size_t x_off = x + ninact;
+    const size_t a_off = a + ninact + nact;
+    GMAT(a_off, x_off) = 2*(FMAT(a_off, x_off) - FMAT(x_off, a_off));
+    GMAT(x_off, a_off) = -GMAT(a_off, x_off);
+  }
+
+  // Active - Inactive Block
+  for(size_t i = 0; i < ninact; ++i)
+  for(size_t x = 0; x < nact;   ++x) {
+    const size_t x_off = x + ninact;
+    GMAT(x_off, i) = 2*(FMAT(x_off, i) - FMAT(i, x_off));
+    GMAT(i, x_off) = -GMAT(x_off, i);
+  }
+
+}
+
 
 void orbital_rotated_generalized_fock(NumOrbital _norb, NumInactive _ninact, 
   NumActive _nact, const double* T, size_t LDT,
