@@ -47,9 +47,8 @@ detail::arg_type_t<Functor> bfgs(
       //  std::cout << ik * dk << ", " << fk << ", " << fk - f_sav << std::endl;
       //}
 
-      throw std::runtime_error("die die die");
+      throw std::runtime_error("Line Search Failed!");
     }
-    //std::cout << "STEP = " << step << std::endl;
     
     // Compute update steps
     arg_type s = Functor::subtract(x_new, x);
@@ -59,7 +58,6 @@ detail::arg_type_t<Functor> bfgs(
     x   = x_new;
     gfx = gfx_new;
     step = 1.0;
-    //std::cout << std::setprecision(15) << std::scientific;
     std::cout << iter << ", " <<  fx <<  ", " << fx-f_sav << ", " 
               << Functor::norm(gfx)  << std::endl;
 
@@ -70,12 +68,8 @@ detail::arg_type_t<Functor> bfgs(
     }
 
     // Update and apply Hessian
-    //std::cout << "X NORM = " << Functor::norm(x_new) << std::endl;
-    //std::cout << "S NORM = " << Functor::norm(s) << std::endl;
-    //std::cout << "Y NORM = " << Functor::norm(y) << std::endl;
     B.update(s,y);
     p = B.apply(gfx); Functor::scal(-1.0, p);
-    //std::cout << "P NORM = " << Functor::norm(p) << std::endl;
 
   }
 
