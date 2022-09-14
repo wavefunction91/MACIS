@@ -11,41 +11,20 @@ struct BFGSHessian {
 
     std::vector<arg_type> sk, yk;
     std::vector<double> rhok;
-    Eigen::MatrixXd hess_inv;
 
     virtual ~BFGSHessian() noexcept = default;
 
     virtual void update(const arg_type& s, const arg_type& y) {
         const auto ys = Functor::dot(y,s);
         rhok.emplace_back( 1./ys );
-        //std::cout << "NEW YS = " << ysk.back() << std::endl;
 
         sk.emplace_back(s);
         yk.emplace_back(y);
-
-
-#if 0
-        if(!hess_inv.size()) {
-          hess_inv = Eigen::MatrixXd::Identity(s.size(), s.size());
-        }
-
-        Eigen::MatrixXd hiy = hess_inv * y;
-        //std::cout << "HIY NORM = " << hiy.norm() << std::endl;
-
-        Eigen::MatrixXd temp = hess_inv;
-        Eigen::MatrixXd sst  = s * s.transpose();
-        temp += (( ys + Functor::dot(y, hiy) ) / (ys*ys))*sst;
-        Eigen::MatrixXd yst = hiy * s.transpose();
-        temp -= (yst + yst.transpose()) / ys;
-        hess_inv = std::move(temp);
-        //std::cout << "HESS NORM = " << hess_inv.norm() << std::endl;
-#endif
     }
 
     virtual void apply_H0( arg_type& x ) { } // Null call
 
     arg_type apply( const arg_type& x ) {
-      #if 1
         arg_type q = x;
         const int64_t nk = sk.size();
 
@@ -60,11 +39,6 @@ struct BFGSHessian {
             Functor::axpy(alpha[i] - beta, sk[i], q);
         } 
         return q;
-      #else
-        if(hess_inv.size()) {
-          return hess_inv * x;
-        } else return x;
-      #endif
     }
     
 };
@@ -154,26 +128,20 @@ struct DiagInitializedBFGSHessian : public BFGSHessian<Functor> {
     using base_type = BFGSHessian<Functor>;
     using arg_type = typename base_type::arg_type;
     using op_type = std::function<void(arg_type&)>;
-    std::vector<double> diag;
+    std::vector<double> inv_diag;
 
     DiagInitializedBFGSHessian() = delete;
     DiagInitializedBFGSHessian(size_t n, double* D) {
-      diag.resize(n);
-      std::transform(D, D+n, diag.begin(), [](auto x){ return 1./x; });
-
-#if 0
-      this->hess_inv = Eigen::MatrixXd::Zero(n,n);
-      for(size_t i = 0; i < n; ++i) {
-        this->hess_inv(i,i) = 1./D[i];
-      }
-#endif
+      inv_diag.resize(n);
+      std::transform(D, D+n, inv_diag.begin(), [](auto x){ return 1./x; });
     }
 
     void apply_H0( arg_type& x ) override final {  
-      for( size_t i = 0; i < diag.size(); ++i ) {
-        x[i] *= diag[i];
+      for( size_t i = 0; i < inv_diag.size(); ++i ) {
+        x[i] *= inv_diag[i];
       }
     }
+
 };
 
 }
