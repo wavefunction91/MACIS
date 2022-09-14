@@ -18,6 +18,7 @@
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/null_sink.h>
 #include <spdlog/stopwatch.h>
 
 template <typename T>
@@ -57,7 +58,8 @@ auto compute_casci_rdms(asci::NumOrbital norb, size_t nalpha, size_t nbeta,
 int main(int argc, char** argv) {
 
   std::cout << std::scientific << std::setprecision(12);
-  spdlog::set_level(spdlog::level::debug);
+  //spdlog::set_level(spdlog::level::debug);
+  spdlog::set_pattern("[%n] %v");
 
   constexpr size_t nwfn_bits = 64;
 
@@ -69,6 +71,7 @@ int main(int argc, char** argv) {
   {
   // Create Logger
   auto console = spdlog::stdout_color_mt("standalone driver");
+  auto bfgs_logger = spdlog::null_logger_mt("bfgs");
 
   // Read Input Options
   std::vector< std::string > opts( argc );
@@ -145,6 +148,7 @@ int main(int argc, char** argv) {
   std::vector<double> T_active(n_active * n_active);
   std::vector<double> V_active(n_active * n_active * n_active * n_active);
 
+  using asci::NumElectron;
   using asci::NumOrbital;
   using asci::NumInactive;
   using asci::NumActive;
@@ -321,12 +325,21 @@ int main(int argc, char** argv) {
 
 #else
 
+#if 0
   // Optimize Orbitals
   std::vector<double> K(norb2);
   asci::optimize_orbitals(NumOrbital(norb), NumInactive(n_inactive),
     NumActive(n_active), NumVirtual(n_virtual), E_core, T.data(), norb,
     V.data(), norb, active_ordm.data(), n_active, active_trdm.data(),
     n_active, K.data(), norb);
+#else
+  // CASSCF
+  asci::casscf_bfgs( NumElectron(nalpha), NumElectron(nbeta),
+    NumOrbital(norb), NumInactive(n_inactive), NumActive(n_active),
+    NumVirtual(n_virtual), E_core, T.data(), norb, V.data(), norb, 
+    active_ordm.data(), n_active, active_trdm.data(), n_active,
+    MPI_COMM_WORLD);
+#endif
 
 #endif
   

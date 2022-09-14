@@ -18,8 +18,13 @@ detail::arg_type_t<Functor> bfgs(
 
   using arg_type  = detail::arg_type_t<Functor>;
   using ret_type  = detail::ret_type_t<Functor>;
-  auto logger = spdlog::stdout_color_mt("bfgs");
-  auto ls_logger = spdlog::stdout_color_mt("line_search");
+  auto logger = spdlog::get("bfgs");
+  if( !logger )
+    logger = spdlog::stdout_color_mt("bfgs");
+
+  auto ls_logger = spdlog::get("line_search");
+  if(!ls_logger)
+    ls_logger = spdlog::stdout_color_mt("line_search");
 
   // Initialize BFGS
   arg_type x   = x0;
@@ -41,24 +46,8 @@ detail::arg_type_t<Functor> bfgs(
     // Do line search
     arg_type x_new, gfx_new = gfx;
     ret_type f_sav = fx;
-    try {
     backtracking_line_search(op, x, p, step, x_new, fx, gfx_new);
     //nocedal_wright_line_search(op, x, p, step, x_new, fx, gfx_new);
-    } catch(...) {
-      std::cout << "Line Search Failed!" << std::endl;
-
-      //double dk = 0.001;
-      //double max_k = 1.0;
-      //size_t nk = max_k / dk;
-
-      //for( auto ik = 0; ik < nk; ++ik ) {
-      //  arg_type xp = x; Functor::axpy(ik * dk, p, xp);
-      //  auto fk = op.eval(xp);
-      //  std::cout << ik * dk << ", " << fk << ", " << fk - f_sav << std::endl;
-      //}
-
-      throw std::runtime_error("Line Search Failed!");
-    }
     
     // Compute update steps
     arg_type s = Functor::subtract(x_new, x);

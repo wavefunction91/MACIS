@@ -47,6 +47,7 @@ private:
 
 };
 
+using NumElectron = NamedType<size_t, struct nelec_type>;
 using NumOrbital  = NamedType<size_t, struct norb_type>;
 using NumActive   = NamedType<size_t, struct nactive_type>;
 using NumInactive = NamedType<size_t, struct ninactive_type>;

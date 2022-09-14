@@ -12,6 +12,8 @@ class HamiltonianGenerator {
 
 public:
 
+  constexpr static size_t nbits = N;
+
   using full_det_t = std::bitset<N>;
   using spin_det_t = std::bitset<N/2>;
 
