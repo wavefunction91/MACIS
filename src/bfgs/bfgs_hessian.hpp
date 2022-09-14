@@ -10,20 +10,21 @@ struct BFGSHessian {
     using arg_type = detail::arg_type_t<Functor>;
 
     std::vector<arg_type> sk, yk;
-    std::vector<double> ysk;
+    std::vector<double> rhok;
     Eigen::MatrixXd hess_inv;
 
     virtual ~BFGSHessian() noexcept = default;
 
     virtual void update(const arg_type& s, const arg_type& y) {
         const auto ys = Functor::dot(y,s);
-        ysk.emplace_back( ys );
+        rhok.emplace_back( 1./ys );
         //std::cout << "NEW YS = " << ysk.back() << std::endl;
 
         sk.emplace_back(s);
         yk.emplace_back(y);
 
 
+#if 0
         if(!hess_inv.size()) {
           hess_inv = Eigen::MatrixXd::Identity(s.size(), s.size());
         }
@@ -38,23 +39,24 @@ struct BFGSHessian {
         temp -= (yst + yst.transpose()) / ys;
         hess_inv = std::move(temp);
         //std::cout << "HESS NORM = " << hess_inv.norm() << std::endl;
+#endif
     }
 
     virtual void apply_H0( arg_type& x ) { } // Null call
 
     arg_type apply( const arg_type& x ) {
-      #if 0
+      #if 1
         arg_type q = x;
         const int64_t nk = sk.size();
 
         std::vector<double> alpha(nk);
         for( int64_t i = nk-1; i >= 0; i-- ) {
-            alpha[i] = Functor::dot( sk[i], q ) / ysk[i];
+            alpha[i] = Functor::dot( sk[i], q ) * rhok[i];
             Functor::axpy(-alpha[i], yk[i], q);
         }
         apply_H0( q );
         for( int64_t i = 0; i < nk; ++i ) {
-            const auto beta = Functor::dot( yk[i], q ) / ysk[i];
+            const auto beta = Functor::dot( yk[i], q ) * rhok[i];
             Functor::axpy(alpha[i] - beta, sk[i], q);
         } 
         return q;
@@ -84,7 +86,7 @@ struct UpdatedScaledBFGSHessian : public BFGSHessian<Functor> {
     void update(const arg_type& s, const arg_type& y) override final {
         base_type::update(s, y);
         const auto y_nrm = Functor::norm(y);
-        gamma_k = (y_nrm * y_nrm) / this->ysk.back();
+        gamma_k = (y_nrm * y_nrm) * this->rhok.back();
     }
        
     // Scaling H_0 ala doi:10.1007/BF01589116
@@ -114,7 +116,7 @@ struct StaticScaledBFGSHessian : public BFGSHessian<Functor> {
         base_type::update(s, y);
         if( !gamma_0.has_value() ) {
             const auto y_nrm = Functor::norm(y);
-            gamma_0 = (y_nrm * y_nrm) / this->ysk.back();
+            gamma_0 = (y_nrm * y_nrm) * this->rhok.back();
         }
     }
        
@@ -152,17 +154,26 @@ struct DiagInitializedBFGSHessian : public BFGSHessian<Functor> {
     using base_type = BFGSHessian<Functor>;
     using arg_type = typename base_type::arg_type;
     using op_type = std::function<void(arg_type&)>;
+    std::vector<double> diag;
 
     DiagInitializedBFGSHessian() = delete;
     DiagInitializedBFGSHessian(size_t n, double* D) {
+      diag.resize(n);
+      std::transform(D, D+n, diag.begin(), [](auto x){ return 1./x; });
 
+#if 0
       this->hess_inv = Eigen::MatrixXd::Zero(n,n);
       for(size_t i = 0; i < n; ++i) {
         this->hess_inv(i,i) = 1./D[i];
       }
-
+#endif
     }
 
+    void apply_H0( arg_type& x ) override final {  
+      for( size_t i = 0; i < diag.size(); ++i ) {
+        x[i] *= diag[i];
+      }
+    }
 };
 
 }
