@@ -113,7 +113,7 @@ void gram_schmidt( int64_t N, int64_t K, const double* V_old, int64_t LDV,
 
 
 template <typename Functor>
-double davidson( size_t N, int64_t max_m, const Functor& op, 
+double davidson( int64_t N, int64_t max_m, const Functor& op, 
   const double* D, double tol, double* X ) {
 
   if(!X) throw std::runtime_error("Davidson: No Guess Provided");
@@ -122,6 +122,7 @@ double davidson( size_t N, int64_t max_m, const Functor& op,
   if(!logger) {
     logger = spdlog::stdout_color_mt("davidson");
   }
+  max_m = std::min(max_m,N);
 
   logger->info("[Davidson Eigensolver]:");
   logger->info("  {} = {:6}, {} = {:4}, {} = {:10.5e}",

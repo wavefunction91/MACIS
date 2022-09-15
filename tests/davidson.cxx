@@ -111,7 +111,8 @@ TEST_CASE("Parallel Davidson") {
     std::vector<double> AX_local(X_local.size());
     sparsexx::spblas::pgespmv(1., H, X_local.data(), 0., AX_local.data(), 
       spmv_info );
-    double inner = blas::dot(X_local.size(), AX_local.data(), 1, X_local.data(), 1);
+    double inner = blas::dot(X_local.size(), AX_local.data(), 1, 
+      X_local.data(), 1);
     MPI_Allreduce(MPI_IN_PLACE, &inner, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     REQUIRE( inner  == Approx(E0) );
   }

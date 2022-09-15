@@ -4,6 +4,7 @@
 #include <asci/util/transform.hpp>
 #include <asci/util/selected_ci_diag.hpp>
 #include <asci/hamiltonian_generator/double_loop.hpp>
+#include <asci/davidson.hpp>
 #include <Eigen/Core>
 
 namespace asci {
@@ -62,6 +63,53 @@ void linear_orb_rot_to_matrix(NumInactive ni, NumActive na,
   linear_orb_rot_to_matrix(ni, na, nv, K_vi, K_va, K_ai, K, LDK);
 
 }
+
+void matrix_to_linear_orb_rot(NumInactive _ni, NumActive _na,
+  NumVirtual _nv, const double* F, size_t LDF, 
+  double* G_vi, double* G_va, double* G_ai ) {
+
+  const auto ni = _ni.get();
+  const auto na = _na.get();
+  const auto nv = _nv.get();
+
+  #define FOCK(i,j) F[i + j*LDF]
+
+  // Virtual - Inactive Block
+  for(size_t i = 0; i < ni; ++i)
+  for(size_t a = 0; a < nv; ++a) {
+    const auto a_off = a + ni + na;
+    G_vi[a + i*nv] = FOCK(a_off, i); 
+  }
+
+  // Virtual - Active Block
+  for(size_t i = 0; i < na; ++i)
+  for(size_t a = 0; a < nv; ++a) {
+    const auto i_off = i + ni;
+    const auto a_off = a + ni + na;
+    G_va[a + i*nv] = FOCK(a_off, i_off); 
+  }
+
+  // Active - Inactive Block
+  for(size_t i = 0; i < ni; ++i)
+  for(size_t a = 0; a < na; ++a) {
+    const auto a_off = a + ni;
+    G_ai[a + i*na] = FOCK(a_off, i); 
+  }
+
+ #undef FOCK
+
+}
+
+void matrix_to_linear_orb_rot(NumInactive ni, NumActive na,
+  NumVirtual nv, const double* F, size_t LDF, double* G_lin ) {
+
+  auto [G_vi, G_va, G_ai] = split_linear_orb_rot(ni,na,nv,G_lin);
+  matrix_to_linear_orb_rot(ni, na, nv, F, LDF, G_vi, G_va, G_ai);
+
+}
+
+
+
 
 
 
@@ -320,6 +368,94 @@ struct bfgs_mcscf_functor {
 
 };
 
+
+
+void one_index_transformed_hamiltonian(NumOrbital norb,
+  const double* T, size_t LDT, const double* V, size_t LDV,
+  const double* X, size_t LDX, double* Tx, size_t LDTx,
+  double* Vx, size_t LDVx) {
+
+  const size_t no = norb.get();
+
+  for(size_t p = 0; p < no; ++p)
+  for(size_t q = 0; q < no; ++q) {
+    double tmp = 0.0;
+    for(size_t o = 0; o < no; ++o) {
+      tmp += X[p + o*LDX] * T[o + q*LDT] +
+             X[q + o*LDX] * T[p + o*LDX];
+    }
+    Tx[p + q*LDTx] = tmp;
+  }
+
+  for(size_t p = 0; p < no; ++p)
+  for(size_t q = 0; q < no; ++q) 
+  for(size_t r = 0; r < no; ++r) 
+  for(size_t s = 0; s < no; ++s) {
+    double tmp = 0.0;
+    for(size_t o = 0; o < no; ++o) {
+      tmp += X[p + o*LDX] * V[o + q*LDV + r*LDV*LDV + s*LDV*LDV*LDV] +
+             X[q + o*LDX] * V[p + o*LDV + r*LDV*LDV + s*LDV*LDV*LDV] +
+             X[r + o*LDX] * V[p + q*LDV + o*LDV*LDV + s*LDV*LDV*LDV] +
+             X[s + o*LDX] * V[p + q*LDV + r*LDV*LDV + o*LDV*LDV*LDV];
+    }
+    Vx[p + q*LDVx + r*LDVx*LDVx + s*LDVx*LDVx*LDVx] = tmp;
+  }
+
+}
+
+
+void orb_orb_hessian_contract(NumOrbital norb, NumInactive ninact, 
+  NumActive nact, NumVirtual nvirt, const double* T, size_t LDT,
+  const double* V, size_t LDV, const double* A1RDM, size_t LDD1,
+  const double* A2RDM, size_t LDD2, const double* OG,
+  const double* K_lin, double* HK_lin) {
+
+  const size_t no  = norb.get();
+  const size_t na  = nact.get();
+  const size_t no2 = no  * no;
+  const size_t no4 = no2 * no2;
+  const size_t orb_rot_sz = 
+    nvirt.get() * (nact.get() + ninact.get()) + nact.get() * ninact.get();
+
+  // Expand to full antisymmetric K
+  std::vector<double> K_full(no2);
+  linear_orb_rot_to_matrix( ninact, nact, nvirt, K_lin, K_full.data(), no);
+
+  // Compute one-index transformed hamiltonian
+  std::vector<double> Tk(no2), Vk(no4);
+  one_index_transformed_hamiltonian(norb, T, LDT, V, LDV, K_full.data(), no,
+    Tk.data(), no, Vk.data(), no);
+
+  // Compute gradient-like term with transformed Hamiltonian
+  std::vector<double> Fk(no2);
+  generalized_fock_matrix_comp_mat2(norb, ninact, nact, Tk.data(), no,
+    Vk.data(), no, A1RDM, LDD1, A2RDM, LDD2, Fk.data(), no);
+  // Store in HK to initialize the memory 
+  fock_to_linear_orb_grad(ninact, nact, nvirt, Fk.data(), no, HK_lin);
+
+  // Expand OG into full antisymmetric matrix (reuse Tk)
+  std::fill(Tk.begin(), Tk.end(), 0);
+  linear_orb_rot_to_matrix(ninact, nact, nvirt, OG, Tk.data(), no);
+
+  // Compute G*K in Fk
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+    no, no, no, 1., Tk.data(), no, K_full.data(), no, 0., Fk.data(), no);
+
+  // Replace Tk with [G,K]
+  for(size_t p = 0; p < no; ++p)
+  for(size_t q = 0; q < no; ++q) {
+    Tk[p + q*no] = Fk[p + q*no] - Fk[q + p*no];
+  }      
+
+  // Take out orbital rotation piece into a temporary buffer
+  std::vector<double> tmp_hk(orb_rot_sz);
+  matrix_to_linear_orb_rot(ninact, nact, nvirt, Tk.data(), no, tmp_hk.data());
+
+  // Add to final result
+  for(size_t i = 0; i < orb_rot_sz; ++i) HK_lin[i] += tmp_hk[i];
+
+}
+
 }
 
 #include "bfgs/bfgs.hpp"
@@ -521,6 +657,68 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
   }
 
   if(converged) logger->info("CASSCF Converged");
+
+#if 0
+  // Check orbital stability
+  struct OrbHessianOperator {
+    
+    NumOrbital  norb;
+    NumInactive ninact;
+    NumActive   nact;
+    NumVirtual  nvirt;
+    const double *m_T, *m_V, *m_OG, *m_A1RDM, *m_A2RDM;
+
+    void operator_action(size_t m, double alpha, const double* K, size_t LDK,
+      double beta, double* AK, size_t LDAK) const {
+
+      const size_t no = norb.get();
+      const size_t na = nact.get();
+      orb_orb_hessian_contract(norb, ninact, nact, nvirt, m_T, no,
+        m_V, no, m_A1RDM, na, m_A2RDM, na, m_OG, K, AK);
+      
+    }
+
+  };
+
+
+  // Compute the gradient again
+  std::vector<double> F(no2), OG(orb_rot_sz);
+  generalized_fock_matrix_comp_mat1( norb, ninact, nact, 
+    F_inactive.data(), no, V, LDV, A1RDM, LDD1, A2RDM, LDD2, 
+    F.data(), no);
+  fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no,
+    OG.data());
+
+  OrbHessianOperator op{norb, ninact, nact, nvirt, T, V, OG.data(),
+    A1RDM, A2RDM};
+
+  std::vector<double> X(orb_rot_sz, 0);
+  std::vector<double> DH(orb_rot_sz);
+  approx_diag_hessian(norb, ninact, nact, nvirt, T, LDT, V, LDV, A1RDM, LDD1,
+    A2RDM, LDD2, DH.data() );
+  auto D_min = std::min_element(DH.begin(), DH.end());
+  auto min_idx = std::distance( DH.begin(), D_min );
+  std::cout << "DMIN = " << *D_min << std::endl;
+  X[min_idx] = 1.;
+
+    
+
+  auto L = davidson(orb_rot_sz, 100, op, DH.data(), 1e-8, X.data() );
+
+  std::vector<double> iden(orb_rot_sz * orb_rot_sz), H(iden.size());
+  for( auto i = 0; i < orb_rot_sz; ++i) iden[i*(orb_rot_sz+1)] = 1.0;
+  for( auto i = 0; i < orb_rot_sz; ++i) {
+    op.operator_action(1, 1.0, iden.data() + i*orb_rot_sz, orb_rot_sz,
+      0.0, H.data() + i*orb_rot_sz, orb_rot_sz);
+  }
+
+  //std::vector<std::complex<double>> W(orb_rot_sz);
+  //lapack::geev(lapack::Job::NoVec, lapack::Job::NoVec,
+  //  orb_rot_sz, H.data(), orb_rot_sz, W.data(), NULL, 1, NULL, 1);
+  //std::sort(W.begin(),W.end(),[](auto a, auto b){ return std::real(a) < std::real(b);});
+  //for( auto w : W ) std::cout << w << std::endl;
+#endif 
+
 }
 
 
