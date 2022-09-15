@@ -223,16 +223,22 @@ struct bfgs_mcscf_functor {
     NumActive   nact;
     NumVirtual  nvirt;
 
+    const double grad_tol;
     const double E_core;
     const double *T, *V, *A1RDM, *A2RDM;
 
     bfgs_mcscf_functor() = delete;
 
     bfgs_mcscf_functor(NumOrbital no, NumInactive ni, NumActive na,
-      NumVirtual nv, double ec, const double* t, const double* v, const double* d1,
-      const double* d2) :
+      NumVirtual nv, double ec, const double* t, const double* v, 
+      const double* d1, const double* d2, double tol) :
+      grad_tol(tol),
       norb(no), ninact(ni), nact(na), nvirt(nv), E_core(ec),
       T(t), V(v), A1RDM(d1), A2RDM(d2) {}
+
+    bool converged(const argument_type& X, const argument_type& G) {
+      return G.norm() < grad_tol; 
+    }
 
     return_type eval(const argument_type& K) {
 
@@ -320,10 +326,11 @@ struct bfgs_mcscf_functor {
 
 namespace asci {
 
-void optimize_orbitals(NumOrbital norb, NumInactive ninact, NumActive nact,
-  NumVirtual nvirt, double E_core, const double* T, size_t LDT, 
-  const double* V, size_t LDV, const double* A1RDM, size_t LDD1, 
-  const double* A2RDM, size_t LDD2, double *K, size_t LDK) {
+void optimize_orbitals(MCSCFSettings settings, NumOrbital norb, 
+  NumInactive ninact, NumActive nact, NumVirtual nvirt, double E_core, 
+  const double* T, size_t LDT, const double* V, size_t LDV, 
+  const double* A1RDM, size_t LDD1, const double* A2RDM, size_t LDD2, 
+  double *K, size_t LDK) {
 
   size_t no = norb.get(), ni = ninact.get(), na = nact.get(), nv = nvirt.get();
 
@@ -333,7 +340,8 @@ void optimize_orbitals(NumOrbital norb, NumInactive ninact, NumActive nact,
     A2RDM, LDD2, DH.data() );
 
   // Create BFGS Functor
-  bfgs_mcscf_functor op(norb, ninact, nact, nvirt, E_core, T, V, A1RDM, A2RDM);
+  bfgs_mcscf_functor op(norb, ninact, nact, nvirt, E_core, T, V, A1RDM, A2RDM,
+    settings.orb_grad_tol_bfgs);
 
   // Initial diagonal hessian
   bfgs::DiagInitializedBFGSHessian<bfgs_mcscf_functor> H0(DH.size(), DH.data());
@@ -343,7 +351,7 @@ void optimize_orbitals(NumOrbital norb, NumInactive ninact, NumActive nact,
   K0.fill(0.);
 
   // Optimize Orbitals
-  K0 = bfgs::bfgs(op, K0, H0);
+  K0 = bfgs::bfgs(op, K0, H0, bfgs::BFGSSettings{settings.max_bfgs_iter});
 
   // Expand into full matrix
   linear_orb_rot_to_matrix(ninact, nact, nvirt, K0.data(), K, LDK);
@@ -353,8 +361,9 @@ void optimize_orbitals(NumOrbital norb, NumInactive ninact, NumActive nact,
 
 
 template <typename HamGen>
-double compute_casci_rdms(asci::NumOrbital norb, size_t nalpha, size_t nbeta,
-  double* T, double* V, double* ORDM, double* TRDM, MPI_Comm comm) {
+double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb, 
+  size_t nalpha, size_t nbeta, double* T, double* V, double* ORDM, 
+  double* TRDM, MPI_Comm comm) {
 
   constexpr auto nbits = HamGen::nbits;
 
@@ -367,7 +376,8 @@ double compute_casci_rdms(asci::NumOrbital norb, size_t nalpha, size_t nbeta,
   std::vector<double> C;
   auto dets = asci::generate_hilbert_space<nbits>(norb.get(), nalpha, nbeta);
   double E0 = asci::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
-    1e-16, 20, 1e-8, C, comm, true);
+    settings.ci_matel_tol, settings.ci_max_subspace, settings.ci_res_tol, C, 
+    comm, true);
 
   // Compute RDMs
   ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
@@ -378,17 +388,43 @@ double compute_casci_rdms(asci::NumOrbital norb, size_t nalpha, size_t nbeta,
 
 
 template <typename HamGen>
-void casscf_bfgs_impl(NumElectron nalpha, NumElectron nbeta, NumOrbital norb, 
-  NumInactive ninact, NumActive nact, NumVirtual nvirt, double E_core, 
-  double* T, size_t LDT, double* V, size_t LDV, double* A1RDM, size_t LDD1, 
-  double* A2RDM, size_t LDD2, MPI_Comm comm) {
+void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha, 
+  NumElectron nbeta, NumOrbital norb, NumInactive ninact, NumActive nact, 
+  NumVirtual nvirt, double E_core, double* T, size_t LDT, double* V, size_t LDV, 
+  double* A1RDM, size_t LDD1, double* A2RDM, size_t LDD2, MPI_Comm comm) {
 
-  auto logger = spdlog::stdout_color_mt("casscf");
+  auto logger = spdlog::get("casscf");
+  if(!logger) logger = spdlog::stdout_color_mt("casscf");
+
+  logger->info("[MCSCF Settings]:");
+  logger->info(
+    "  {:13} = {:3}, {:13} = {:3}, {:13} = {:3}",
+    "NACTIVE_ALPHA", nalpha.get(),
+    "NACTIVE_BETA" , nbeta.get(),
+    "NORB_TOTAL",    norb.get()
+  );
+  logger->info(
+    "  {:13} = {:3}, {:13} = {:3}, {:13} = {:3}",
+    "NINACTIVE", ninact.get(),
+    "NACTIVE",    nact.get(),
+    "NVIRTUAL",  nvirt.get()
+  );
+  logger->info( "  {:13} = {:.6f}", "E_CORE", E_core);
+  logger->info( 
+    "  {:13} = {:.6e}, {:13} = {:.6e}, {:13} = {:3}",
+    "ORBGRAD_TOL", settings.orb_grad_tol_mcscf,
+    "BFGS_TOL",    settings.orb_grad_tol_bfgs,
+    "BFGS_MAX_ITER", settings.max_bfgs_iter
+   );
+  logger->info("  {:13} = {:.6e}, {:13} = {:.6e}, {:13} = {:3}",
+    "CI_RES_TOL",  settings.ci_res_tol,
+    "CI_MATEL_TOL", settings.ci_matel_tol, 
+    "CI_MAX_SUB",   settings.ci_max_subspace
+  );
 
   const size_t no = norb.get(), ni = ninact.get(), na = nact.get(), 
                nv = nvirt.get();
 
-  
   const size_t no2 = no  * no;
   const size_t no4 = no2 * no2;
   const size_t na2 = na  * na;
@@ -420,7 +456,6 @@ void casscf_bfgs_impl(NumElectron nalpha, NumElectron nbeta, NumOrbital norb,
 
   // Compute Gradient
   bool converged = false;
-  double grad_tol = 5e-6;
   {
   std::vector<double> F(no2), OG(orb_rot_sz);
   generalized_fock_matrix_comp_mat1( norb, ninact, nact, 
@@ -432,22 +467,21 @@ void casscf_bfgs_impl(NumElectron nalpha, NumElectron nbeta, NumOrbital norb,
   double grad_nrm = std::accumulate(OG.begin(),OG.end(),0.0,
     [](auto a, auto b){ return a + b*b; });
   grad_nrm = std::sqrt(grad_nrm);
-  converged = grad_nrm < grad_tol;
+  converged = grad_nrm < settings.orb_grad_tol_mcscf;
 
   logger->info(fmt_string, 0, E0, 0.0, grad_nrm);
   }
 
   // MCSCF Loop
-  size_t max_iter = 100;
-  for(size_t iter = 0; iter < max_iter; ++iter) {
+  for(size_t iter = 0; iter < settings.max_macro_iter; ++iter) {
      if(converged) break;
      // Save old E0
      const double E0_old = E0;
 
      // Optimize Orbitals
      std::vector<double> K_opt(no2);
-     optimize_orbitals(norb, ninact, nact, nvirt, E_core, T, LDT, V, LDV,
-       A1RDM, LDD1, A2RDM, LDD2, K_opt.data(), no);
+     optimize_orbitals(settings, norb, ninact, nact, nvirt, E_core, T, LDT, 
+       V, LDV, A1RDM, LDD1, A2RDM, LDD2, K_opt.data(), no);
 
      // Rotate MO Hamiltonian in place
      std::vector<double> U(no2);
@@ -465,9 +499,9 @@ void casscf_bfgs_impl(NumElectron nalpha, NumElectron nbeta, NumOrbital norb,
      // Compute active RDMs
      for( auto i = 0; i < na2; ++i ) A1RDM[i] = 0.0;
      for( auto i = 0; i < na4; ++i ) A2RDM[i] = 0.0;
-     E0 = compute_casci_rdms<HamGen>(NumOrbital(na), nalpha.get(), nbeta.get(),
-       T_active.data(), V_active.data(), A1RDM, A2RDM, comm);
-     E0 += E_inactive;
+     E0 = compute_casci_rdms<HamGen>(settings, NumOrbital(na), 
+       nalpha.get(), nbeta.get(), T_active.data(), V_active.data(), A1RDM, 
+       A2RDM, comm) + E_inactive;
 
     // Compute Gradient
     std::vector<double> F(no2), OG(orb_rot_sz);
@@ -477,12 +511,13 @@ void casscf_bfgs_impl(NumElectron nalpha, NumElectron nbeta, NumOrbital norb,
     fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no,
       OG.data());
 
+    // Gradient Norm
      double grad_nrm = std::accumulate(OG.begin(),OG.end(),0.0,
        [](auto a, auto b){ return a + b*b; });
      grad_nrm = std::sqrt(grad_nrm);
      logger->info(fmt_string, iter+1, E0, E0 - E0_old, grad_nrm);
 
-     converged = grad_nrm < grad_tol;
+     converged = grad_nrm < settings.orb_grad_tol_mcscf;
   }
 
   if(converged) logger->info("CASSCF Converged");
@@ -490,14 +525,14 @@ void casscf_bfgs_impl(NumElectron nalpha, NumElectron nbeta, NumOrbital norb,
 
 
 
-void casscf_bfgs(NumElectron nalpha, NumElectron nbeta, NumOrbital norb, 
-  NumInactive ninact, NumActive nact, NumVirtual nvirt, double E_core, 
-  double* T, size_t LDT, double* V, size_t LDV, double* A1RDM, size_t LDD1, 
-  double* A2RDM, size_t LDD2, MPI_Comm comm) {
+void casscf_bfgs(MCSCFSettings settings, NumElectron nalpha, NumElectron nbeta, 
+  NumOrbital norb, NumInactive ninact, NumActive nact, NumVirtual nvirt, 
+  double E_core, double* T, size_t LDT, double* V, size_t LDV, 
+  double* A1RDM, size_t LDD1, double* A2RDM, size_t LDD2, MPI_Comm comm) { 
 
   using generator_t = DoubleLoopHamiltonianGenerator<64>;
-  casscf_bfgs_impl<generator_t>(nalpha, nbeta, norb, ninact, nact, nvirt, 
-    E_core, T, LDT, V, LDV, A1RDM, LDD1, A2RDM, LDD2, comm);
+  casscf_bfgs_impl<generator_t>(settings, nalpha, nbeta, norb, ninact, nact, 
+    nvirt, E_core, T, LDT, V, LDV, A1RDM, LDD1, A2RDM, LDD2, comm);
 
 }
 

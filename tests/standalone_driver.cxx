@@ -99,46 +99,56 @@ int main(int argc, char** argv) {
   auto E_core = asci::read_fcidump_core(fcidump_fname);
   asci::read_fcidump_1body(fcidump_fname, T.data(), norb);
   asci::read_fcidump_2body(fcidump_fname, V.data(), norb);
+
+  #define OPT_KEYWORD(STR, RES, DTYPE) \
+  if(input.containsData(STR)) {        \
+    RES = input.getData<DTYPE>(STR);   \
+  }
   
   // Set up active space
   size_t n_inactive = 0;
-  if(input.containsData("CI.NINACTIVE")) {
-    n_inactive = input.getData<size_t>("CI.NINACTIVE");
-  }
+  OPT_KEYWORD("CI.NINACTIVE", n_inactive, size_t);
 
   if( n_inactive >= norb )
     throw std::runtime_error("NINACTIVE >= NORB");
 
   size_t n_active = norb - n_inactive;
-  if(input.containsData("CI.NACTIVE")) {
-    n_active = input.getData<size_t>("CI.NACTIVE");
-  }
+  OPT_KEYWORD("CI.NACTIVE", n_active, size_t);
 
   if( n_inactive + n_active > norb )
     throw std::runtime_error("NINACTIVE + NACTIVE > NORB");
 
   size_t n_virtual = norb - n_active - n_inactive;
 
-  std::string rdm_fname;
-  if(input.containsData("CI.RDMFILE")) {
-    rdm_fname = input.getData<std::string>("CI.RDMFILE");
-  }
-  std::string fci_out_fname;
-  if(input.containsData("CI.FCIDUMP_OUT")) {
-    fci_out_fname = input.getData<std::string>("CI.FCIDUMP_OUT");
-  }
+  // Misc optional files
+  std::string rdm_fname, fci_out_fname;
+  OPT_KEYWORD("CI.RDMFILE",     rdm_fname,     std::string);
+  OPT_KEYWORD("CI.FCIDUMP_OUT", fci_out_fname, std::string);
+  
+
+  // MCSCF Settings
+  asci::MCSCFSettings mcscf_settings;
+  OPT_KEYWORD("MCSCF.MAX_MACRO_ITER", mcscf_settings.max_macro_iter,     size_t);
+  OPT_KEYWORD("MCSCF.MCSCF_ORB_TOL" , mcscf_settings.orb_grad_tol_mcscf, double);
+  OPT_KEYWORD("MCSCF.BFGS_TOL",       mcscf_settings.orb_grad_tol_bfgs,  double);
+  OPT_KEYWORD("MCSCF.BFGS_MAX_ITER",  mcscf_settings.max_bfgs_iter,      size_t);
+  OPT_KEYWORD("MCSCF.CI_RES_TOL",     mcscf_settings.ci_res_tol,         double);
+  OPT_KEYWORD("MCSCF.CI_MAX_SUB",     mcscf_settings.ci_max_subspace,    size_t);
+  OPT_KEYWORD("MCSCF.CI_MATEL_TOL",   mcscf_settings.ci_matel_tol,       double);
 
   if( !world_rank ) {
     console->info("[Wavefunction Data]:");
     console->info("  * FCIDUMP = {}", fcidump_fname );
     if( rdm_fname.size() ) console->info("  * RDMFILE = {}", rdm_fname );
-    console->info("  * N_ALPHA = {}", nalpha);
-    console->info("  * N_BETA  = {}", nbeta);
-    console->info("[Active Space]:");
-    console->info("  * N_ORB      = {}", norb);
-    console->info("  * N_INACTIVE = {}", n_inactive);
-    console->info("  * N_ACTIVE   = {}", n_active);
-    console->info("  * N_VIRTUAL  = {}", n_virtual);
+    if( fci_out_fname.size() ) 
+      console->info("  * FCIDUMP_OUT = {}", fci_out_fname);
+    //console->info("  * N_ALPHA = {}", nalpha);
+    //console->info("  * N_BETA  = {}", nbeta);
+    //console->info("[Active Space]:");
+    //console->info("  * N_ORB      = {}", norb);
+    //console->info("  * N_INACTIVE = {}", n_inactive);
+    //console->info("  * N_ACTIVE   = {}", n_active);
+    //console->info("  * N_VIRTUAL  = {}", n_virtual);
 
     console->debug("READ {} 1-body integrals and {} 2-body integrals", 
       T.size(), V.size());
@@ -366,7 +376,7 @@ int main(int argc, char** argv) {
     n_active, K.data(), norb);
 #else
   // CASSCF
-  asci::casscf_bfgs( NumElectron(nalpha), NumElectron(nbeta),
+  asci::casscf_bfgs( mcscf_settings, NumElectron(nalpha), NumElectron(nbeta),
     NumOrbital(norb), NumInactive(n_inactive), NumActive(n_active),
     NumVirtual(n_virtual), E_core, T.data(), norb, V.data(), norb, 
     active_ordm.data(), n_active, active_trdm.data(), n_active,

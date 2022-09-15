@@ -9,11 +9,16 @@
 
 namespace bfgs {
 
+struct BFGSSettings {
+  size_t max_iter = 100;
+};
+
 template <typename Functor>
 detail::arg_type_t<Functor> bfgs( 
   Functor& op,
   const detail::arg_type_t<Functor>& x0,
-  BFGSHessian<Functor>& B
+  BFGSHessian<Functor>& B,
+  BFGSSettings settings
 ) {
 
   using arg_type  = detail::arg_type_t<Functor>;
@@ -36,12 +41,11 @@ detail::arg_type_t<Functor> bfgs(
     Functor::norm(x), fx, Functor::norm(gfx));
 
   // Initial Hessian
-  arg_type p = gfx; Functor::scal(-1.0, p);
+  arg_type p = B.apply(gfx); Functor::scal(-1.0, p);
   ret_type step = 1.; // Initialize step for gradient descent
 
-  size_t max_iter = 100;
   bool converged = false;
-  for(size_t iter = 0; iter < max_iter; ++iter) {
+  for(size_t iter = 0; iter < settings.max_iter; ++iter) {
 
     // Do line search
     arg_type x_new, gfx_new = gfx;
@@ -65,7 +69,7 @@ detail::arg_type_t<Functor> bfgs(
       iter, fx, fx - f_sav, Functor::norm(gfx));
 
     // Check for convergence
-    if( Functor::norm(gfx) < 5e-6 /** Functor::norm(x)*/ ) {
+    if( op.converged(x, gfx) ) {
         converged = true;
         break;
     }
@@ -85,10 +89,11 @@ detail::arg_type_t<Functor> bfgs(
 template <typename Functor>
 detail::arg_type_t<Functor> bfgs( 
   Functor& op,
-  const detail::arg_type_t<Functor>& x0
+  const detail::arg_type_t<Functor>& x0,
+  BFGSSettings settings
 ) {
   auto B = make_identity_hessian<Functor>();
-  return bfgs(op, x0, *B);
+  return bfgs(op, x0, *B, settings);
 }
 
 }
