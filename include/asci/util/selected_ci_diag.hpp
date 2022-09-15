@@ -49,6 +49,28 @@ void diagonal_guess( size_t N_local, const SpMatType& A, double* X ) {
 
 }
 
+template <typename SpMatType>
+class SparseMatrixOperator {
+
+  using index_type = typename SpMatType::index_type;
+
+  const SpMatType& m_matrix_;
+  sparsexx::spblas::spmv_info<index_type> m_spmv_info_;
+
+public:
+
+  SparseMatrixOperator( const SpMatType& m ) :
+    m_matrix_(m),
+    m_spmv_info_(sparsexx::spblas::generate_spmv_comm_info(m)) {}
+
+  void operator_action( size_t m, double alpha, const double* V, size_t LDV,
+    double beta, double* AV, size_t LDAV) const {
+    sparsexx::spblas::pgespmv( alpha, m_matrix_, V, beta, AV, 
+      m_spmv_info_ );
+  }
+
+};
+
 
 template <size_t N, typename index_t = int32_t>
 double selected_ci_diag( 
@@ -80,14 +102,13 @@ double selected_ci_diag(
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
 
-  MPI_Barrier(comm);
-  auto H_st = clock_type::now();
   // Generate Hamiltonian
+  MPI_Barrier(comm); auto H_st = clock_type::now();
+
   auto H = make_dist_csr_hamiltonian<index_t>( comm, dets_begin, dets_end,
     ham_gen, h_el_tol );
 
-  MPI_Barrier(comm);
-  auto H_en = clock_type::now();
+  MPI_Barrier(comm); auto H_en = clock_type::now();
 
   // Get total NNZ
   size_t local_nnz = H.nnz();
@@ -106,43 +127,20 @@ double selected_ci_diag(
   C_local.resize( H.local_row_extent() );
 
   // Setup guess
+  auto D_local = extract_diagonal_elements( H.diagonal_tile() );
   diagonal_guess(C_local.size(), H, C_local.data());
 
   // Setup Davidson Functor
-  struct SpMatOp {
-    const decltype(H)& matrix;
-    sparsexx::spblas::spmv_info<index_t> spmv_info;
-
-    SpMatOp() = delete;
-    SpMatOp(decltype(matrix) m) : matrix(m), 
-      spmv_info(sparsexx::spblas::generate_spmv_comm_info(m)) {}
-
-    void operator_action( size_t m, double alpha, const double* V, size_t LDV,
-      double beta, double* AV, size_t LDAV) const {
-      sparsexx::spblas::pgespmv( alpha, matrix, V, beta, AV, spmv_info );
-    }
-  };
-  SpMatOp op(H);
-  auto D_local = extract_diagonal_elements( H.diagonal_tile() );
+  SparseMatrixOperator op(H);
 
   // Solve EVP
-  MPI_Barrier(comm);
-  auto dav_st = clock_type::now();
-  #if 1
+  MPI_Barrier(comm); auto dav_st = clock_type::now();
+
   double E = p_davidson( H.local_row_extent(), davidson_max_m, op, 
     D_local.data(), davidson_res_tol, C_local.data(), H.comm() );
-  #else
-  const size_t ndets = std::distance(dets_begin,dets_end);
-  std::vector<double> H_dense(ndets*ndets);
-  sparsexx::convert_to_dense( H.diagonal_tile(), H_dense.data(), ndets );
 
-  std::vector<double> W(ndets);
-  lapack::syevd( lapack::Job::NoVec, lapack::Uplo::Lower, ndets, 
-    H_dense.data(), ndets, W.data() );
-  auto E = W[0];
-  #endif
-  MPI_Barrier(comm);
-  auto dav_en = clock_type::now();
+  MPI_Barrier(comm); auto dav_en = clock_type::now();
+
   if( !quiet )
   {
     std::cout << "    * Davidson                 = " 

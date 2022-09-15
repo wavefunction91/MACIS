@@ -7,6 +7,10 @@
 #include <iomanip>
 #include <iostream>
 
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/null_sink.h>
+
 
 namespace asci {
 
@@ -189,41 +193,47 @@ template <typename Functor>
 double p_davidson( int64_t N_local, int64_t max_m, const Functor& op, 
   const double* D_local, double tol, double* X_local, MPI_Comm comm ) {
 
-  if(N_local and !X_local) throw std::runtime_error("Davidson: No Guess Provided");
+  if(N_local and !X_local) 
+    throw std::runtime_error("Davidson: No Guess Provided");
+
+  auto logger = spdlog::get("davidson");
+  if(!logger) {
+    logger = spdlog::stdout_color_mt("davidson");
+  }
+
 
   int world_rank, world_size;
   MPI_Comm_rank( comm, &world_rank );
   MPI_Comm_size( comm, &world_size );
 
   bool print = false;
-  if( world_rank == 0 and print ) {
-    std::cout << "\nDavidson Eigensolver" << std::endl
-              << "  MAX_M = " << max_m << std::endl
-              << "  RTOL  = " << tol   << std::endl
-              << std::endl
-              << "Iterations:" << std::endl;
-  }
+  logger->info("[Davidson Eigensolver]:");
+  logger->info("  {} = {:6}, {} = {:4}, {} = {:10.5e}",
+    "N_LOCAL", N_local,
+    "MAX_M", max_m,
+    "RES_TOL", tol
+  );
 
   // Allocations
-  std::vector<double> V_local( N_local * (max_m+1) ), AV_local( N_local * (max_m+1) ), 
+  std::vector<double> 
+    V_local( N_local * (max_m+1) ), AV_local( N_local * (max_m+1) ), 
     C( (max_m+1)*(max_m+1) ), LAM(max_m+1);
 
   // Copy over guess
   std::copy_n(X_local, N_local, V_local.begin());
 
   // Compute initial A*V
-  //sparsexx::spblas::pgespmv( 1., A, V_local.data(), 0., AV_local.data(), spmv_info );
-  op.operator_action(1, 1., V_local.data(), N_local, 0., AV_local.data(), N_local);
+  op.operator_action(1, 1., V_local.data(), N_local, 
+    0., AV_local.data(), N_local);
 
   // Copy AV(:,0) -> V(:,1) and orthogonalize wrt V(:,0)
   std::copy_n(AV_local.data(), N_local, V_local.data()+N_local);
-  p_gram_schmidt(N_local, 1, V_local.data(), N_local, V_local.data()+N_local, comm);
+  p_gram_schmidt(N_local, 1, V_local.data(), N_local, 
+    V_local.data()+N_local, comm);
 
   for( int64_t i = 1; i < max_m; ++i ) {
 
     // AV(:,i) = A * V(:,i)
-    //sparsexx::spblas::pgespmv( 1., A, V_local.data()+i*N_local, 
-    //  0., AV_local.data()+i*N_local, spmv_info );
     op.operator_action(1, 1., V_local.data() + i*N_local, N_local, 
       0., AV_local.data() + i*N_local, N_local);
     
@@ -269,10 +279,8 @@ double p_davidson( int64_t N_local, int64_t max_m, const Functor& op,
     auto res_dot = blas::dot( N_local, R_local, 1, R_local, 1 );
     MPI_Allreduce(MPI_IN_PLACE, &res_dot, 1, MPI_DOUBLE, MPI_SUM, comm );
     auto res_nrm = std::sqrt(res_dot);
-    if( print and world_rank == 0 ) {
-      std::cout << std::scientific << std::setprecision(12);
-      std::cout << std::setw(4) << i << ", " << LAM[0] << ", " << res_nrm << std::endl;
-    }
+    logger->info("iter = {:4}, LAM(0) = {:20.12e}, RNORM = {:20.12e}",
+      i, LAM[0], res_nrm);
     if( res_nrm < tol ) return LAM[0];
 
 
