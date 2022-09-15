@@ -13,6 +13,10 @@ TEST_CASE("Davidson") {
 
   ROOT_ONLY(MPI_COMM_WORLD);
 
+  if(!spdlog::get("davidson")) {
+    auto l = spdlog::null_logger_mt("davidson");
+  }
+
   size_t norb = asci::read_fcidump_norb(ref_fcidump);
   size_t nocc = 5;
 
@@ -38,14 +42,12 @@ TEST_CASE("Davidson") {
 
 
   // Obtain lowest eigenvalue
-  SECTION("E Only") {
-    auto E0 = asci::davidson(15, H, 1e-8);
-    REQUIRE( E0 + E_core == Approx(E0_ref) );
-  }
-
   SECTION("With Vectors") {
     std::vector<double> X(H.n());
-    auto E0 = asci::davidson(15, H, 1e-8, X.data());
+    asci::diagonal_guess(H.n(), H, X.data());
+    auto D = sparsexx::extract_diagonal_elements(H);
+    auto E0 = asci::davidson(H.n(), 15, asci::SparseMatrixOperator(H), 
+      D.data(), 1e-8, X.data());
 
     REQUIRE( E0 + E_core == Approx(E0_ref) );
     REQUIRE( blas::nrm2(X.size(), X.data(), 1) == Approx(1.0) );
@@ -61,6 +63,10 @@ TEST_CASE("Davidson") {
 
 
 TEST_CASE("Parallel Davidson") {
+
+  if(!spdlog::get("davidson")) {
+    auto l = spdlog::null_logger_mt("davidson");
+  }
 
   MPI_Barrier(MPI_COMM_WORLD);
   size_t norb = asci::read_fcidump_norb(ref_fcidump);
@@ -89,14 +95,12 @@ TEST_CASE("Parallel Davidson") {
 
 
   // Obtain lowest eigenvalue
-  SECTION("E Only") {
-    auto E0 = asci::p_davidson(15, H, 1e-8);
-    REQUIRE( E0 + E_core == Approx(E0_ref) );
-  }
-
   SECTION("With Vectors") {
     std::vector<double> X_local(H.local_row_extent());
-    auto E0 = asci::p_davidson(15, H, 1e-8, X_local.data());
+    asci::p_diagonal_guess(X_local.size(), H, X_local.data());
+    auto D_local = sparsexx::extract_diagonal_elements(H.diagonal_tile());
+    auto E0 = asci::p_davidson(X_local.size(), 15, asci::SparseMatrixOperator(H), 
+      D_local.data(), 1e-8, X_local.data(), MPI_COMM_WORLD);
 
     REQUIRE( E0 + E_core == Approx(E0_ref) );
     double nrm = blas::dot(X_local.size(), X_local.data(), 1, X_local.data(), 1);

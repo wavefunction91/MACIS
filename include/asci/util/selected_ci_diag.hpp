@@ -8,68 +8,7 @@
 
 namespace asci {
 
-template <typename SpMatType>
-void diagonal_guess( size_t N_local, const SpMatType& A, double* X ) {
 
-  auto comm = A.comm();
-  int world_rank, world_size;
-  MPI_Comm_rank( comm, &world_rank );
-  MPI_Comm_size( comm, &world_size );
-
-  // Extract diagonal tile
-  auto A_diagonal_tile = A.diagonal_tile_ptr();
-  if( !A_diagonal_tile ) throw std::runtime_error("Diagonal Tile Not Populated");
-
-  // Gather Diagonal
-  auto D_local = extract_diagonal_elements( *A_diagonal_tile );
-
-  std::vector<int> remote_counts(world_size), row_starts(world_size+1,0);
-  for( auto i = 0; i < world_size; ++i ) {
-    remote_counts[i] = A.row_extent(i);
-    row_starts[i+1]  = row_starts[i] + A.row_extent(i);
-  }
-
-  std::vector<double> D(row_starts.back());
-
-  MPI_Allgatherv( D_local.data(), D_local.size(), MPI_DOUBLE, D.data(),
-    remote_counts.data(), row_starts.data(), MPI_DOUBLE, comm );
-
-  // Determine min index
-  auto D_min = std::min_element(D.begin(), D.end());
-  auto min_idx = std::distance( D.begin(), D_min );
-
-  // Zero out guess
-  for(size_t i = 0; i < N_local; ++i ) X[i] = 0.;
-
-  // Get owner rank
-  int owner_rank = min_idx / remote_counts[0];
-  if( world_rank == owner_rank ) {
-    X[ min_idx - A.local_row_start() ] = 1.;
-  }
-
-}
-
-template <typename SpMatType>
-class SparseMatrixOperator {
-
-  using index_type = typename SpMatType::index_type;
-
-  const SpMatType& m_matrix_;
-  sparsexx::spblas::spmv_info<index_type> m_spmv_info_;
-
-public:
-
-  SparseMatrixOperator( const SpMatType& m ) :
-    m_matrix_(m),
-    m_spmv_info_(sparsexx::spblas::generate_spmv_comm_info(m)) {}
-
-  void operator_action( size_t m, double alpha, const double* V, size_t LDV,
-    double beta, double* AV, size_t LDAV) const {
-    sparsexx::spblas::pgespmv( alpha, m_matrix_, V, beta, AV, 
-      m_spmv_info_ );
-  }
-
-};
 
 
 template <size_t N, typename index_t = int32_t>
@@ -136,7 +75,7 @@ double selected_ci_diag(
 
   // Setup guess
   auto D_local = extract_diagonal_elements( H.diagonal_tile() );
-  diagonal_guess(C_local.size(), H, C_local.data());
+  p_diagonal_guess(C_local.size(), H, C_local.data());
 
   // Setup Davidson Functor
   SparseMatrixOperator op(H);

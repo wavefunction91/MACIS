@@ -145,6 +145,14 @@ public:
 }; // class dist_sparse_matrix
 
 
+template <typename SpMatType>
+struct is_dist_sparse_matrix : public std::false_type {};
+template <typename SpMatType>
+struct is_dist_sparse_matrix<dist_sparse_matrix<SpMatType>> :
+  public std::true_type {};
 
+template <typename SpMatType>
+inline static constexpr bool is_dist_sparse_matrix_v =
+  is_dist_sparse_matrix<SpMatType>::value;
 
 }

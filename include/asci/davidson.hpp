@@ -14,6 +14,85 @@
 
 namespace asci {
 
+template <typename SpMatType>
+class SparseMatrixOperator {
+
+  using index_type = typename SpMatType::index_type;
+
+  const SpMatType& m_matrix_;
+  sparsexx::spblas::spmv_info<index_type> m_spmv_info_;
+
+public:
+
+  SparseMatrixOperator( const SpMatType& m ) :
+    m_matrix_(m) {
+    if constexpr (sparsexx::is_dist_sparse_matrix_v<SpMatType>) {
+      m_spmv_info_ = sparsexx::spblas::generate_spmv_comm_info(m);
+    } 
+  }
+
+  void operator_action( size_t m, double alpha, const double* V, size_t LDV,
+    double beta, double* AV, size_t LDAV) const {
+    if constexpr (sparsexx::is_dist_sparse_matrix_v<SpMatType>) {
+      sparsexx::spblas::pgespmv( alpha, m_matrix_, V, beta, AV, 
+        m_spmv_info_ );
+    } else {
+      sparsexx::spblas::gespmbv(m, alpha, m_matrix_, V, LDV, beta, AV, LDAV);
+    }
+  }
+
+};
+
+template <typename SpMatType>
+void diagonal_guess( size_t N, const SpMatType& A, double* X) {
+  // Extract diagonal and setup guess
+  auto D = extract_diagonal_elements( A );
+  auto D_min = std::min_element(D.begin(), D.end());
+  auto min_idx = std::distance( D.begin(), D_min );
+  X[min_idx] = 1.;
+}
+
+template <typename SpMatType>
+void p_diagonal_guess( size_t N_local, const SpMatType& A, double* X ) {
+
+  auto comm = A.comm();
+  int world_rank, world_size;
+  MPI_Comm_rank( comm, &world_rank );
+  MPI_Comm_size( comm, &world_size );
+
+  // Extract diagonal tile
+  auto A_diagonal_tile = A.diagonal_tile_ptr();
+  if( !A_diagonal_tile ) throw std::runtime_error("Diagonal Tile Not Populated");
+
+  // Gather Diagonal
+  auto D_local = extract_diagonal_elements( *A_diagonal_tile );
+
+  std::vector<int> remote_counts(world_size), row_starts(world_size+1,0);
+  for( auto i = 0; i < world_size; ++i ) {
+    remote_counts[i] = A.row_extent(i);
+    row_starts[i+1]  = row_starts[i] + A.row_extent(i);
+  }
+
+  std::vector<double> D(row_starts.back());
+
+  MPI_Allgatherv( D_local.data(), D_local.size(), MPI_DOUBLE, D.data(),
+    remote_counts.data(), row_starts.data(), MPI_DOUBLE, comm );
+
+  // Determine min index
+  auto D_min = std::min_element(D.begin(), D.end());
+  auto min_idx = std::distance( D.begin(), D_min );
+
+  // Zero out guess
+  for(size_t i = 0; i < N_local; ++i ) X[i] = 0.;
+
+  // Get owner rank
+  int owner_rank = min_idx / remote_counts[0];
+  if( world_rank == owner_rank ) {
+    X[ min_idx - A.local_row_start() ] = 1.;
+  }
+
+}
+
 void gram_schmidt( int64_t N, int64_t K, const double* V_old, int64_t LDV,
   double* V_new ) {
 
@@ -33,23 +112,27 @@ void gram_schmidt( int64_t N, int64_t K, const double* V_old, int64_t LDV,
 }  
 
 
-#if 0
 template <typename Functor>
 double davidson( size_t N, int64_t max_m, const Functor& op, 
-  double tol, double* X = NULL, bool print = false ) {
+  const double* D, double tol, double* X ) {
 
   if(!X) throw std::runtime_error("Davidson: No Guess Provided");
 
-  if(print) std::cout << "N = " << N << ", MAX_M = " << max_m << std::endl;
+  auto logger = spdlog::get("davidson");
+  if(!logger) {
+    logger = spdlog::stdout_color_mt("davidson");
+  }
 
-  std::vector<double> V(N * (max_m+1)), AV(N * (max_m+1)), C((max_m+1)*(max_m+1)), 
-    LAM(max_m+1);
+  logger->info("[Davidson Eigensolver]:");
+  logger->info("  {} = {:6}, {} = {:4}, {} = {:10.5e}",
+    "N", N, "MAX_M", max_m, "RES_TOL", tol
+  );
 
-  // Extract diagonal and setup guess
-  auto D = extract_diagonal_elements( A );
-  auto D_min = std::min_element(D.begin(), D.end());
-  auto min_idx = std::distance( D.begin(), D_min );
-  V[min_idx] = 1.;
+  std::vector<double> V(N * (max_m+1)), AV(N * (max_m+1)), 
+    C((max_m+1)*(max_m+1)), LAM(max_m+1);
+
+  // Copy over guess
+  std::copy_n(X, N, V.begin());
 
   // Compute Initial A*V
   //sparsexx::spblas::gespmbv(1, 1., A, V.data(), N, 0., AV.data(), N);
@@ -61,13 +144,14 @@ double davidson( size_t N, int64_t max_m, const Functor& op,
 
 
 
+  bool converged = false;
   for( int64_t i = 1; i < max_m; ++i ) {
+
+    const auto k = i + 1; // Current subspace dimension after new vector
 
     // AV(:,i) = A * V(:,i)
     //sparsexx::spblas::gespmbv(1, 1., A, V.data()+i*N, N, 0., AV.data()+i*N, N );
     op.operator_action(1, 1., V.data() + i*N, N, 0., AV.data() + i*N, N);
-
-    const auto k = i + 1;
 
     // Rayleigh Ritz
     lobpcgxx::rayleigh_ritz( N, k, V.data(), N, AV.data(), N, LAM.data(),
@@ -76,35 +160,25 @@ double davidson( size_t N, int64_t max_m, const Functor& op,
     // Compute Residual (A - LAM(0)*I) * V(:,0:i) * C(:,0)
     double* R = V.data() + (i+1)*N;
 
-    if(X) {
-      // If X is non-null, save the Ritz vector 
+    // X = V*C
+    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+      N, 1, k, 1., V.data(), N, C.data(), k, 0., X, N );
 
-      // X = V*C
-      blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-        N, 1, k, 1., V.data(), N, C.data(), k, 0., X, N );
+    // R = X
+    std::copy_n( X, N, R );
 
-      // R = X
-      std::copy_n( X, N, R );
-
-      // R = (AV - LAM[0]*V)*C = AV*C - LAM[0]*X = AV*C - LAM[0]*R
-      blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-        N, 1, k, 1., AV.data(), N, C.data(), k, -LAM[0], R, N );
-
-    } else {
-      blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-        N, 1, k, 1., AV.data(), N, C.data(), k, 0., R, N );
-      blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-        N, 1, k, -LAM[0], V.data(), N, C.data(), k, 1., R, N );
-    }
+    // R = (AV - LAM[0]*V)*C = AV*C - LAM[0]*X = AV*C - LAM[0]*R
+    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+      N, 1, k, 1., AV.data(), N, C.data(), k, -LAM[0], R, N );
 
     // Compute residual norm
     auto res_nrm = blas::nrm2( N, R, 1 );
-    if(print) {
-      std::cout << std::scientific << std::setprecision(12);
-      std::cout << std::setw(4) << i << ", " << LAM[0] << ", " << res_nrm 
-                << std::endl;
-    }
-    if( res_nrm < tol ) return LAM[0];
+
+    logger->info("iter = {:4}, LAM(0) = {:20.12e}, RNORM = {:20.12e}",
+      i, LAM[0], res_nrm);
+
+    // Check for convergence
+    if( res_nrm < tol ) {converged = true; break;}
 
     // Compute new vector
     // (D - LAM(0)*I) * W = -R ==> W = -(D - LAM(0)*I)**-1 * R
@@ -117,9 +191,11 @@ double davidson( size_t N, int64_t max_m, const Functor& op,
 
   } // Davidson iterations
 
+  if(!converged) throw std::runtime_error("Davidson Did Not Converge!");
+  logger->info("Davidson Converged!");
+
   return LAM[0];
 }
-#endif
 
 
 
@@ -206,7 +282,6 @@ double p_davidson( int64_t N_local, int64_t max_m, const Functor& op,
   MPI_Comm_rank( comm, &world_rank );
   MPI_Comm_size( comm, &world_size );
 
-  bool print = false;
   logger->info("[Davidson Eigensolver]:");
   logger->info("  {} = {:6}, {} = {:4}, {} = {:10.5e}",
     "N_LOCAL", N_local, "MAX_M", max_m, "RES_TOL", tol
