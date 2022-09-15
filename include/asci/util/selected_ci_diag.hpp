@@ -8,6 +8,47 @@
 
 namespace asci {
 
+template <typename SpMatType>
+void diagonal_guess( size_t N_local, const SpMatType& A, double* X ) {
+
+  auto comm = A.comm();
+  int world_rank, world_size;
+  MPI_Comm_rank( comm, &world_rank );
+  MPI_Comm_size( comm, &world_size );
+
+  // Extract diagonal tile
+  auto A_diagonal_tile = A.diagonal_tile_ptr();
+  if( !A_diagonal_tile ) throw std::runtime_error("Diagonal Tile Not Populated");
+
+  // Gather Diagonal
+  auto D_local = extract_diagonal_elements( *A_diagonal_tile );
+
+  std::vector<int> remote_counts(world_size), row_starts(world_size+1,0);
+  for( auto i = 0; i < world_size; ++i ) {
+    remote_counts[i] = A.row_extent(i);
+    row_starts[i+1]  = row_starts[i] + A.row_extent(i);
+  }
+
+  std::vector<double> D(row_starts.back());
+
+  MPI_Allgatherv( D_local.data(), D_local.size(), MPI_DOUBLE, D.data(),
+    remote_counts.data(), row_starts.data(), MPI_DOUBLE, comm );
+
+  // Determine min index
+  auto D_min = std::min_element(D.begin(), D.end());
+  auto min_idx = std::distance( D.begin(), D_min );
+
+  // Zero out guess
+  for(size_t i = 0; i < N_local; ++i ) X[i] = 0.;
+
+  // Get owner rank
+  int owner_rank = min_idx / remote_counts[0];
+  if( world_rank == owner_rank ) {
+    X[ min_idx - A.local_row_start() ] = 1.;
+  }
+
+}
+
 
 template <size_t N, typename index_t = int32_t>
 double selected_ci_diag( 
@@ -64,11 +105,32 @@ double selected_ci_diag(
   // Resize eigenvector size
   C_local.resize( H.local_row_extent() );
 
+  // Setup guess
+  diagonal_guess(C_local.size(), H, C_local.data());
+
+  // Setup Davidson Functor
+  struct SpMatOp {
+    const decltype(H)& matrix;
+    sparsexx::spblas::spmv_info<index_t> spmv_info;
+
+    SpMatOp() = delete;
+    SpMatOp(decltype(matrix) m) : matrix(m), 
+      spmv_info(sparsexx::spblas::generate_spmv_comm_info(m)) {}
+
+    void operator_action( size_t m, double alpha, const double* V, size_t LDV,
+      double beta, double* AV, size_t LDAV) const {
+      sparsexx::spblas::pgespmv( alpha, matrix, V, beta, AV, spmv_info );
+    }
+  };
+  SpMatOp op(H);
+  auto D_local = extract_diagonal_elements( H.diagonal_tile() );
+
   // Solve EVP
   MPI_Barrier(comm);
   auto dav_st = clock_type::now();
   #if 1
-  double E = p_davidson( davidson_max_m, H, davidson_res_tol, C_local.data() );
+  double E = p_davidson( H.local_row_extent(), davidson_max_m, op, 
+    D_local.data(), davidson_res_tol, C_local.data(), H.comm() );
   #else
   const size_t ndets = std::distance(dets_begin,dets_end);
   std::vector<double> H_dense(ndets*ndets);

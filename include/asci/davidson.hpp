@@ -29,11 +29,13 @@ void gram_schmidt( int64_t N, int64_t K, const double* V_old, int64_t LDV,
 }  
 
 
-template <typename index_t>
-double davidson( int64_t max_m, const sparsexx::csr_matrix<double,index_t>& A, 
+#if 0
+template <typename Functor>
+double davidson( size_t N, int64_t max_m, const Functor& op, 
   double tol, double* X = NULL, bool print = false ) {
 
-  int64_t N = A.n();
+  if(!X) throw std::runtime_error("Davidson: No Guess Provided");
+
   if(print) std::cout << "N = " << N << ", MAX_M = " << max_m << std::endl;
 
   std::vector<double> V(N * (max_m+1)), AV(N * (max_m+1)), C((max_m+1)*(max_m+1)), 
@@ -46,7 +48,8 @@ double davidson( int64_t max_m, const sparsexx::csr_matrix<double,index_t>& A,
   V[min_idx] = 1.;
 
   // Compute Initial A*V
-  sparsexx::spblas::gespmbv(1, 1., A, V.data(), N, 0., AV.data(), N);
+  //sparsexx::spblas::gespmbv(1, 1., A, V.data(), N, 0., AV.data(), N);
+  op.operator_action(1, 1., V.data(), N, 0., AV.data(), N);
 
   // Copy AV(:,0) -> V(:,1) and orthogonalize wrt V(:,0)
   std::copy_n(AV.data(), N, V.data()+N);
@@ -57,7 +60,8 @@ double davidson( int64_t max_m, const sparsexx::csr_matrix<double,index_t>& A,
   for( int64_t i = 1; i < max_m; ++i ) {
 
     // AV(:,i) = A * V(:,i)
-    sparsexx::spblas::gespmbv(1, 1., A, V.data()+i*N, N, 0., AV.data()+i*N, N );
+    //sparsexx::spblas::gespmbv(1, 1., A, V.data()+i*N, N, 0., AV.data()+i*N, N );
+    op.operator_action(1, 1., V.data() + i*N, N, 0., AV.data() + i*N, N);
 
     const auto k = i + 1;
 
@@ -111,6 +115,7 @@ double davidson( int64_t max_m, const sparsexx::csr_matrix<double,index_t>& A,
 
   return LAM[0];
 }
+#endif
 
 
 
@@ -180,18 +185,17 @@ void p_rayleigh_ritz( int64_t N_local, int64_t K, const double* X, int64_t LDX,
 }
 
 
-double p_davidson( int64_t max_m, 
-  const sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double,int32_t>>& A, 
-  double tol, double* X_local = nullptr, bool print = false ) {
+template <typename Functor>
+double p_davidson( int64_t N_local, int64_t max_m, const Functor& op, 
+  const double* D_local, double tol, double* X_local, MPI_Comm comm ) {
 
-  //int64_t N = A.n();
-  int64_t N_local = A.local_row_extent();
-  auto comm = A.comm();
+  if(N_local and !X_local) throw std::runtime_error("Davidson: No Guess Provided");
 
   int world_rank, world_size;
   MPI_Comm_rank( comm, &world_rank );
   MPI_Comm_size( comm, &world_size );
 
+  bool print = false;
   if( world_rank == 0 and print ) {
     std::cout << "\nDavidson Eigensolver" << std::endl
               << "  MAX_M = " << max_m << std::endl
@@ -200,90 +204,16 @@ double p_davidson( int64_t max_m,
               << "Iterations:" << std::endl;
   }
 
-  //if( world_rank == 0 ) {
-  //  std::cout << "N = " << N << ", MAX_M = " << max_m << std::endl;
-  //}
-
   // Allocations
   std::vector<double> V_local( N_local * (max_m+1) ), AV_local( N_local * (max_m+1) ), 
     C( (max_m+1)*(max_m+1) ), LAM(max_m+1);
 
-  // Extract diagonal and setup guess
-  auto A_diagonal_tile = A.diagonal_tile_ptr();
-  if( !A_diagonal_tile ) throw std::runtime_error("DIE DIE DIE");
-
-  // Gather Diagonal
-  auto D_local = extract_diagonal_elements( *A_diagonal_tile );
-#if 1
-  {
-    std::vector<int> remote_counts(world_size), row_starts(world_size+1,0);
-    for( auto i = 0; i < world_size; ++i ) {
-      remote_counts[i] = A.row_extent(i);
-      row_starts[i+1]  = row_starts[i] + A.row_extent(i);
-    }
-    std::vector<double> D(row_starts.back());
-
-    MPI_Allgatherv( D_local.data(), D_local.size(), MPI_DOUBLE, D.data(),
-      remote_counts.data(), row_starts.data(), MPI_DOUBLE, comm );
-
-    // Determine min index
-    auto D_min = std::min_element(D.begin(), D.end());
-    auto min_idx = std::distance( D.begin(), D_min );
-
-    // Get owner rank
-    int owner_rank = min_idx / remote_counts[0];
-    if( world_rank == owner_rank ) {
-      V_local[ min_idx - A.local_row_start() ] = 1.;
-    }
-    //// Starting vector: Normalized random vector.
-    //std::default_random_engine gen;
-    //std::normal_distribution<> dist(-1.,1.);
-    //std::generate( V_local.begin(), V_local.begin()+N_local, [&](){ return dist(gen); } );
-    //V_local[0] += 1.;
-    //double tmp = 0.;
-    //for( auto i = 0; i < N_local; ++i ) tmp += V_local[i] * V_local[i];
-    //tmp = std::sqrt(tmp);
-    //for( auto i = 0; i < N_local; ++i ) V_local[i] /= tmp;
-
-  }
-#else
-  std::default_random_engine gen;
-  std::normal_distribution<> dist(0,1);
-  std::generate( V_local.begin(), V_local.end(), [&](){ return dist(gen); } );
-  V_local[0] += 1.;
-  double tmp = 0.;
-  for( auto i = 0; i < V_local.size(); ++i ) tmp += V_local[i] * V_local[i];
-  tmp = std::sqrt(tmp);
-  for( auto i = 0; i < V_local.size(); ++i ) V_local[i] /= tmp;
-#endif
-
-  // Debugging
-  //std::default_random_engine gen;
-  //std::normal_distribution<> dist(-1.,1.);
-  //std::generate( V_local.begin(), V_local.begin()+N_local, [&](){ return dist(gen); } );
-  //V_local[0] += 1.;
-  //double tmp = 0.;
-  //for( auto i = 0; i < N_local; ++i ) tmp += V_local[i] * V_local[i];
-  //tmp = std::sqrt(tmp);
-  //for( auto i = 0; i < N_local; ++i ) V_local[i] /= tmp;
-  ////V_local[2130] = 1.;
-  ////std::ifstream ifile( "py_gs.dat", std::ios::in );
-  ////for( int a = 0; a < N_local; a++ )
-  ////  ifile >> V_local[a];
-  ////ifile.close();
-
-  //std::ofstream ofile( "davidson_psi0.dat", std::ios::out );
-  //double *v0 = V_local.data();
-  //for( int a = 0; a < N_local; a++ )
-  //  ofile << *(v0 + a) << std::endl;
-  //ofile.close();
-  // Debugging
-
-  // Generate SPMV info
-  auto spmv_info = sparsexx::spblas::generate_spmv_comm_info( A );
+  // Copy over guess
+  std::copy_n(X_local, N_local, V_local.begin());
 
   // Compute initial A*V
-  sparsexx::spblas::pgespmv( 1., A, V_local.data(), 0., AV_local.data(), spmv_info );
+  //sparsexx::spblas::pgespmv( 1., A, V_local.data(), 0., AV_local.data(), spmv_info );
+  op.operator_action(1, 1., V_local.data(), N_local, 0., AV_local.data(), N_local);
 
   // Copy AV(:,0) -> V(:,1) and orthogonalize wrt V(:,0)
   std::copy_n(AV_local.data(), N_local, V_local.data()+N_local);
@@ -292,8 +222,11 @@ double p_davidson( int64_t max_m,
   for( int64_t i = 1; i < max_m; ++i ) {
 
     // AV(:,i) = A * V(:,i)
-    sparsexx::spblas::pgespmv( 1., A, V_local.data()+i*N_local, 
-      0., AV_local.data()+i*N_local, spmv_info );
+    //sparsexx::spblas::pgespmv( 1., A, V_local.data()+i*N_local, 
+    //  0., AV_local.data()+i*N_local, spmv_info );
+    op.operator_action(1, 1., V_local.data() + i*N_local, N_local, 
+      0., AV_local.data() + i*N_local, N_local);
+    
 
     const auto k = i + 1;
 
