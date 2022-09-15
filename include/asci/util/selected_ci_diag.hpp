@@ -85,22 +85,35 @@ double selected_ci_diag(
   const bool                 quiet = false
 ) {
 
-  if( !quiet )
-  {
-    std::cout << "* Diagonalizing CI Hamiltonian over " 
-              << std::distance(dets_begin,dets_end)
-              << " Determinants" << std::endl;
-
-    std::cout << "  * Hamiltonian Knobs:" << std::endl
-              << "    * Hamiltonian Element Tolerance = " << h_el_tol << std::endl;
-
-    std::cout << "  * Davidson Knobs:" << std::endl
-              << "    * Residual Tol = " << davidson_res_tol << std::endl
-              << "    * Max M        = " << davidson_max_m << std::endl;
+  auto logger = spdlog::get("ci_solver");
+  if(!logger) {
+    logger = spdlog::stdout_color_mt("ci_solver");
   }
 
+  logger->info("[Selected CI Solver]:");
+  logger->info("  {} = {:6}, {} = {:.5e}, {} = {:.5e}, {} = {:4}",
+    "NDETS", std::distance(dets_begin, dets_end),
+    "MATEL_TOL", h_el_tol,
+    "RES_TOL",   davidson_res_tol,
+    "MAX_SUB",   davidson_max_m
+  );
+
+  //if( !quiet )
+  //{
+  //  std::cout << "* Diagonalizing CI Hamiltonian over " 
+  //            << std::distance(dets_begin,dets_end)
+  //            << " Determinants" << std::endl;
+
+  //  std::cout << "  * Hamiltonian Knobs:" << std::endl
+  //            << "    * Hamiltonian Element Tolerance = " << h_el_tol << std::endl;
+
+  //  std::cout << "  * Davidson Knobs:" << std::endl
+  //            << "    * Residual Tol = " << davidson_res_tol << std::endl
+  //            << "    * Max M        = " << davidson_max_m << std::endl;
+  //}
+
   using clock_type = std::chrono::high_resolution_clock;
-  using duration_type = std::chrono::duration<double>;
+  using duration_type = std::chrono::duration<double, std::milli>;
 
   // Generate Hamiltonian
   MPI_Barrier(comm); auto H_st = clock_type::now();
@@ -114,14 +127,9 @@ double selected_ci_diag(
   size_t local_nnz = H.nnz();
   size_t total_nnz;
   MPI_Allreduce( &local_nnz, &total_nnz, 1, MPI_UINT64_T, MPI_SUM, comm );
-  if(!quiet)
-  {
-    std::cout << "  * Hamiltonian NNZ = " << total_nnz << std::endl;
-
-    std::cout << "  * Timings:" << std::endl;
-    std::cout << "    * Hamiltonian Construction = " 
-      << duration_type(H_en-H_st).count() << std::endl;
-  }
+  logger->info("  {}   = {:6}, {}     = {:.5e} ms",
+    "NNZ", total_nnz, "H_DUR", duration_type(H_en-H_st).count()
+  );
 
   // Resize eigenvector size
   C_local.resize( H.local_row_extent() );
@@ -147,6 +155,9 @@ double selected_ci_diag(
       << duration_type(dav_en-dav_st).count() << std::endl;
     std::cout << std::endl;
   } 
+  logger->info("  {} = {:.6e} Eh, {} = {:.5e} ms", 
+    "E0", E,
+    "DAVIDSON_DUR", duration_type(dav_en-dav_st).count());
 
   return E;
 

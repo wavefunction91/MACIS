@@ -209,9 +209,7 @@ double p_davidson( int64_t N_local, int64_t max_m, const Functor& op,
   bool print = false;
   logger->info("[Davidson Eigensolver]:");
   logger->info("  {} = {:6}, {} = {:4}, {} = {:10.5e}",
-    "N_LOCAL", N_local,
-    "MAX_M", max_m,
-    "RES_TOL", tol
+    "N_LOCAL", N_local, "MAX_M", max_m, "RES_TOL", tol
   );
 
   // Allocations
@@ -231,14 +229,14 @@ double p_davidson( int64_t N_local, int64_t max_m, const Functor& op,
   p_gram_schmidt(N_local, 1, V_local.data(), N_local, 
     V_local.data()+N_local, comm);
 
+  bool converged = false;
   for( int64_t i = 1; i < max_m; ++i ) {
+
+    const auto k = i + 1; // Current subspace dimension after new vector
 
     // AV(:,i) = A * V(:,i)
     op.operator_action(1, 1., V_local.data() + i*N_local, N_local, 
       0., AV_local.data() + i*N_local, N_local);
-    
-
-    const auto k = i + 1;
 
     // Rayleigh Ritz
     p_rayleigh_ritz( N_local, k, V_local.data(), N_local, AV_local.data(), 
@@ -247,41 +245,29 @@ double p_davidson( int64_t N_local, int64_t max_m, const Functor& op,
     // Compute Residual (A - LAM(0)*I) * V(:,0:i) * C(:,0)
     double* R_local = V_local.data() + (i+1)*N_local;
 
-    if( X_local ) {
-      // If X_local is non-null, save Ritz vector
+    // X = V*C
+    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+      N_local, 1, k, 1., V_local.data(), N_local, C.data(), k, 0., 
+      X_local, N_local );
 
-      // X = V*C
-      blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-        N_local, 1, k, 1., V_local.data(), N_local, C.data(), k, 0., 
-        X_local, N_local );
+    // R = X
+    std::copy_n( X_local, N_local, R_local );
 
-      // R = X
-      std::copy_n( X_local, N_local, R_local );
-
-      // R = (AV - LAM[0]*V)*C = AV*C - LAM[0]*X = AV*C - LAM[0]*R
-      blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-        N_local, 1, k, 1., AV_local.data(), N_local, C.data(), k, -LAM[0], 
-        R_local, N_local );
-
-    } else {
-
-      // Else just compute R Directly 
-      blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-        N_local, 1, k, 1., AV_local.data(), N_local, C.data(), k, 0., 
-        R_local, N_local );
-      blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-        N_local, 1, k, -LAM[0], V_local.data(), N_local, C.data(), k, 1., 
-        R_local, N_local );
-
-    }
+    // R = (AV - LAM[0]*V)*C = AV*C - LAM[0]*X = AV*C - LAM[0]*R
+    blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+      N_local, 1, k, 1., AV_local.data(), N_local, C.data(), k, -LAM[0], 
+      R_local, N_local );
 
     // Compute residual norm
     auto res_dot = blas::dot( N_local, R_local, 1, R_local, 1 );
     MPI_Allreduce(MPI_IN_PLACE, &res_dot, 1, MPI_DOUBLE, MPI_SUM, comm );
     auto res_nrm = std::sqrt(res_dot);
+
     logger->info("iter = {:4}, LAM(0) = {:20.12e}, RNORM = {:20.12e}",
       i, LAM[0], res_nrm);
-    if( res_nrm < tol ) return LAM[0];
+
+    // Check for convergence
+    if( res_nrm < tol ) {converged = true; break;}
 
 
     // Compute new vector
@@ -294,6 +280,9 @@ double p_davidson( int64_t N_local, int64_t max_m, const Functor& op,
     p_gram_schmidt(N_local, k, V_local.data(), N_local, R_local, comm);
 
   } // Davidson iterations
+
+  if(!converged) throw std::runtime_error("Davidson Did Not Converge!");
+  logger->info("Davidson Converged!");
 
   return LAM[0];
 
