@@ -135,7 +135,6 @@ double davidson( size_t N, int64_t max_m, const Functor& op,
   std::copy_n(X, N, V.begin());
 
   // Compute Initial A*V
-  //sparsexx::spblas::gespmbv(1, 1., A, V.data(), N, 0., AV.data(), N);
   op.operator_action(1, 1., V.data(), N, 0., AV.data(), N);
 
   // Copy AV(:,0) -> V(:,1) and orthogonalize wrt V(:,0)
@@ -150,7 +149,6 @@ double davidson( size_t N, int64_t max_m, const Functor& op,
     const auto k = i + 1; // Current subspace dimension after new vector
 
     // AV(:,i) = A * V(:,i)
-    //sparsexx::spblas::gespmbv(1, 1., A, V.data()+i*N, N, 0., AV.data()+i*N, N );
     op.operator_action(1, 1., V.data() + i*N, N, 0., AV.data() + i*N, N);
 
     // Rayleigh Ritz
