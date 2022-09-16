@@ -12,6 +12,7 @@
 #include "cmz_ed/hamil.h++"
 #include "cmz_ed/lanczos.h++"
 #include "cmz_ed/rdms.h++"
+#include "cmz_ed/freq_grids.h++"
 #include "dbwy/gf.h++"
 
 #include <bitset>
@@ -178,13 +179,7 @@ auto run_asci_w_GF(
       std::cout << oc << ", ";
     std::cout << endl;
 
-    size_t nws  = cmz::ed::getParam<int>( input, "nws" );
-    double wmin = cmz::ed::getParam<double>( input, "wmin" );
-    double wmax = cmz::ed::getParam<double>( input, "wmax" );
-    double eta  = cmz::ed::getParam<double>( input,  "broad" );
-    std::vector<std::complex<double> > ws(nws);
-    for( int iw = 0; iw < nws; iw++ )
-      ws[iw] = std::complex<double>( wmin + double(iw) * (wmax - wmin) / (double(nws - 1)) , eta );
+    auto ws = cmz::ed::GetFreqGrid( input );
 
     // Particle sector
     bool is_part = true;
@@ -517,6 +512,180 @@ auto run_ed_w_1rdm(
   }
 
   return std::tuple( Eret, ordm );
+}
+
+template< size_t nbits>
+auto run_ed_w_GF(
+  const cmz::ed::Input_t &input
+) {
+
+  double Eret = 0.;
+  std::vector<double> X_local; // Eigenvectors
+  std::vector<std::bitset<nbits>> dets;
+  vector<vector<vector<complex<double> > > > GF;
+  int world_rank; MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
+  int world_size; MPI_Comm_size(MPI_COMM_WORLD,&world_size);
+
+  // Get Parameters
+  size_t norb = cmz::ed::getParam<int>( input, "norbs" );
+  size_t nalpha  = cmz::ed::getParam<int>( input, "nups"  );
+  size_t nbeta  = cmz::ed::getParam<int>( input, "ndos"  );
+  bool   quiet  = cmz::ed::getParam<bool>( input, "quiet" );
+  bool real_ints = cmz::ed::getParam<bool>( input, "real_ints" );
+  if( norb > 16 )
+    throw( std::runtime_error("Error in run_ed_w_1rdm! Asked for ED with more than 16 orbitals!") );
+  std::string fcidump = 
+    cmz::ed::getParam<std::string>( input, "fcidump_file" );
+  bool read_wfn =
+    cmz::ed::getParam<bool>( input, "read_wfn");
+  std::string wfn_file;
+  if( read_wfn )
+    wfn_file = 
+      cmz::ed::getParam<std::string>( input, "wfn_file" );
+  
+  if( norb > nbits/2 ) throw std::runtime_error("Not Enough Bits...");
+  
+  
+  // Read in the integrals 
+  bool just_singles;
+  cmz::ed::intgrls::integrals ints(norb, fcidump, just_singles, real_ints);
+  MPI_Barrier(MPI_COMM_WORLD);
+  
+  // Hamiltonian Matrix Element Generator
+  //dbwy::DoubleLoopHamiltonianGenerator<nbits> 
+  //  ham_gen( norb, ints.u.data(), ints.t.data() );
+  dbwy::SDBuildHamiltonianGenerator<nbits> 
+    ham_gen( norb, ints.u.data(), ints.t.data() );
+  ham_gen.SetJustSingles( just_singles );
+  
+  // Compute HF Energy
+  std::vector<double> orb_ens( norb );
+  for( int i = 0; i < norb; i++ )
+    orb_ens[i] = ints.get( i, i ); 
+  const std::bitset<nbits> hf_det = 
+    dbwy::canonical_hf_determinant<nbits>( nalpha,nbeta, orb_ens );
+  //const std::bitset<nbits> hf_det = 
+  //  dbwy::canonical_hf_determinant<nbits>(nalpha,nbeta);
+  const double EHF = ham_gen.matrix_element(hf_det, hf_det);
+  if( world_rank == 0 && !quiet ) {
+    std::cout << std::scientific << std::setprecision(12);
+    std::cout << "E(HF) = " << EHF + ints.core_energy << std::endl;
+  }
+  
+  
+  auto print_ed  = [&](double E) {
+    if( world_rank == 0 && !quiet ) {
+      std::cout << "  * E(ED)   = " << E + ints.core_energy << " Eh" << std::endl;
+      std::cout << "  * E_c(ED) = " << (E - EHF)*1000 << " mEh" << std::endl;
+    }
+  };
+  
+  if(read_wfn) {
+    // Read WFN
+  
+    {
+      std::ifstream wfn(wfn_file);
+      std::string line;
+      std::getline( wfn, line );
+      while( std::getline(wfn, line) ) {
+        std::stringstream ss{line};
+      std::string coeff, det;
+      ss >> coeff >> det;
+      dets.emplace_back( dbwy::from_canonical_string<nbits>(det));
+      }
+    }
+    if(world_rank == 0 && !quiet)
+      std::cout << "NDETS = " << dets.size() << std::endl;
+    for( auto det : dets ) std::cout << det << std::endl;
+    auto E = dbwy::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
+      1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD, quiet );
+    print_ed( E );
+    if(!quiet)
+      std::cout << "**** MY PRINT ***" << std::endl;
+    ham_gen.matrix_element(dets[0], dets[1]);
+  } else {
+  
+  //  Run ED
+  {
+  if(world_size != 1) throw "NO MPI"; // Disable MPI for now
+  
+  // Fill the determinant list with all possible dets
+  dets = dbwy::generate_full_hilbert_space<nbits>( norb, nalpha, nbeta );
+  if(world_rank == 0 && !quiet)
+    std::cout << "* NDETS in ED = " << dets.size() << std::endl;
+  auto EED = dbwy::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
+    1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD, quiet );
+  Eret = EED + ints.core_energy;
+  std::cout << "EED = " << EED << std::endl;
+  print_ed( EED );
+  
+  bool print_wf;
+  try{ print_wf = cmz::ed::getParam<bool>( input, "print_wf" ); }catch (...) { print_wf = false; }
+  if( print_wf )
+  {
+    std::ofstream ofile( "final_ed_wf.dat", std::ios::out );
+
+    struct wf_pair
+    {
+      std::string s;
+      double coeff;
+    };
+    std::vector<wf_pair> pairs;
+    pairs.reserve( dets.size() );
+    for( int idet = 0; idet < dets.size(); idet++ )
+    {
+      wf_pair p = { to_canonical_string(dets[idet]), X_local[idet] };
+      pairs.push_back( p );
+    }
+    std::sort( pairs.begin(), pairs.end(), []( wf_pair &a, wf_pair &b )->bool{ return abs(a.coeff) > abs(b.coeff); } );
+
+    ofile << dets.size() << std::endl;
+    auto w = std::setw(25);
+
+    for( int idet = 0; idet < dets.size(); idet++ )
+       ofile << pairs[idet].coeff << w << pairs[idet].s << std::endl; 
+
+    ofile.close();
+  }
+  
+  } // ED
+
+  }
+
+  // Green's function calculation
+  { 
+    double EED = Eret - ints.core_energy;
+    Eigen::VectorXd psi0  = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>( X_local.data(), X_local.size() );
+    std::vector<double> ordm( norb*norb, 0. );
+    ham_gen.form_rdms( dets.begin(), dets.end(), 
+                       dets.begin(), dets.end(),
+                       X_local.data(), ordm.data() );
+
+    std::vector<double> occs(norb, 0.);
+    for( int i = 0; i < norb; i++ )
+      occs[i] += ordm[i + i * norb] / 2.;
+
+    std::cout << "Occs: ";
+    for( const auto oc : occs )
+      std::cout << oc << ", ";
+    std::cout << endl;
+
+    auto ws = cmz::ed::GetFreqGrid( input );
+
+    // Particle sector
+    bool is_part = true;
+    cmz::ed::RunGFCalc<nbits>( GF, psi0, ham_gen, dets, EED, is_part, ws, occs, input );
+
+    // Hole sector
+    is_part = false;
+    std::vector<std::vector<std::vector<std::complex<double> > > > GF_tmp;
+    cmz::ed::RunGFCalc<nbits>( GF_tmp, psi0, ham_gen, dets, EED, is_part, ws, occs, input );
+    for( int i = 0; i < GF_tmp.size(); i++ )
+      for( int j = 0; j < GF_tmp[i].size(); j++)
+        for( int k = 0; k < GF_tmp[i][j].size(); k++)
+          GF[i][j][k] += GF_tmp[i][j][k];
+  } // GF
+  return std::tuple( Eret, GF );
 }
 
 }

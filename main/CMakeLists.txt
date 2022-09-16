@@ -5,6 +5,7 @@ include_directories(${CMAKE_SOURCE_DIR}/inc
 
 # add to the library
 add_executable(cmzed_main cmzed_main.c++)
+add_executable(run_asci_gf run_asci_gf.c++)
 
 # links
 target_link_libraries(cmzed_main PUBLIC 
@@ -12,6 +13,12 @@ target_link_libraries(cmzed_main PUBLIC
                       ${LAPACK_LIBRARIES}
                       Eigen3::Eigen
                      )
+target_link_libraries(run_asci_gf PUBLIC 
+                      ASCI 
+                      ${LAPACK_LIBRARIES}
+                      Eigen3::Eigen
+                     )
 
 # install executable
 install(TARGETS cmzed_main DESTINATION bin)
+install(TARGETS run_asci_gf DESTINATION bin)

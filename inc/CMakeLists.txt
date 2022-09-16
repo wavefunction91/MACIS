@@ -12,6 +12,7 @@ list(APPEND ASCI_SOURCES_HXX
      cmz_ed/slaterdet.h++
      cmz_ed/hamil.h++
      cmz_ed/ed.h++
+     cmz_ed/freq_grids.h++
      cmz_ed/utils.h++
     )
 list(APPEND DBWY_SOURCES_HXX
