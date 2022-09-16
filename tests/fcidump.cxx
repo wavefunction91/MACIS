@@ -1,5 +1,6 @@
 #include "ut_common.hpp"
 #include <asci/fcidump.hpp>
+#include <asci/util/orbital_energies.hpp>
 #include <iostream>
 #include <iomanip>
 
@@ -46,14 +47,9 @@ TEST_CASE("FCIDUMP") {
       asci::read_fcidump_2body(ref_file, V.data(), norb);
 
       std::vector<double> eps(norb);
-      for( auto p = 0ul; p < norb; ++p ) {
-        double tmp = 0.;
-        for( auto i = 0ul; i < nocc; ++i ) {
-          tmp += 2.*V[p*(norb + 1) + i*(norb2 + norb3)] 
-                  - V[p*(1 + norb3) + i*(norb+norb2)];
-        }      
-        eps[p] = T[p*(norb+1)] + tmp;
-      }
+      asci::canonical_orbital_energies(asci::NumOrbital(norb),
+        asci::NumInactive(nocc), T.data(), norb, V.data(), norb,
+        eps.data());
 
       // Check orbital energies
       std::vector<double> ref_eps = {

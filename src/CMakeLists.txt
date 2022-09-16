@@ -4,6 +4,8 @@ add_library( asci
   transform.cxx
   orbital_gradient.cxx
   mcscf.cxx
+  #rdms.cxx
+  orbital_energies.cxx
 )
 
 target_include_directories( asci PUBLIC 

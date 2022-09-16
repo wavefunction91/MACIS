@@ -5,6 +5,7 @@
 #include <asci/util/selected_ci_diag.hpp>
 #include <asci/hamiltonian_generator/double_loop.hpp>
 #include <asci/davidson.hpp>
+#include <asci/fcidump.hpp>
 #include <Eigen/Core>
 
 namespace asci {
@@ -296,10 +297,41 @@ struct bfgs_mcscf_functor {
       linear_orb_rot_to_matrix(ninact, nact, nvirt, K.data(),
         K_expand.data(), norb.get());
 
+#if 0
+      std::cout << "K = [" << std::endl;
+      for(size_t i = 0; i < norb.get(); i++) {
+        for(size_t j = 0; j < norb.get(); ++j)
+          std::cout << K_expand[i + j*norb.get()] << " ";
+        std::cout << std::endl;
+      }
+      std::cout << "];" << std::endl;
+
+      std::vector<double> K_cpy(K_expand);
+      std::vector<std::complex<double>> K_ev(norb.get());
+      lapack::geev(lapack::Job::NoVec, lapack::Job::NoVec, norb.get(), K_cpy.data(), norb.get(), K_ev.data(), NULL, 1, NULL, 1);
+      std::cout << "K eigenvalues" << std::endl;
+      for( auto x : K_ev ) std::cout << x << std::endl; 
+#endif
+
       // Compute U = EXP[-K]
       std::vector<double> U(norb.get() * norb.get());
       compute_orbital_rotation(norb, 1.0, K_expand.data(), norb.get(),
         U.data(), norb.get() );
+
+#if 0
+      std::cout << "U = [" << std::endl;
+      for(size_t i = 0; i < norb.get(); i++) {
+        for(size_t j = 0; j < norb.get(); ++j)
+          std::cout << U[i + j*norb.get()] << " ";
+        std::cout << std::endl;
+      }
+      std::cout << "];" << std::endl;
+
+      std::vector<double> iden(U.size());
+      blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, norb.get(), norb.get(), norb.get(), 1.0, U.data(), norb.get(), U.data(), norb.get(), 0.0, iden.data(), norb.get());
+      for(auto i = 0 ; i < norb.get(); ++i) iden[i*(norb.get()+1)] -= 1.0;
+      std::cout << "|U2 - I| = " << blas::nrm2(U.size(), iden.data(), 1) << std::endl;
+#endif
 
       // Compute energy evaluated at rotated orbitals
       return orbital_rotated_energy(norb, ninact, nact, T, norb.get(),
@@ -475,6 +507,12 @@ void optimize_orbitals(MCSCFSettings settings, NumOrbital norb,
   approx_diag_hessian(norb, ninact, nact, nvirt, T, LDT, V, LDV, A1RDM, LDD1,
     A2RDM, LDD2, DH.data() );
 
+  //std::cout << "DIAGONAL HESSIAN" << std::endl;
+  //std::cout << std::scientific << std::setprecision(12);
+  //for( int i = 0; i < DH.size(); i++ )
+  //  std::cout << DH[i] << std::endl;
+
+
   // Create BFGS Functor
   bfgs_mcscf_functor op(norb, ninact, nact, nvirt, E_core, T, V, A1RDM, A2RDM,
     settings.orb_grad_tol_bfgs);
@@ -511,6 +549,46 @@ double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb,
   // Compute Lowest Energy Eigenvalue (ED)
   std::vector<double> C;
   auto dets = asci::generate_hilbert_space<nbits>(norb.get(), nalpha, nbeta);
+  double E0 = asci::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
+    settings.ci_matel_tol, settings.ci_max_subspace, settings.ci_res_tol, C, 
+    comm, true);
+
+  // Compute RDMs
+  ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
+    C.data(), ORDM, TRDM);
+
+  return E0;
+}
+
+template <typename HamGen>
+double compute_casci_rdms2(MCSCFSettings settings, NumOrbital norb, 
+  NumInactive ninact, NumActive nact, size_t nalpha, size_t nbeta, 
+  double* T, double* V, double* ORDM, double* TRDM, MPI_Comm comm) {
+
+  constexpr auto nbits = HamGen::nbits;
+
+  int rank; MPI_Comm_rank(comm, &rank);
+
+  // Hamiltonian Matrix Element Generator
+  asci::DoubleLoopHamiltonianGenerator<nbits> ham_gen( norb.get(), V, T );
+  
+  // Compute Lowest Energy Eigenvalue (ED)
+  std::vector<double> C;
+  auto dets = asci::generate_hilbert_space<nbits>(nact.get(), nalpha, nbeta);
+
+  auto inactive_mask = full_mask<nbits/2>(ninact.get());
+  for(auto& d : dets) {
+    std::cout << d << std::endl;
+    auto d_alpha = truncate_bitset<nbits/2>(d);
+    auto d_beta  = truncate_bitset<nbits/2>(d >> (nbits/2));
+    std::cout << "  " << d_alpha << " " << d_beta << std::endl;
+    d_alpha = inactive_mask | (d_alpha << ninact.get());
+    d_beta = inactive_mask | (d_beta << ninact.get());
+    d = expand_bitset<nbits>(d_alpha) | 
+        expand_bitset<nbits>(d_beta) << (nbits/2);
+    std::cout << "  " << d << std::endl;
+  }
+
   double E0 = asci::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
     settings.ci_matel_tol, settings.ci_max_subspace, settings.ci_res_tol, C, 
     comm, true);
@@ -578,14 +656,41 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
   auto E_inactive = inactive_energy(ninact, T, LDT, F_inactive.data(), no);
   E_inactive += E_core;
 
-#if 0
+
+  // Compute the trace of the input A1RDM
+  double iAtr = 0.0;
+  for(size_t i = 0; i < na; ++i) iAtr += A1RDM[i*(LDD1+1)];
+
+  double E0;
+  bool comp_rdms = std::abs(iAtr - nalpha.get() - nbeta.get()) > 1e-6; 
+
   // Compute active RDMs
-  auto E0 = compute_casci_rdms<HamGen>(NumOrbital(na), nalpha.get(), nbeta.get(),
-    T_active.data(), V_active.data(), A1RDM, A2RDM, comm);
-#else
-  auto E0 = blas::dot(na2, A1RDM, 1, T_active.data(), 1) +
-            blas::dot(na4, A2RDM, 1, V_active.data(), 1) +
-            E_inactive; 
+  if(comp_rdms) {
+    logger->info("Computing Initial RDMs");
+    std::fill_n(A1RDM, na2, 0.0);
+    std::fill_n(A2RDM, na4, 0.0);
+    compute_casci_rdms<HamGen>(settings, NumOrbital(na), nalpha.get(), 
+      nbeta.get(), T_active.data(), V_active.data(), A1RDM, A2RDM, comm) 
+      + E_inactive;
+  } else {
+    logger->info("Using Passed RDMs");
+  }
+
+  double E_1RDM = blas::dot(na2, A1RDM, 1, T_active.data(), 1);
+  double E_2RDM = blas::dot(na4, A2RDM, 1, V_active.data(), 1);
+
+  E0 =  E_1RDM + E_2RDM + E_inactive; 
+  logger->info("{} = {:.12f}","E1",E_1RDM);
+  logger->info("{} = {:.12f}","E2",E_2RDM);
+  logger->info("{} = {:.12f}","EF",E0);
+
+#if 0
+  std::vector<double> full_ordm(no2), full_trdm(no4);
+  auto E0_full = compute_casci_rdms2<HamGen>(settings, norb, ninact, nact,
+    nalpha.get(), nbeta.get(), T, V, full_ordm.data(), full_trdm.data(), comm) + E_core;
+  std::cout << "TEST " << E0 << " " << E0_full << std::endl;
+  write_fcidump("FCIDUMP.dat", no, T, LDT, V, LDV, E_core);
+  write_rdms_binary("rdms.bin", no, full_ordm.data(), no, full_trdm.data(), no);
 #endif
 
   const std::string fmt_string = "iter = {:4} E(CI) = {:.10f}, dE = {:18.10e}, |orb_grad| = {:18.10e}";

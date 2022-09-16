@@ -6,6 +6,7 @@
 #include <asci/util/fock_matrices.hpp>
 #include <asci/util/transform.hpp>
 #include <asci/util/mcscf.hpp>
+#include <asci/util/orbital_energies.hpp>
 #include <asci/util/orbital_gradient.hpp>
 
 #include <iostream>
@@ -20,6 +21,14 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/stopwatch.h>
+#include <spdlog/cfg/env.h>
+
+using asci::NumElectron;
+using asci::NumOrbital;
+using asci::NumInactive;
+using asci::NumActive;
+using asci::NumVirtual;
+
 
 template <typename T>
 T vec_sum(const std::vector<T>& x) {
@@ -59,6 +68,7 @@ int main(int argc, char** argv) {
 
   std::cout << std::scientific << std::setprecision(12);
   //spdlog::set_level(spdlog::level::debug);
+  spdlog::cfg::load_env_levels();
   spdlog::set_pattern("[%n] %v");
 
   constexpr size_t nwfn_bits = 64;
@@ -71,7 +81,7 @@ int main(int argc, char** argv) {
   {
   // Create Logger
   auto console = spdlog::stdout_color_mt("standalone driver");
-  auto bfgs_logger = spdlog::null_logger_mt("bfgs");
+  //auto bfgs_logger = spdlog::null_logger_mt("bfgs");
 
   // Read Input Options
   std::vector< std::string > opts( argc );
@@ -142,13 +152,6 @@ int main(int argc, char** argv) {
     if( rdm_fname.size() ) console->info("  * RDMFILE = {}", rdm_fname );
     if( fci_out_fname.size() ) 
       console->info("  * FCIDUMP_OUT = {}", fci_out_fname);
-    //console->info("  * N_ALPHA = {}", nalpha);
-    //console->info("  * N_BETA  = {}", nbeta);
-    //console->info("[Active Space]:");
-    //console->info("  * N_ORB      = {}", norb);
-    //console->info("  * N_INACTIVE = {}", n_inactive);
-    //console->info("  * N_ACTIVE   = {}", n_active);
-    //console->info("  * N_VIRTUAL  = {}", n_virtual);
 
     console->debug("READ {} 1-body integrals and {} 2-body integrals", 
       T.size(), V.size());
@@ -157,55 +160,30 @@ int main(int argc, char** argv) {
     console->debug("VSUM  = {:.12f}", vec_sum(V));
   }
 
-
+  // Compute canonical orbital energies
+  std::vector<double> eps(norb);
+  asci::canonical_orbital_energies(NumOrbital(norb), NumInactive(nalpha),
+    T.data(), norb, V.data(), norb, eps.data());
+  
   // Copy integrals into active subsets
   std::vector<double> T_active(n_active * n_active);
   std::vector<double> V_active(n_active * n_active * n_active * n_active);
 
-  using asci::NumElectron;
-  using asci::NumOrbital;
-  using asci::NumInactive;
-  using asci::NumActive;
-  using asci::NumVirtual;
-
   std::vector<double> F_inactive(norb2);
-#if 0
-  // Extract active two body interaction from V
-  asci::active_subtensor_2body(NumActive(n_active), 
-    NumInactive(n_inactive), V.data(), norb, 
-    V_active.data(), n_active);
-
-  // Compute inactive Fock in full MO space
-  asci::inactive_fock_matrix( NumOrbital(norb), 
-    NumInactive(n_inactive), T.data(), norb, 
-    V.data(), norb, F_inactive.data(), norb );
-
-  // Replace T_active with active-active block of F_inactive
-  asci::active_submatrix_1body(NumActive(n_active), 
-    NumInactive(n_inactive), F_inactive.data(), norb, 
-    T_active.data(), n_active);
-#else
   // Compute active-space Hamiltonian and inactive Fock matrix
   asci::active_hamiltonian(NumOrbital(norb), NumActive(n_active),
     NumInactive(n_inactive), T.data(), norb, V.data(), norb,
     F_inactive.data(), norb, T_active.data(), n_active,
     V_active.data(), n_active);
-#endif
 
-
-  if(world_rank == 0) {
-    console->debug("FINACTIVE_SUM = {:.12f}", vec_sum(F_inactive));
-    console->debug("VACTIVE_SUM   = {:.12f}", vec_sum(V_active)  );
-    console->debug("TACTIVE_SUM   = {:.12f}", vec_sum(T_active)  ); 
-  }
+  console->debug("FINACTIVE_SUM = {:.12f}", vec_sum(F_inactive));
+  console->debug("VACTIVE_SUM   = {:.12f}", vec_sum(V_active)  );
+  console->debug("TACTIVE_SUM   = {:.12f}", vec_sum(T_active)  ); 
 
   // Compute Inactive energy
   auto E_inactive = asci::inactive_energy(NumInactive(n_inactive), 
     T.data(), norb, F_inactive.data(), norb);
-
-  if(world_rank == 0) {
-    console->info("E(inactive) = {:.12f}", E_inactive);
-  }
+  console->info("E(inactive) = {:.12f}", E_inactive);
   
 
   // Storage for active RDMs
