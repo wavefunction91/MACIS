@@ -36,4 +36,10 @@ void numerical_orbital_gradient(NumOrbital norb,
   size_t LDD1, const double* A2RDM, size_t LDD2,
   double* OG, size_t LDOG ); 
 
+void numerical_orbital_hessian(NumOrbital _norb, 
+  NumInactive ninact, NumActive nact, const double* T, size_t LDT,
+  const double* V, size_t LDV, const double* A1RDM,
+  size_t LDD1, const double* A2RDM, size_t LDD2,
+  double* OH, size_t LDOH );
+
 }

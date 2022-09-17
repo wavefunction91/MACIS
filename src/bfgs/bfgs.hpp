@@ -105,6 +105,8 @@ detail::arg_type_t<Functor> bfgs(
     B.update(s,y);
     p = B.apply(gfx); Functor::scal(-1.0, p);
 
+    logger->debug("  XNRM = {:10.5e} SNRM = {:10.5e} YNRM = {:10.5e} PNRM = {:10.5e}",
+      Functor::norm(x), Functor::norm(s), Functor::norm(y), Functor::norm(p));
   }
   if(converged) logger->info("BFGS Converged!");
 

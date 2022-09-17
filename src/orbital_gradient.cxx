@@ -166,4 +166,165 @@ void numerical_orbital_gradient(NumOrbital _norb,
 
 }
 
+
+
+
+
+void numerical_orbital_hessian(NumOrbital _norb, 
+  NumInactive ninact, NumActive nact, const double* T, size_t LDT,
+  const double* V, size_t LDV, const double* A1RDM,
+  size_t LDD1, const double* A2RDM, size_t LDD2,
+  double* OH, size_t LDOH ) { 
+
+
+  const auto norb = _norb.get();
+
+  const size_t norb2 = norb  * norb;
+  const size_t norb4 = norb2 * norb2;
+  std::vector<double> F(norb2), T_trans(norb2), 
+    V_trans(norb4), K(norb2), Kx(norb2), Ky(norb2), U(norb2);
+
+  auto energy = [&]() {
+    return orbital_rotated_energy(_norb, ninact, nact, 
+      T, LDT, V, LDV, A1RDM, LDD1, A2RDM, LDD2, U.data(), norb,
+      T_trans.data(), norb, V_trans.data(), norb, F.data(),
+      norb);
+  };
+  
+  const double dk = 0.001;
+  for(size_t i = 0;   i < norb; ++i) 
+  for(size_t a = i+1; a < norb; ++a) 
+  for(size_t j = 0;   j < norb; ++j) 
+  for(size_t b = i+1; b < norb; ++b) {
+    std::fill(Kx.begin(), Kx.end(), 0);
+    std::fill(Ky.begin(), Ky.end(), 0);
+    Kx[a + i*norb] = dk;
+    Kx[i + a*norb] = -dk;
+    Ky[b + j*norb] = dk;
+    Ky[j + b*norb] = -dk;
+
+    //E(x+h,y+h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = Kx[p] + Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xp1_yp1 = energy();
+
+    //E(x+2h,y+h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = 2*Kx[p] + Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xp2_yp1 = energy();
+
+    //E(x+h,y+2h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = Kx[p] + 2*Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xp1_yp2 = energy();
+
+    //E(x+2h,y+2h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = 2*Kx[p] + 2*Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xp2_yp2 = energy();
+
+
+
+    //E(x+h,y-h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = Kx[p] - Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xp1_ym1 = energy();
+
+    //E(x+2h,y-h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = 2*Kx[p] - Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xp2_ym1 = energy();
+
+    //E(x+h,y-2h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = Kx[p] - 2*Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xp1_ym2 = energy();
+
+    //E(x+2h,y-2h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = 2*Kx[p] - 2*Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xp2_ym2 = energy();
+
+
+
+    //E(x-h,y+h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = -Kx[p] + Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xm1_yp1 = energy();
+
+    //E(x-2h,y+h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = -2*Kx[p] + Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xm2_yp1 = energy();
+
+    //E(x-h,y+2h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = -Kx[p] + 2*Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xm1_yp2 = energy();
+
+    //E(x-2h,y+2h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = -2*Kx[p] + 2*Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xm2_yp2 = energy();
+
+
+
+    //E(x-h,y-h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = -Kx[p] - Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xm1_ym1 = energy();
+
+    //E(x-2h,y-h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = -2*Kx[p] - Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xm2_ym1 = energy();
+
+    //E(x-h,y-2h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = -Kx[p] - 2*Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xm1_ym2 = energy();
+
+    //E(x-2h,y-2h)
+    std::fill(K.begin(), K.end(), 0);
+    for(size_t p = 0; p < norb2; ++p) K[p] = -2*Kx[p] - 2*Ky[p];
+    compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
+    auto E_xm2_ym2 = energy();
+
+#if 0
+    OH[a + i*LDOH + b*LDOH*LDOH + j*LDOH*LDOH*LDOH] = 
+      (E_xp1_yp1 + E_xm1_ym1 - E_xp1_ym1 - E_xm1_yp1) / (4 * dk*dk);
+#else
+    std::vector<double> c    = { -1.0, 8.0, -8.0, 1.0 };
+    std::vector<double> e_p2 = { E_xp2_yp2, E_xp2_yp1, E_xp2_ym1, E_xp2_ym2 };
+    std::vector<double> e_p1 = { E_xp1_yp2, E_xp1_yp1, E_xp1_ym1, E_xp1_ym2 };
+    std::vector<double> e_m1 = { E_xm1_yp2, E_xm1_yp1, E_xm1_ym1, E_xm1_ym2 };
+    std::vector<double> e_m2 = { E_xm2_yp2, E_xm2_yp1, E_xm2_ym1, E_xm2_ym2 };
+    std::vector<std::vector<double>> e = {e_p2, e_p1, e_m1, e_m2};
+    double tmp = 0.0;
+    for( auto p = 0; p < c.size(); ++p )
+    for( auto q = 0; q < c.size(); ++q ) {
+      tmp += c[p] * c[q] * e[p][q];
+    }
+    OH[a + i*LDOH + b*LDOH*LDOH + j*LDOH*LDOH*LDOH] = tmp / (144*dk*dk);
+#endif
+
+  }
+
+}
+
 }
