@@ -14,20 +14,21 @@ void HamiltonianGenerator<N>::rdm_contributions(
   spin_det_t bra_beta, spin_det_t ket_beta, spin_det_t ex_beta, 
   const std::vector<uint32_t>& bra_occ_alpha,
   const std::vector<uint32_t>& bra_occ_beta,
-  double val, double* ordm, double* trdm) {
+  double val, matrix_span<double> ordm, rank4_span<double> trdm) {
 
   const uint32_t ex_alpha_count = ex_alpha.count();
   const uint32_t ex_beta_count  = ex_beta.count();
 
   if( (ex_alpha_count + ex_beta_count) > 4 ) return;
 
-  if( ex_alpha_count == 4 and trdm) 
+  const auto trdm_ptr = trdm.data_handle();
+  if( ex_alpha_count == 4 and trdm_ptr) 
     rdm_contributions_4( bra_alpha, ket_alpha, ex_alpha, val, trdm );
 
-  else if( ex_beta_count == 4 and trdm)
+  else if( ex_beta_count == 4 and trdm_ptr)
     rdm_contributions_4( bra_beta, ket_beta, ex_beta, val, trdm );
 
-  else if( ex_alpha_count == 2 and ex_beta_count == 2 and trdm )
+  else if( ex_alpha_count == 2 and ex_beta_count == 2 and trdm_ptr )
     rdm_contributions_22( bra_alpha, ket_alpha, ex_alpha,
       bra_beta, ket_beta, ex_beta, val, trdm );
 
@@ -45,15 +46,15 @@ void HamiltonianGenerator<N>::rdm_contributions(
 
 template <size_t N>
 void HamiltonianGenerator<N>::rdm_contributions_4( spin_det_t bra, 
-  spin_det_t ket, spin_det_t ex, double val, double* trdm ) {
+  spin_det_t ket, spin_det_t ex, double val, rank4_span<double> trdm ) {
 
   auto [o1,v1,o2,v2,sign] = doubles_sign_indices( bra, ket, ex );
 
   val *= sign * 0.5;
-  trdm[ v1 + o1*norb_ + v2*norb2_ + o2*norb3_ ] += val;
-  trdm[ v2 + o1*norb_ + v1*norb2_ + o2*norb3_ ] -= val;
-  trdm[ v1 + o2*norb_ + v2*norb2_ + o1*norb3_ ] -= val;
-  trdm[ v2 + o2*norb_ + v1*norb2_ + o1*norb3_ ] += val;
+  trdm(v1, o1, v2, o2) += val;
+  trdm(v2, o1, v1, o2) -= val;
+  trdm(v1, o2, v2, o1) -= val;
+  trdm(v2, o2, v1, o1) += val;
 
 }
 
@@ -70,7 +71,7 @@ template <size_t N>
 void HamiltonianGenerator<N>::rdm_contributions_22( 
   spin_det_t bra_alpha, spin_det_t ket_alpha, spin_det_t ex_alpha, 
   spin_det_t bra_beta, spin_det_t ket_beta, spin_det_t ex_beta,
-  double val, double* trdm ) {
+  double val, rank4_span<double> trdm ) {
 
   auto [o1,v1,sign_a] = 
     single_excitation_sign_indices( bra_alpha, ket_alpha, ex_alpha );
@@ -79,8 +80,8 @@ void HamiltonianGenerator<N>::rdm_contributions_22(
   auto sign = sign_a*sign_b;
 
   val *= sign * 0.5;
-  trdm[ v1 + o1*norb_ + v2*norb2_ + o2*norb3_ ] += val;
-  trdm[ v2 + o2*norb_ + v1*norb2_ + o1*norb3_ ] += val;
+  trdm(v1, o1, v2, o2) += val;
+  trdm(v2, o2, v1, o1) += val;
 
 }
 
@@ -96,24 +97,24 @@ void HamiltonianGenerator<N>::rdm_contributions_2(
   spin_det_t bra, spin_det_t ket, spin_det_t ex,
   const std::vector<uint32_t>& bra_occ_alpha,
   const std::vector<uint32_t>& bra_occ_beta,
-  double val, double* ordm, double* trdm) {
+  double val, matrix_span<double> ordm, rank4_span<double> trdm) {
 
   auto [o1,v1,sign] = single_excitation_sign_indices(bra,ket,ex);
 
-  ordm[v1 + o1*norb_] += sign * val;
+  ordm(v1, o1) += sign * val;
   
-  if(trdm) {
+  if(trdm.data_handle()) {
     val *= sign * 0.5;
     for( auto p : bra_occ_alpha ) {
-      trdm[ v1 + o1*norb_ + p *norb2_ +  p*norb3_ ] += val;
-      trdm[ p  + p *norb_ + v1*norb2_ + o1*norb3_ ] += val;
-      trdm[ v1 + p *norb_ + p *norb2_ + o1*norb3_ ] -= val;
-      trdm[ p  + o1*norb_ + v1*norb2_ +  p*norb3_ ] -= val;
+      trdm( v1, o1, p ,  p) += val;
+      trdm( p , p , v1, o1) += val;
+      trdm( v1, p , p , o1) -= val;
+      trdm( p , o1, v1,  p) -= val;
     }
 
     for( auto p : bra_occ_beta ) {
-      trdm[ v1 + o1*norb_ + p *norb2_ +  p*norb3_ ] += val;
-      trdm[ p  + p *norb_ + v1*norb2_ + o1*norb3_ ] += val;
+      trdm(v1, o1, p ,  p) += val;
+      trdm(p , p , v1, o1) += val;
     }
   }
 
@@ -130,31 +131,31 @@ template <size_t N>
 void HamiltonianGenerator<N>::rdm_contributions_diag( 
   const std::vector<uint32_t>& occ_alpha,
   const std::vector<uint32_t>& occ_beta,
-  double val, double* ordm, double* trdm ) {
+  double val, matrix_span<double> ordm, rank4_span<double> trdm ) {
 
   // One-electron piece
-  for( auto p : occ_alpha ) ordm[p*(norb_+1)] += val;
-  for( auto p : occ_beta  ) ordm[p*(norb_+1)] += val;
+  for( auto p : occ_alpha ) ordm(p,p) += val;
+  for( auto p : occ_beta  ) ordm(p,p) += val;
 
-  if(trdm) {
+  if(trdm.data_handle()) {
     val *= 0.5;
     // Same-spin two-body term
     for( auto q : occ_alpha )
     for( auto p : occ_alpha ) {
-      trdm[p + p*norb_ + q*norb2_ + q*norb3_] += val;
-      trdm[p + q*norb_ + p*norb2_ + q*norb3_] -= val;
+      trdm(p, p, q, q) += val;
+      trdm(p, q, p, q) -= val;
     }
     for( auto q : occ_beta )
     for( auto p : occ_beta ) {
-      trdm[p + p*norb_ + q*norb2_ + q*norb3_] += val;
-      trdm[p + q*norb_ + p*norb2_ + q*norb3_] -= val;
+      trdm(p, p, q, q) += val;
+      trdm(p, q, p, q) -= val;
     }
 
     // Opposite-spin two-body term
     for( auto q : occ_beta  )
     for( auto p : occ_alpha ) {
-      trdm[p + p*norb_ + q*norb2_ + q*norb3_] += val;
-      trdm[q + q*norb_ + p*norb2_ + p*norb3_] += val;
+      trdm(p, p, q, q) += val;
+      trdm(q, q, p, p) += val;
     }
   }
 

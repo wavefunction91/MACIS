@@ -441,7 +441,8 @@ double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb,
 
   // Compute RDMs
   ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
-    C.data(), ORDM, TRDM);
+    C.data(), matrix_span<double>(ORDM,no,no), 
+    rank4_span<double>(TRDM,no,no,no,no));
 
   return E0;
 }

@@ -124,7 +124,7 @@ public:
     full_det_iterator bra_end,
     full_det_iterator ket_begin,
     full_det_iterator ket_end,
-    double *C, double* ordm, double* trdm ) override {
+    double *C, matrix_span<double> ordm, rank4_span<double> trdm ) override {
 
     
     const size_t nbra_dets = std::distance( bra_begin, bra_end );

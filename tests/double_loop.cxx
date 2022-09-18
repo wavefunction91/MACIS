@@ -180,7 +180,8 @@ TEST_CASE("Double Loop") {
     std::vector<double> C = { 1. };
   
     ham_gen.form_rdms( dets.begin(), dets.end(), dets.begin(), dets.end(), 
-      C.data(), ordm.data(), trdm.data() );
+      C.data(), asci::matrix_span<double>(ordm.data(),norb,norb), 
+      asci::rank4_span<double>(trdm.data(),norb,norb,norb,norb) );
 
     auto E_tmp = blas::dot(norb2, ordm.data(),1, T.data(),1) + 
                  blas::dot(norb3*norb, trdm.data(),1, V.data(),1);
@@ -198,18 +199,17 @@ TEST_CASE("RDMS") {
   const size_t nocc = 5;
 
   std::vector<double> T(norb*norb, 0.0);
-  std::vector<double> V(norb*norb*norb*norb, 0.0);
+  std::vector<double> V(norb3*norb, 0.0);
   std::vector<double> ordm(norb*norb,0.0), trdm(norb3 * norb,0.0);
 
+  asci::matrix_span<double> T_span(T.data(),norb,norb);
+  asci::matrix_span<double> ordm_span(ordm.data(),norb,norb);
+  asci::rank4_span<double> V_span(V.data(),norb,norb,norb,norb);
+  asci::rank4_span<double> trdm_span(trdm.data(),norb,norb,norb,norb);
+
   using generator_type = asci::DoubleLoopHamiltonianGenerator<128>;
-#if 0
-  generator_type ham_gen(norb, V.data(), T.data());
-#else
-  generator_type ham_gen(
-    asci::matrix_span<double>(T.data(),norb,norb),
-    asci::rank4_span<double>(V.data(),norb,norb,norb,norb)
-  );
-#endif
+  generator_type ham_gen( T_span, V_span );
+      
   auto abs_sum = [](auto a, auto b){ return a + std::abs(b); };
 
   SECTION("HF") {
@@ -220,24 +220,20 @@ TEST_CASE("RDMS") {
     std::vector<double> C = { 1. };
   
     ham_gen.form_rdms( dets.begin(), dets.end(), dets.begin(), dets.end(), 
-      C.data(), ordm.data(), trdm.data() );
+      C.data(), ordm_span, trdm_span ); 
 
 
-   #define TRDM(i,j,k,l) trdm[i + j*norb + k*norb2 + l*norb3] 
-   #define ORDM(i,j) ordm[i+j*norb]
     for( auto i = 0ul; i < nocc; ++i )
     for( auto j = 0ul; j < nocc; ++j )
     for( auto k = 0ul; k < nocc; ++k )
     for( auto l = 0ul; l < nocc; ++l ) {
-      TRDM(i,j,l,k) -= 0.5  * ORDM(i,j) * ORDM(k,l);
-      TRDM(i,j,l,k) += 0.25 * ORDM(i,l) * ORDM(k,j);
+      trdm_span(i,j,l,k) -= 0.5  * ordm_span(i,j) * ordm_span(k,l);
+      trdm_span(i,j,l,k) += 0.25 * ordm_span(i,l) * ordm_span(k,j);
     }
-    #undef TRDM
-    #undef ORDM
     auto sum = std::accumulate(trdm.begin(), trdm.end(), 0.0, abs_sum );
     REQUIRE( sum < 1e-15 );
   
-    for( auto i = 0ul; i < nocc; ++i ) ordm[i*(norb+1)] -= 2.0;
+    for( auto i = 0ul; i < nocc; ++i ) ordm_span(i,i) -= 2.0;
     sum = std::accumulate(ordm.begin(), ordm.end(), 0.0, abs_sum );
     REQUIRE(sum < 1e-15);
 
@@ -258,20 +254,20 @@ TEST_CASE("RDMS") {
     blas::scal(coeffs.size(), 1./c_nrm, coeffs.data(), 1);
 
     ham_gen.form_rdms( states.begin(), states.end(), states.begin(), states.end(), 
-      coeffs.data(), ordm.data(), trdm.data());
+      coeffs.data(), ordm_span, trdm_span );
     auto sum_ordm = std::accumulate(ordm.begin(), ordm.end(), 0.0, abs_sum );
     auto sum_trdm = std::accumulate(trdm.begin(), trdm.end(), 0.0, abs_sum );
     REQUIRE(sum_ordm == Approx(1.038559618650e+01));
     REQUIRE(sum_trdm == Approx(9.928269867561e+01));
 
     double trace_ordm = 0.;
-    for( auto p = 0; p < norb; ++p ) trace_ordm += ordm[p*(norb+1)];
+    for( auto p = 0; p < norb; ++p ) trace_ordm += ordm_span(p,p);
     REQUIRE(trace_ordm == Approx(2.0*nocc));
 
     // Check symmetries
     for( auto p = 0; p < norb; ++p )
     for( auto q = p; q < norb; ++q ) {
-      REQUIRE( ordm[p + q*norb] == Approx(ordm[q + p*norb]) );
+      REQUIRE( ordm_span(p,q) == Approx(ordm_span(q,p)) );
     }
     
 #if 0 

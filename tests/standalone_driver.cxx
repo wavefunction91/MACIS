@@ -64,7 +64,8 @@ auto compute_casci_rdms(asci::NumOrbital norb, size_t nalpha, size_t nbeta,
 
   // Compute RDMs
   ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
-    C.data(), ORDM, TRDM);
+    C.data(), asci::matrix_span<double>(ORDM,no,no),
+    asci::rank4_span<double>(TRDM,no,no,no,no));
 
   return std::make_pair(EHF, E0);
 }
@@ -177,8 +178,8 @@ int main(int argc, char** argv) {
   std::vector<double> T_active(n_active * n_active);
   std::vector<double> V_active(n_active * n_active * n_active * n_active);
 
-  std::vector<double> F_inactive(norb2);
   // Compute active-space Hamiltonian and inactive Fock matrix
+  std::vector<double> F_inactive(norb2);
   asci::active_hamiltonian(NumOrbital(norb), NumActive(n_active),
     NumInactive(n_inactive), T.data(), norb, V.data(), norb,
     F_inactive.data(), norb, T_active.data(), n_active,
@@ -217,37 +218,8 @@ int main(int argc, char** argv) {
     console->info("E(CI)   = {:.12f} Eh", E0  + E_inactive + E_core);
   }
 
-#if 0
-  std::vector<double> a1rdm(active_ordm.size()), a2rdm(active_trdm.size());
-  compute_casci_rdms<nwfn_bits>(NumOrbital(n_active), nalpha, nbeta, 
-    T_active.data(), V_active.data(), a1rdm.data(), a2rdm.data(),
-    MPI_COMM_WORLD);
-
-  std::vector<double> a1rdm_diff(a1rdm.size());
-  for( auto i = 0, v = 0; v < n_active; ++v) 
-  for( auto w = 0;        w < n_active; ++w, ++i) {
-    a1rdm_diff[i] = a1rdm[i] - active_ordm[i];
-    console->info("A1RDM ({:3},{:3}) {:15.5e} {:15.5e} {:15.5e}",w,v,a1rdm[i],active_ordm[i],a1rdm_diff[i]);
-  }
-
-  std::vector<double> a2rdm_diff(a2rdm.size());
-  for( auto i = 0, v = 0; v < n_active; ++v) 
-  for( auto w = 0;        w < n_active; ++w) 
-  for( auto x = 0;        x < n_active; ++x) 
-  for( auto y = 0;        y < n_active; ++y, ++i) {
-    a2rdm_diff[i] = a2rdm[i] - active_trdm[i];
-    console->info("A2RDM ({:3},{:3},{:3},{:3}) {:15.5e} {:15.5e} {:15.5e}",y,x,w,v,a2rdm[i],active_trdm[i],a2rdm_diff[i]);
-  }
-#endif
-
-
-  
-
-#if 1
-  if(world_rank == 0) {
-    console->debug("ORDMSUM = {:.12f}", vec_sum(active_ordm));
-    console->debug("TRDMSUM = {:.12f}", vec_sum(active_trdm));
-  }
+  console->debug("ORDMSUM = {:.12f}", vec_sum(active_ordm));
+  console->debug("TRDMSUM = {:.12f}", vec_sum(active_trdm));
 
   // Compute CI energy from RDMs
   double ERDM = blas::dot( active_ordm.size(), active_ordm.data(), 1, T_active.data(), 1 );
@@ -277,83 +249,6 @@ int main(int argc, char** argv) {
   console->info("E(FOCK) = {:.12f} Eh", E_FOCK + E_core);
 
 #if 0
-
-  // Numerical Orbital gradient
-  std::vector<double> OGrad(norb*norb);
-  asci::numerical_orbital_gradient(NumOrbital(norb), 
-    NumInactive(n_inactive), NumActive(n_active),
-    T.data(), norb, V.data(), norb, active_ordm.data(), 
-    n_active, active_trdm.data(), n_active, OGrad.data(),
-    norb);
-
-  std::cout << std::endl;
-  std::cout << "Active - Inactive Orbital Gradient" << std::endl;
-  for(size_t i = 0; i < n_inactive; ++i) 
-  for(size_t a = 0; a < n_active;   ++a){
-    auto ia = i + (a+n_inactive)*norb;
-    auto ai = (a+n_inactive) + i*norb;
-    auto exact = 2*(F[ai] - F[ia]);
-    auto numer = OGrad[ai];
-    std::cout << "  " << i << " " << a << ": " << exact << ", " << std::abs(exact - numer) << std::endl; 
-  }
-
-  std::cout << "Virtual - Inactive Orbital Gradient" << std::endl;
-  for(size_t i = 0; i < n_inactive; ++i) 
-  for(size_t a = 0; a < n_virtual;  ++a) {
-    auto ia = i + (a+n_inactive+n_active)*norb;
-    auto ai = (a+n_inactive+n_active) + i*norb;
-    auto exact = 2*(F[ai] - F[ia]);
-    auto numer = OGrad[ai];
-    std::cout << "  " << i << " " << a << ": " << exact << ", " << std::abs(exact - numer) << std::endl; 
-  }
-
-
-  std::cout << "Virtual - Active Orbital Gradient" << std::endl;
-  for(size_t i = 0; i < n_active;  ++i) 
-  for(size_t a = 0; a < n_virtual; ++a) {
-    auto ia = (i+n_inactive) + (a+n_inactive+n_active)*norb;
-    auto ai = (a+n_inactive+n_active) + (i+n_inactive)*norb;
-    auto exact = 2*(F[ai] - F[ia]);
-    auto numer = OGrad[ai];
-    std::cout << "  " << i << " " << a << ": " << exact << ", " << std::abs(exact - numer) << std::endl; 
-  }
-
-
-  // check orbital rotated energy
-  size_t i = 0, a = 3;
-  double dk = 0.001;
-  double max_k = 0.5;
-  size_t nk = max_k/dk;
-  std::vector<double> K(norb2), U(norb2);
-
-  // Compute K
-  std::fill(K.begin(), K.end(), 0);
-  //K[a + i*norb] =  1.0;
-  //K[i + a*norb] = -1.0;
-  asci::fock_to_gradient(NumOrbital(norb),NumInactive(n_inactive),
-    NumActive(n_active), NumVirtual(n_virtual), F.data(), norb,
-    K.data(), norb);
-  for( auto& x : K ) x = -x;
-  
-
-  for(size_t ik = 0; ik < nk; ++ik) {
-
-    // Compute U = EXP[-alpha * K]
-    asci::compute_orbital_rotation(NumOrbital(norb), ik*dk, K.data(), norb,
-      U.data(), norb);
-
-    // Compute Rotated Energy
-    auto E = asci::orbital_rotated_energy(NumOrbital(norb), NumInactive(n_inactive),
-      NumActive(n_active), T.data(), norb, V.data(), norb, active_ordm.data(),
-      n_active, active_trdm.data(), n_active, U.data(), norb);
-
-    std::cout << ik*dk << ", " << E << ", " << E - E_FOCK << std::endl;
-    
-  }
-
-#else
-
-#if 0
   // Optimize Orbitals
   std::vector<double> K(norb2);
   asci::optimize_orbitals(NumOrbital(norb), NumInactive(n_inactive),
@@ -369,12 +264,9 @@ int main(int argc, char** argv) {
     MPI_COMM_WORLD);
 
   if(fci_out_fname.size())
-  asci::write_fcidump(fci_out_fname,norb, T.data(), norb, V.data(), norb, E_core);
+    asci::write_fcidump(fci_out_fname,norb, T.data(), norb, V.data(), norb, E_core);
 #endif
 
-#endif
-#endif
-  
   } // MPI Scope
 
   MPI_Finalize();
