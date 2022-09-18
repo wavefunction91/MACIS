@@ -25,7 +25,14 @@ TEST_CASE("Double Loop") {
 
   using generator_type = asci::DoubleLoopHamiltonianGenerator<64>;
 
+#if 0
   generator_type ham_gen(norb, V.data(), T.data());
+#else
+  generator_type ham_gen(
+    asci::matrix_span<double>(T.data(),norb,norb),
+    asci::rank4_span<double>(V.data(),norb,norb,norb,norb)
+  );
+#endif
   const auto hf_det = asci::canonical_hf_determinant<64>(nocc, nocc);
 
   std::vector<double> eps(norb);
@@ -195,7 +202,14 @@ TEST_CASE("RDMS") {
   std::vector<double> ordm(norb*norb,0.0), trdm(norb3 * norb,0.0);
 
   using generator_type = asci::DoubleLoopHamiltonianGenerator<128>;
+#if 0
   generator_type ham_gen(norb, V.data(), T.data());
+#else
+  generator_type ham_gen(
+    asci::matrix_span<double>(T.data(),norb,norb),
+    asci::rank4_span<double>(V.data(),norb,norb,norb,norb)
+  );
+#endif
   auto abs_sum = [](auto a, auto b){ return a + std::abs(b); };
 
   SECTION("HF") {

@@ -214,12 +214,13 @@ void HamiltonianGenerator<N>::rotate_hamiltonian_ordm( const double* ordm ) {
   
   // Transform T
   // T <- N**H * T * N
+  auto* T_pq_ptr = T_pq_.data_handle();
   blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-    norb_, norb_, norb_, 1., T_pq_, norb_, natural_orbitals.data(), norb_, 
+    norb_, norb_, norb_, 1., T_pq_ptr, norb_, natural_orbitals.data(), norb_, 
     0., tmp.data(), norb_ );
   blas::gemm( blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
     norb_, norb_, norb_, 1., natural_orbitals.data(), norb_, tmp.data(), norb_, 
-    0., T_pq_, norb_ );
+    0., T_pq_ptr, norb_ );
 
   // Transorm V
 
@@ -227,8 +228,8 @@ void HamiltonianGenerator<N>::rotate_hamiltonian_ordm( const double* ordm ) {
   // (pj|kl) = N(i,p) (ij|kl) 
   // W(p,jkl) = N(i,p) * V(i,jkl)
   blas::gemm( blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-    norb_, norb3_, norb_, 1., natural_orbitals.data(), norb_, V_pqrs_, norb_, 
-    0., tmp.data(), norb_ );
+    norb_, norb3_, norb_, 1., natural_orbitals.data(), norb_, 
+    V_pqrs_.data_handle(), norb_, 0., tmp.data(), norb_ );
 
   // 2nd Quarter
   // (pq|kl) = N(j,q) (pj|kl)
@@ -258,7 +259,7 @@ void HamiltonianGenerator<N>::rotate_hamiltonian_ordm( const double* ordm ) {
   // W(pqr,s) = V(pqr,l) N(l,s)
   blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
     norb3_, norb_, norb_, 1., tmp.data(), norb3_, natural_orbitals.data(), norb_,
-    0., V_pqrs_, norb3_ );
+    0., V_pqrs_.data_handle(), norb3_ );
 
   // Regenerate intermediates
   generate_integral_intermediates( norb_, V_pqrs_ );

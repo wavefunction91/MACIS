@@ -9,16 +9,16 @@ double HamiltonianGenerator<N>::single_orbital_en( uint32_t orb,
   const std::vector<uint32_t>& os_occ ) const {
 
   // One electron component
-  double orb_en = T_pq_[ orb + orb*norb_ ];
+  double orb_en = T_pq_(orb,orb);
 
   // Same-spin two-body term
   for( auto q : ss_occ )
-    orb_en += G2_red_[orb + q*norb_] + G2_red_[q + orb*norb_];
-  orb_en -= G2_red_[orb + orb*norb_];
+    orb_en += G2_red_(orb,q) + G2_red_(q,orb);
+  orb_en -= G2_red_(orb,orb);
 
   // Opposite-spin two-body term
   for( auto q : os_occ  )
-    orb_en += V2_red_[orb + q*norb_];
+    orb_en += V2_red_(orb,q);
 
   return orb_en;
 }
@@ -32,8 +32,8 @@ double HamiltonianGenerator<N>::fast_diag_single(
   return orig_det_Hii
        + single_orbital_en( orb_par, ss_occ, os_occ )  
        - single_orbital_en( orb_hol, ss_occ, os_occ )
-       - G2_red_[ orb_par + norb_*orb_hol ] 
-       - G2_red_[ orb_hol + norb_*orb_par ];
+       - G2_red_(orb_par,orb_hol) 
+       - G2_red_(orb_hol,orb_par);
 }
 
 template <size_t N>
@@ -48,18 +48,18 @@ double HamiltonianGenerator<N>::fast_diag_ss_double(
        + single_orbital_en( orb_par2, ss_occ, os_occ )
        - single_orbital_en( orb_hol1, ss_occ, os_occ ) 
        - single_orbital_en( orb_hol2, ss_occ, os_occ )
-       + G2_red_[ orb_hol1 + norb_*orb_hol2 ] 
-       + G2_red_[ orb_hol2 + norb_*orb_hol1 ]
-       + G2_red_[ orb_par1 + norb_*orb_par2 ] 
-       + G2_red_[ orb_par2 + norb_*orb_par1 ]
-       - G2_red_[ orb_par1 + norb_*orb_hol1 ] 
-       - G2_red_[ orb_hol1 + norb_*orb_par1 ]
-       - G2_red_[ orb_par2 + norb_*orb_hol1 ] 
-       - G2_red_[ orb_hol1 + norb_*orb_par2 ]
-       - G2_red_[ orb_par1 + norb_*orb_hol2 ] 
-       - G2_red_[ orb_hol2 + norb_*orb_par1 ]
-       - G2_red_[ orb_par2 + norb_*orb_hol2 ] 
-       - G2_red_[ orb_hol2 + norb_*orb_par2 ];
+       + G2_red_(orb_hol1,orb_hol2) 
+       + G2_red_(orb_hol2,orb_hol1)
+       + G2_red_(orb_par1,orb_par2) 
+       + G2_red_(orb_par2,orb_par1)
+       - G2_red_(orb_par1,orb_hol1) 
+       - G2_red_(orb_hol1,orb_par1)
+       - G2_red_(orb_par2,orb_hol1) 
+       - G2_red_(orb_hol1,orb_par2)
+       - G2_red_(orb_par1,orb_hol2) 
+       - G2_red_(orb_hol2,orb_par1)
+       - G2_red_(orb_par2,orb_hol2) 
+       - G2_red_(orb_hol2,orb_par2);
 }
 
 template <size_t N>
@@ -74,14 +74,14 @@ double HamiltonianGenerator<N>::fast_diag_os_double(
        + single_orbital_en( orb_pard, do_occ, up_occ )
        - single_orbital_en( orb_holu, up_occ, do_occ ) 
        - single_orbital_en( orb_hold, do_occ, up_occ )
-       + V2_red_[ orb_holu + norb_*orb_hold ] 
-       + V2_red_[ orb_paru + norb_*orb_pard ]
-       - G2_red_[ orb_paru + norb_*orb_holu ] 
-       - G2_red_[ orb_holu + norb_*orb_paru ]
-       - G2_red_[ orb_pard + norb_*orb_hold ] 
-       - G2_red_[ orb_hold + norb_*orb_pard ]
-       - V2_red_[ orb_paru + norb_*orb_hold ] 
-       - V2_red_[ orb_holu + norb_*orb_pard ];
+       + V2_red_(orb_holu,orb_hold) 
+       + V2_red_(orb_paru,orb_pard)
+       - G2_red_(orb_paru,orb_holu) 
+       - G2_red_(orb_holu,orb_paru)
+       - G2_red_(orb_pard,orb_hold) 
+       - G2_red_(orb_hold,orb_pard)
+       - V2_red_(orb_paru,orb_hold) 
+       - V2_red_(orb_holu,orb_pard);
 }
 
 }

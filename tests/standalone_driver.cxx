@@ -42,7 +42,15 @@ auto compute_casci_rdms(asci::NumOrbital norb, size_t nalpha, size_t nbeta,
   int rank; MPI_Comm_rank(comm, &rank);
 
   // Hamiltonian Matrix Element Generator
+#if 0
   asci::DoubleLoopHamiltonianGenerator<nbits> ham_gen( norb.get(), V, T );
+#else
+  size_t no = norb.get();
+  asci::DoubleLoopHamiltonianGenerator<nbits> ham_gen( 
+    asci::matrix_span<double>(T,no,no),
+    asci::rank4_span<double>(V,no,no,no,no) 
+  );
+#endif
 
   // Compute HF Energy
   const auto hf  = asci::canonical_hf_determinant<nbits>(nalpha, nbeta);

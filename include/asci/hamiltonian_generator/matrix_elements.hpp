@@ -66,7 +66,7 @@ double HamiltonianGenerator<N>::matrix_element_4(
 
   auto [o1,v1,o2,v2,sign] = doubles_sign_indices( bra, ket, ex );
 
-  return sign * G_pqrs_[v1 + o1*norb_ + v2*norb2_ + o2*norb3_];
+  return sign * G_pqrs_(v1,o1,v2,o2);
 
 }
 
@@ -82,7 +82,7 @@ double HamiltonianGenerator<N>::matrix_element_22(
     single_excitation_sign_indices( bra_beta,  ket_beta,  ex_beta  );
   auto sign = sign_a*sign_b;
 
-  return sign * V_pqrs_[v1 + o1*norb_ + v2*norb2_ + o2*norb3_];
+  return sign * V_pqrs_(v1,o1,v2,o2);
 
 }
 
@@ -96,14 +96,14 @@ double HamiltonianGenerator<N>::matrix_element_2(
 
   auto [o1,v1,sign] = single_excitation_sign_indices(bra,ket,ex);
   
-  double h_el = T_pq_[v1 + o1*norb_];
+  double h_el = T_pq_(v1,o1);
 
-  const double* G_red_ov = G_red_.data() + v1*norb_ + o1*norb2_;
+  const double* G_red_ov = &G_red_(0,v1,o1);
   for( auto p : bra_occ_alpha ) {
     h_el += G_red_ov[p];
   }
 
-  const double* V_red_ov = V_red_.data() + v1*norb_ + o1*norb2_;
+  const double* V_red_ov = &V_red_(0,v1,o1);
   for( auto p : bra_occ_beta ) {
     h_el += V_red_ov[p];
   }
@@ -122,24 +122,24 @@ double HamiltonianGenerator<N>::matrix_element_diag(
   double h_el = 0;
 
   // One-electron piece
-  for( auto p : occ_alpha ) h_el += T_pq_[p*(norb_+1)];
-  for( auto p : occ_beta  ) h_el += T_pq_[p*(norb_+1)];
+  for( auto p : occ_alpha ) h_el += T_pq_(p,p);
+  for( auto p : occ_beta  ) h_el += T_pq_(p,p);
 
 
   // Same-spin two-body term
   for( auto q : occ_alpha )
   for( auto p : occ_alpha ) {
-    h_el += G2_red_[p + q*norb_];
+    h_el += G2_red_(p,q);
   }
   for( auto q : occ_beta )
   for( auto p : occ_beta ) {
-    h_el += G2_red_[p + q*norb_];
+    h_el += G2_red_(p,q);
   }
 
   // Opposite-spin two-body term
   for( auto q : occ_beta  )
   for( auto p : occ_alpha ) {
-    h_el += V2_red_[p + q*norb_];
+    h_el += V2_red_(p,q);
   }
 
   return h_el;

@@ -422,7 +422,15 @@ double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb,
   int rank; MPI_Comm_rank(comm, &rank);
 
   // Hamiltonian Matrix Element Generator
+#if 0
   asci::DoubleLoopHamiltonianGenerator<nbits> ham_gen( norb.get(), V, T );
+#else
+  size_t no = norb.get();
+  asci::DoubleLoopHamiltonianGenerator<nbits> ham_gen( 
+    matrix_span<double>(T,no,no),
+    rank4_span<double>(V,no,no,no,no) 
+  );
+#endif
   
   // Compute Lowest Energy Eigenvalue (ED)
   std::vector<double> C;

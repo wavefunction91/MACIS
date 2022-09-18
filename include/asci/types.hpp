@@ -14,8 +14,28 @@ using col_major_span =
   stdex::mdspan<T, stdex::dextents<size_t,rank>, 
     stdex::layout_left>;
 
+template <typename T>
+using matrix_span = col_major_span<T,2>;
+
+template <typename T>
+using rank3_span = col_major_span<T,3>;
+
+template <typename T>
+using rank4_span = col_major_span<T,4>;
+
+template <typename T>
+auto begin(T&& s){
+  return s.data_handle();
+}
+
+template <typename T>
+auto end(T&& s){
+  return begin(s) + s.size();
+}
+
 template <size_t N>
-using wavefunction_iterator_t = typename std::vector< std::bitset<N> >::iterator;
+using wavefunction_iterator_t = 
+  typename std::vector< std::bitset<N> >::iterator;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"

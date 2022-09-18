@@ -28,7 +28,14 @@ TEST_CASE("CSR Hamiltonian") {
   
   using generator_type = asci::DoubleLoopHamiltonianGenerator<64>;
 
+#if 0
   generator_type ham_gen(norb, V.data(), T.data());
+#else
+  generator_type ham_gen(
+    asci::matrix_span<double>(T.data(),norb,norb),
+    asci::rank4_span<double>(V.data(),norb,norb,norb,norb)
+  );
+#endif
 
   // Generate configuration space
   const auto hf_det = asci::canonical_hf_determinant<64>(nocc, nocc);
@@ -77,7 +84,14 @@ TEST_CASE("Distributed CSR Hamiltonian") {
   
   using generator_type = asci::DoubleLoopHamiltonianGenerator<64>;
 
+#if 0
   generator_type ham_gen(norb, V.data(), T.data());
+#else
+  generator_type ham_gen(
+    asci::matrix_span<double>(T.data(),norb,norb),
+    asci::rank4_span<double>(V.data(),norb,norb,norb,norb)
+  );
+#endif
 
   // Generate configuration space
   const auto hf_det = asci::canonical_hf_determinant<64>(nocc, nocc);
