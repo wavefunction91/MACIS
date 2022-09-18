@@ -6,6 +6,8 @@ add_library( asci
   mcscf.cxx
   #rdms.cxx
   orbital_energies.cxx
+  orbital_rotation_utilities.cxx
+  orbital_hessian.cxx
 )
 
 target_include_directories( asci PUBLIC 
@@ -34,3 +36,7 @@ target_link_libraries(asci PUBLIC lobpcgxx sparsexx)
 # SPDLOG
 include(asci-spdlog)
 target_link_libraries(asci PUBLIC spdlog::spdlog)
+
+# MDSPAN
+include(asci-mdspan)
+target_link_libraries(asci PUBLIC mdspan)

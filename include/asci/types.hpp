@@ -3,8 +3,16 @@
 #include <bit>
 #include <vector>
 #include <strings.h>
+#include <experimental/mdspan>
 
 namespace asci {
+
+namespace stdex = std::experimental;
+
+template <typename T, size_t rank>
+using col_major_span = 
+  stdex::mdspan<T, stdex::dextents<size_t,rank>, 
+    stdex::layout_left>;
 
 template <size_t N>
 using wavefunction_iterator_t = typename std::vector< std::bitset<N> >::iterator;

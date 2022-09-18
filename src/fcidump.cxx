@@ -45,7 +45,7 @@ auto fcidump_line( const std::vector<std::string>& tokens ) {
     q = std::stoi(tokens[2]);
     r = std::stoi(tokens[3]);
     s = std::stoi(tokens[4]);
-    integral = std::stod(tokens[1]);
+    integral = std::stod(tokens[0]);
   }
 
   if(p < 0 or q < 0 or r < 0 or s < 0) throw std::runtime_error("Invalid Orb Idx");
@@ -107,10 +107,13 @@ double read_fcidump_core( std::string fname ) {
 
 }
 
-void read_fcidump_1body( std::string fname, double* T, size_t LDT ) {
+
+void read_fcidump_1body( std::string fname, col_major_span<double,2> T ) {
+
+  if(T.extent(0) != T.extent(1)) throw std::runtime_error("T must be square");
 
   auto norb = read_fcidump_norb(fname);
-  if( LDT < norb ) throw std::runtime_error("LDT < NORB");
+  if( T.extent(0) != norb ) throw std::runtime_error("T is of improper dimension");
 
   std::ifstream file(fname);
   std::string line;
@@ -122,23 +125,36 @@ void read_fcidump_1body( std::string fname, double* T, size_t LDT ) {
     auto lc = line_classification(p,q,r,s);
     if( lc == LineClassification::OneBody ) {
       p--; q--;
-      T[p + q*LDT] = integral;
-      T[q + p*LDT] = integral;
+      T(p,q) = integral;
+      T(q,p) = integral;
     }
   }
 
 }
 
-void read_fcidump_2body( std::string fname, double* V, size_t LDV ) {
+void read_fcidump_1body( std::string fname, double* T, size_t LDT ) {
 
   auto norb = read_fcidump_norb(fname);
-  if( LDV < norb ) throw std::runtime_error("LDV < NORB");
-  size_t LDV2 = LDV  * LDV;
-  size_t LDV3 = LDV2 * LDV;
+  col_major_span<double,2> T_map(T, LDT, norb);
+  read_fcidump_1body(fname, 
+    stdex::submdspan(T_map, std::pair{0,norb}, stdex::full_extent));
+
+}
+
+
+
+
+void read_fcidump_2body( std::string fname, col_major_span<double,4> V ) {
+
+  if(V.extent(0) != V.extent(1)) throw std::runtime_error("V must be square");
+  if(V.extent(0) != V.extent(2)) throw std::runtime_error("V must be square");
+  if(V.extent(0) != V.extent(3)) throw std::runtime_error("V must be square");
+
+  auto norb = read_fcidump_norb(fname);
+  if( V.extent(0) != norb ) throw std::runtime_error("V is of improper dimension");
 
   std::ifstream file(fname);
   std::string line;
-  #define V_pqrs(p,q,r,s) V[p + q*LDV + r*LDV2 + s*LDV3]
   while(std::getline(file, line)) {
     auto tokens = split(line, " ");
     if( tokens.size() != 5 ) continue; // not a valid FCIDUMP line
@@ -147,17 +163,26 @@ void read_fcidump_2body( std::string fname, double* V, size_t LDV ) {
     auto lc = line_classification(p,q,r,s);
     if( lc == LineClassification::TwoBody ) {
       p--; q--; r--; s--;
-      V_pqrs(p,q,r,s) = integral; // (pq|rs)
-      V_pqrs(p,q,s,r) = integral; // (pq|sr)
-      V_pqrs(q,p,r,s) = integral; // (qp|rs)
-      V_pqrs(q,p,s,r) = integral; // (qp|sr)
+      V(p,q,r,s) = integral; // (pq|rs)
+      V(p,q,s,r) = integral; // (pq|sr)
+      V(q,p,r,s) = integral; // (qp|rs)
+      V(q,p,s,r) = integral; // (qp|sr)
 
-      V_pqrs(r,s,p,q) = integral; // (rs|pq)
-      V_pqrs(s,r,p,q) = integral; // (sr|pq)
-      V_pqrs(r,s,q,p) = integral; // (rs|qp)
-      V_pqrs(s,r,q,p) = integral; // (sr|qp)
+      V(r,s,p,q) = integral; // (rs|pq)
+      V(s,r,p,q) = integral; // (sr|pq)
+      V(r,s,q,p) = integral; // (rs|qp)
+      V(s,r,q,p) = integral; // (sr|qp)
     }
   }
+}
+
+void read_fcidump_2body( std::string fname, double* V, size_t LDV ) {
+
+  auto norb = read_fcidump_norb(fname);
+  col_major_span<double,4> V_map(V, LDV, LDV, LDV, norb);
+  auto sl = std::pair{0,norb};
+  read_fcidump_2body(fname, 
+    stdex::submdspan(V_map, sl, sl ,sl, stdex::full_extent));
 
 }
 

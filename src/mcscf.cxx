@@ -8,111 +8,10 @@
 #include <asci/fcidump.hpp>
 #include <Eigen/Core>
 
+#include "orbital_rotation_utilities.hpp"
+#include "orbital_hessian.hpp"
+
 namespace asci {
-
-template <typename T>
-auto split_linear_orb_rot( NumInactive ni, NumActive na, NumVirtual nv, 
-  T&& V_lin ) {
-  auto V_vi = V_lin;
-  auto V_va = V_vi + nv.get() * ni.get();
-  auto V_ai = V_va + nv.get() * na.get();
-  return std::make_tuple(V_vi, V_va, V_ai);
-}
-
-void linear_orb_rot_to_matrix(NumInactive _ni, NumActive _na,
-  NumVirtual _nv, const double* K_vi, const double* K_va, 
-  const double* K_ai, double* K, size_t LDK ) {
-
-  const auto ni = _ni.get();
-  const auto na = _na.get();
-  const auto nv = _nv.get();
-
-  // Virtual - Inactive Block
-  for(size_t i = 0; i < ni; ++i)
-  for(size_t a = 0; a < nv; ++a) {
-    const auto a_off = a + ni + na;
-    const auto k = K_vi[a + i*nv];
-    K[a_off + i*LDK] =  k;
-    K[i + a_off*LDK] = -k;
-  }
-
-  // Virtual - Active Block
-  for(size_t i = 0; i < na; ++i)
-  for(size_t a = 0; a < nv; ++a) {
-    const auto i_off = i + ni;
-    const auto a_off = a + ni + na;
-    const auto k = K_va[a + i*nv];
-    K[a_off + i_off*LDK] =  k;
-    K[i_off + a_off*LDK] = -k;
-  }
-
-  // Active - Inactive Block
-  for(size_t i = 0; i < ni; ++i)
-  for(size_t a = 0; a < na; ++a) {
-    const auto a_off = a + ni;
-    const auto k = K_ai[a + i*na];
-    K[a_off + i*LDK] =  k;
-    K[i + a_off*LDK] = -k;
-  }
-
-}
-
-void linear_orb_rot_to_matrix(NumInactive ni, NumActive na,
-  NumVirtual nv, const double* K_lin, double* K, size_t LDK ) {
-
-  auto [K_vi, K_va, K_ai] = split_linear_orb_rot(ni,na,nv,K_lin);
-  linear_orb_rot_to_matrix(ni, na, nv, K_vi, K_va, K_ai, K, LDK);
-
-}
-
-void matrix_to_linear_orb_rot(NumInactive _ni, NumActive _na,
-  NumVirtual _nv, const double* F, size_t LDF, 
-  double* G_vi, double* G_va, double* G_ai ) {
-
-  const auto ni = _ni.get();
-  const auto na = _na.get();
-  const auto nv = _nv.get();
-
-  #define FOCK(i,j) F[i + j*LDF]
-
-  // Virtual - Inactive Block
-  for(size_t i = 0; i < ni; ++i)
-  for(size_t a = 0; a < nv; ++a) {
-    const auto a_off = a + ni + na;
-    G_vi[a + i*nv] = FOCK(a_off, i); 
-  }
-
-  // Virtual - Active Block
-  for(size_t i = 0; i < na; ++i)
-  for(size_t a = 0; a < nv; ++a) {
-    const auto i_off = i + ni;
-    const auto a_off = a + ni + na;
-    G_va[a + i*nv] = FOCK(a_off, i_off); 
-  }
-
-  // Active - Inactive Block
-  for(size_t i = 0; i < ni; ++i)
-  for(size_t a = 0; a < na; ++a) {
-    const auto a_off = a + ni;
-    G_ai[a + i*na] = FOCK(a_off, i); 
-  }
-
- #undef FOCK
-
-}
-
-void matrix_to_linear_orb_rot(NumInactive ni, NumActive na,
-  NumVirtual nv, const double* F, size_t LDF, double* G_lin ) {
-
-  auto [G_vi, G_va, G_ai] = split_linear_orb_rot(ni,na,nv,G_lin);
-  matrix_to_linear_orb_rot(ni, na, nv, F, LDF, G_vi, G_va, G_ai);
-
-}
-
-
-
-
-
 
 
 
@@ -161,101 +60,8 @@ void fock_to_linear_orb_grad(NumInactive ni, NumActive na,
 }
 
 
-void approx_diag_hessian(NumInactive _ni, NumActive _na, NumVirtual _nv,
-  const double* Fi, size_t LDFi, const double* Fa, size_t LDFa,
-  const double* A1RDM, size_t LDD, const double* F, size_t LDF, 
-  double* H_vi, double* H_va, double* H_ai) {
 
-  const auto ni = _ni.get();
-  const auto na = _na.get();
-  const auto nv = _nv.get();
 
-  #define TWO_IDX(A,i,j,LDA) A[i + j*LDA]
-  #define FI(i,j) TWO_IDX(Fi,i,j,LDFi)
-  #define FA(i,j) TWO_IDX(Fa,i,j,LDFa)
-  #define FF(i,j) TWO_IDX(F,i,j,LDF)
-  #define ORDM(i,j) TWO_IDX(A1RDM,i,j,LDD)
-
-  // Virtual - Inactive Block
-  for(size_t i = 0; i < ni; ++i)
-  for(size_t a = 0; a < nv; ++a) {
-    const auto a_off = a + ni + na;
-    H_vi[a + i*nv] = 4. * (
-      FI(a_off,a_off) + FA(a_off,a_off) -
-      FI(i,i)         - FA(i,i)
-    );
-  }
-
-  // Virtual - Active Block
-  for(size_t i = 0; i < na; ++i)
-  for(size_t a = 0; a < nv; ++a) {
-    const auto i_off = i + ni;
-    const auto a_off = a + ni + na;
-    H_va[a + i*nv] = 2. * ORDM(i,i) *(FI(a_off,a_off) + FA(a_off,a_off)) - 
-                     2. * FF(i_off,i_off);
-  }
-
-  // Active - Inactive Block
-  for(size_t i = 0; i < ni; ++i)
-  for(size_t a = 0; a < na; ++a) {
-    const auto a_off = a + ni;
-    H_ai[a + i*na] = 2. * ORDM(a,a) * (FI(i,i) + FA(i,i)) +
-                     4. * (FI(a_off,a_off) + FA(a_off,a_off) -
-                           FI(i,i)         - FA(i,i) ) -
-                     2. * FF(a_off, a_off);
-  }
-  
-  #undef TWO_IDX
-  #undef FI
-  #undef FA
-  #undef FF
-  #undef ORDM
-
-}
-
-void approx_diag_hessian(NumInactive ni, NumActive na, NumVirtual nv,
-  const double* Fi, size_t LDFi, const double* Fa, size_t LDFa,
-  const double* A1RDM, size_t LDD, const double* F, size_t LDF, 
-  double* H_lin) {
-
-  auto [H_vi, H_va, H_ai] = split_linear_orb_rot(ni, na, nv, H_lin);
-  approx_diag_hessian(ni, na, nv, Fi, LDFi, Fa, LDFa, A1RDM, LDD, F, LDF,
-    H_vi, H_va, H_ai);
-
-}
-
-template <typename... Args>
-void approx_diag_hessian(NumOrbital norb, NumInactive ninact, NumActive nact,
-  NumVirtual nvirt, const double* T, size_t LDT, const double* V, size_t LDV,
-  const double* A1RDM, size_t LDD1, const double* A2RDM, size_t LDD2,
-  Args&&... args) {
-
-  const size_t no = norb.get();
-  const size_t ni = ninact.get();
-  const size_t na = nact.get();
-  const size_t nv = nvirt.get();
-
-  // Compute inactive Fock
-  std::vector<double> Fi(no*no);
-  inactive_fock_matrix(norb, ninact, T, LDT, V, LDV, Fi.data(), no);
-
-  // Compute active fock
-  std::vector<double> Fa(no*no);
-  active_fock_matrix(norb, ninact, nact, V, LDV, A1RDM, LDD1, Fa.data(), no);
-
-  // Compute Q matrix
-  std::vector<double> Q(na*no);
-  aux_q_matrix(nact, norb, ninact, V, LDV, A2RDM, LDD2, Q.data(), na);
-
-  // Compute generalized Fock
-  std::vector<double> F(no*no);
-  generalized_fock_matrix(norb, ninact, nact, Fi.data(), no, Fa.data(), no,
-    A1RDM, LDD1, Q.data(), na, F.data(), no);
-
-  // Compute approximate diagonal hessian
-  approx_diag_hessian(ninact, nact, nvirt, Fi.data(), no, Fa.data(), no,
-    A1RDM, LDD1, F.data(), no, std::forward<Args>(args)... );
-}
 
 
 
@@ -520,18 +326,68 @@ void optimize_orbitals(MCSCFSettings settings, NumOrbital norb,
   const double* A1RDM, size_t LDD1, const double* A2RDM, size_t LDD2, 
   double *K, size_t LDK) {
 
-  size_t no = norb.get(), ni = ninact.get(), na = nact.get(), nv = nvirt.get();
+  const size_t no = norb.get(), ni = ninact.get(), na = nact.get(), nv = nvirt.get();
+  const size_t orb_rot_sz = nv*(na+ni) + na*ni;
+  std::vector<double> DH(orb_rot_sz);
+
+#if 1
+
+  // Compute inactive Fock
+  std::vector<double> Fi(no*no);
+  inactive_fock_matrix(norb, ninact, T, LDT, V, LDV, Fi.data(), no);
+
+  // Compute active fock
+  std::vector<double> Fa(no*no);
+  active_fock_matrix(norb, ninact, nact, V, LDV, A1RDM, LDD1, Fa.data(), no);
+
+  // Compute Q matrix
+  std::vector<double> Q(na*no);
+  aux_q_matrix(nact, norb, ninact, V, LDV, A2RDM, LDD2, Q.data(), na);
+
+  // Compute generalized Fock
+  std::vector<double> F(no*no);
+  generalized_fock_matrix(norb, ninact, nact, Fi.data(), no, Fa.data(), no,
+    A1RDM, LDD1, Q.data(), na, F.data(), no);
+
+  // Compute approximate diagonal hessian
+  approx_diag_hessian(ninact, nact, nvirt, Fi.data(), no, Fa.data(), no,
+    A1RDM, LDD1, F.data(), no, DH.data() );
+
+  // Compute Gradient
+  std::vector<double> OG(orb_rot_sz);
+  fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no, OG.data());
+
+  // Precondition the gradient
+  for(size_t p = 0; p < orb_rot_sz; ++p) {
+    OG[p] /= DH[p];
+  }
+
+  // Get NRM of step
+  auto step_nrm = blas::nrm2(orb_rot_sz,OG.data(),1);
+
+  // Get ABSMAX of step
+  auto step_max = *std::max_element(OG.begin(), OG.end(),
+    [](auto a, auto b){return std::abs(a) < std::abs(b);});
+
+  auto logger = spdlog::get("casscf");
+  logger->debug("{:12}step_nrm = {:.4e}, step_amax = {:.4e}", "", 
+    step_nrm, step_max);
+
+  if( step_max > 0.5 ) { 
+    logger->info("  * decresing step from {:.2f} to {:.2f}", step_max, 0.5);
+    blas::scal(orb_rot_sz, -0.5 / step_max, OG.data(), 1);
+  } else {
+    blas::scal(orb_rot_sz, -1.0, OG.data(), 1);
+  }
+
+  // Expand into full matrix
+  linear_orb_rot_to_matrix(ninact, nact, nvirt, OG.data(), K, LDK);
+
+#else
 
   // Compute Diagonal Hessian Approximation
-  std::vector<double> DH(nv*(na+ni) + na*ni);
   approx_diag_hessian(norb, ninact, nact, nvirt, T, LDT, V, LDV, A1RDM, LDD1,
     A2RDM, LDD2, DH.data() );
-
-  //std::cout << "DIAGONAL HESSIAN" << std::endl;
-  //std::cout << std::scientific << std::setprecision(12);
-  //for( int i = 0; i < DH.size(); i++ )
-  //  std::cout << DH[i] << std::endl;
-
 
   // Create BFGS Functor
   bfgs_mcscf_functor op(norb, ninact, nact, nvirt, E_core, T, V, A1RDM, A2RDM,
@@ -549,6 +405,8 @@ void optimize_orbitals(MCSCFSettings settings, NumOrbital norb,
 
   // Expand into full matrix
   linear_orb_rot_to_matrix(ninact, nact, nvirt, K0.data(), K, LDK);
+
+#endif
 
 }
 
@@ -665,6 +523,8 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
   const size_t na4 = na2 * na2;
 
   const size_t orb_rot_sz = nv*(ni + na) + na*ni;
+  const double rms_factor = std::sqrt(orb_rot_sz);
+  logger->info("  {:13} = {}","ORB_ROT_SZ", orb_rot_sz);
 
   // Compute Active Space Hamiltonian 
   std::vector<double> T_active(na2), V_active(na4), F_inactive(no2);
@@ -700,9 +560,9 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
   double E_2RDM = blas::dot(na4, A2RDM, 1, V_active.data(), 1);
 
   E0 =  E_1RDM + E_2RDM + E_inactive; 
-  logger->info("{} = {:.12f}","E1",E_1RDM);
-  logger->info("{} = {:.12f}","E2",E_2RDM);
-  logger->info("{} = {:.12f}","EF",E0);
+  logger->info("{:8} = {:20.12f}","E(1RDM)",E_1RDM);
+  logger->info("{:8} = {:20.12f}","E(2RDM)",E_2RDM);
+  logger->info("{:8} = {:20.12f}","E(CI)",E0);
 
 #if 0
   std::vector<double> full_ordm(no2), full_trdm(no4);
@@ -713,7 +573,7 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
   write_rdms_binary("rdms.bin", no, full_ordm.data(), no, full_trdm.data(), no);
 #endif
 
-  const std::string fmt_string = "iter = {:4} E(CI) = {:.10f}, dE = {:18.10e}, |orb_grad| = {:18.10e}";
+  const std::string fmt_string = "iter = {:4} E(CI) = {:.10f}, dE = {:18.10e}, |orb_rms| = {:18.10e}";
 
   // Compute Gradient
   bool converged = false;
@@ -729,8 +589,7 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
     [](auto a, auto b){ return a + b*b; });
   grad_nrm = std::sqrt(grad_nrm);
   converged = grad_nrm < settings.orb_grad_tol_mcscf;
-
-  logger->info(fmt_string, 0, E0, 0.0, grad_nrm);
+  logger->info(fmt_string, 0, E0, 0.0, grad_nrm/rms_factor);
   }
 
   // MCSCF Loop
@@ -776,9 +635,9 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
      double grad_nrm = std::accumulate(OG.begin(),OG.end(),0.0,
        [](auto a, auto b){ return a + b*b; });
      grad_nrm = std::sqrt(grad_nrm);
-     logger->info(fmt_string, iter+1, E0, E0 - E0_old, grad_nrm);
+     logger->info(fmt_string, iter+1, E0, E0 - E0_old, grad_nrm/rms_factor);
 
-     converged = grad_nrm < settings.orb_grad_tol_mcscf;
+     converged = grad_nrm/rms_factor < settings.orb_grad_tol_mcscf;
   }
 
   if(converged) logger->info("CASSCF Converged");
