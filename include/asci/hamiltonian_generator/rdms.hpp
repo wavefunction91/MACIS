@@ -8,13 +8,14 @@
 
 namespace asci {
 
+#if 0
 template <size_t N>
 void HamiltonianGenerator<N>::rdm_contributions( 
   spin_det_t bra_alpha, spin_det_t ket_alpha, spin_det_t ex_alpha, 
   spin_det_t bra_beta, spin_det_t ket_beta, spin_det_t ex_beta, 
   const std::vector<uint32_t>& bra_occ_alpha,
   const std::vector<uint32_t>& bra_occ_beta,
-  double val, matrix_span<double> ordm, rank4_span<double> trdm) {
+  double val, matrix_span_t ordm, rank4_span_t trdm) {
 
   const uint32_t ex_alpha_count = ex_alpha.count();
   const uint32_t ex_beta_count  = ex_beta.count();
@@ -46,7 +47,7 @@ void HamiltonianGenerator<N>::rdm_contributions(
 
 template <size_t N>
 void HamiltonianGenerator<N>::rdm_contributions_4( spin_det_t bra, 
-  spin_det_t ket, spin_det_t ex, double val, rank4_span<double> trdm ) {
+  spin_det_t ket, spin_det_t ex, double val, rank4_span_t trdm ) {
 
   auto [o1,v1,o2,v2,sign] = doubles_sign_indices( bra, ket, ex );
 
@@ -71,7 +72,7 @@ template <size_t N>
 void HamiltonianGenerator<N>::rdm_contributions_22( 
   spin_det_t bra_alpha, spin_det_t ket_alpha, spin_det_t ex_alpha, 
   spin_det_t bra_beta, spin_det_t ket_beta, spin_det_t ex_beta,
-  double val, rank4_span<double> trdm ) {
+  double val, rank4_span_t trdm ) {
 
   auto [o1,v1,sign_a] = 
     single_excitation_sign_indices( bra_alpha, ket_alpha, ex_alpha );
@@ -97,7 +98,7 @@ void HamiltonianGenerator<N>::rdm_contributions_2(
   spin_det_t bra, spin_det_t ket, spin_det_t ex,
   const std::vector<uint32_t>& bra_occ_alpha,
   const std::vector<uint32_t>& bra_occ_beta,
-  double val, matrix_span<double> ordm, rank4_span<double> trdm) {
+  double val, matrix_span_t ordm, rank4_span_t trdm) {
 
   auto [o1,v1,sign] = single_excitation_sign_indices(bra,ket,ex);
 
@@ -131,7 +132,7 @@ template <size_t N>
 void HamiltonianGenerator<N>::rdm_contributions_diag( 
   const std::vector<uint32_t>& occ_alpha,
   const std::vector<uint32_t>& occ_beta,
-  double val, matrix_span<double> ordm, rank4_span<double> trdm ) {
+  double val, matrix_span_t ordm, rank4_span_t trdm ) {
 
   // One-electron piece
   for( auto p : occ_alpha ) ordm(p,p) += val;
@@ -160,7 +161,7 @@ void HamiltonianGenerator<N>::rdm_contributions_diag(
   }
 
 }
-
+#endif
 
 
 

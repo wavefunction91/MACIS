@@ -34,6 +34,9 @@ auto end(T&& s){
 }
 
 template <size_t N>
+using wfn_t = std::bitset<N>;
+
+template <size_t N>
 using wavefunction_iterator_t = 
   typename std::vector< std::bitset<N> >::iterator;
 

@@ -24,6 +24,10 @@ public:
 
   using full_det_iterator = wavefunction_iterator_t<N>;
 
+  using matrix_span_t = matrix_span<double>;
+  using rank3_span_t  = rank3_span<double>;
+  using rank4_span_t  = rank4_span<double>;
+
 public:
 
   inline spin_det_t alpha_string( full_det_t str ) {
@@ -36,28 +40,28 @@ public:
   size_t norb_;
   size_t norb2_;
   size_t norb3_;
-  matrix_span<double> T_pq_;
-  rank4_span<double>  V_pqrs_;
+  matrix_span_t T_pq_;
+  rank4_span_t  V_pqrs_;
 
   // G(i,j,k,l) = (ij|kl) - (il|kj)
   std::vector<double> G_pqrs_data_; 
-  rank4_span<double>  G_pqrs_;
+  rank4_span_t  G_pqrs_;
 
   // G_red(i,j,k) = G(i,j,k,k)
   std::vector<double> G_red_data_;  
-  rank3_span<double>  G_red_;  
+  rank3_span_t  G_red_;  
 
   // V_red(i,j,k) = (ij|kk)
   std::vector<double> V_red_data_;
-  rank3_span<double>  V_red_;
+  rank3_span_t  V_red_;
 
   // G2_red(i,j)  = 0.5 * G(i,i,j,j)
   std::vector<double> G2_red_data_; 
-  matrix_span<double> G2_red_;
+  matrix_span_t G2_red_;
 
   // V2_red(i,j)  = (ii|jj)
   std::vector<double> V2_red_data_;
-  matrix_span<double> V2_red_; 
+  matrix_span_t V2_red_; 
 
   virtual sparse_matrix_type<int32_t> 
     make_csr_hamiltonian_block_32bit_(
@@ -71,16 +75,11 @@ public:
 
 public:
 
-#if 0
-  HamiltonianGenerator( size_t no, double* V, double* T ); 
-#else
-  HamiltonianGenerator(matrix_span<double> T,
-    rank4_span<double> V);
-#endif
+  HamiltonianGenerator(matrix_span_t T, rank4_span_t V);
   virtual ~HamiltonianGenerator() noexcept = default;
 
 
-  void generate_integral_intermediates(rank4_span<double> V);
+  void generate_integral_intermediates(rank4_span_t V);
 
 
   double matrix_element_4( spin_det_t bra, spin_det_t ket, 
@@ -185,21 +184,21 @@ public:
     double* ordm, double* trdm ) = 0;
 #else
   void rdm_contributions_4( spin_det_t bra, spin_det_t ket, 
-    spin_det_t ex, double val, rank4_span<double> trdm );
+    spin_det_t ex, double val, rank4_span_t trdm );
   void rdm_contributions_22( spin_det_t bra_alpha, 
     spin_det_t ket_alpha, spin_det_t ex_alpha, 
     spin_det_t bra_beta, spin_det_t ket_beta,
-    spin_det_t ex_beta, double val, rank4_span<double> trdm );
+    spin_det_t ex_beta, double val, rank4_span_t trdm );
   void rdm_contributions_2( spin_det_t bra, spin_det_t ket, 
     spin_det_t ex,
     const std::vector<uint32_t>& bra_occ_alpha,
     const std::vector<uint32_t>& bra_occ_beta,
-    double val, matrix_span<double> ordm, 
-    rank4_span<double> trdm);
+    double val, matrix_span_t ordm, 
+    rank4_span_t trdm);
   void rdm_contributions_diag( 
     const std::vector<uint32_t>& occ_alpha,
     const std::vector<uint32_t>& occ_beta, double val, 
-    matrix_span<double> ordm, rank4_span<double> trdm );
+    matrix_span_t ordm, rank4_span_t trdm );
   
   void rdm_contributions( spin_det_t bra_alpha, 
     spin_det_t ket_alpha, spin_det_t ex_alpha, 
@@ -207,13 +206,13 @@ public:
     spin_det_t ex_beta, 
     const std::vector<uint32_t>& bra_occ_alpha,
     const std::vector<uint32_t>& bra_occ_beta, 
-    double val, matrix_span<double> ordm, 
-    rank4_span<double> trdm);
+    double val, matrix_span_t ordm, 
+    rank4_span_t trdm);
 
 
   virtual void form_rdms( full_det_iterator, full_det_iterator, 
     full_det_iterator, full_det_iterator, double* C, 
-    matrix_span<double> ordm, rank4_span<double> trdm ) = 0;
+    matrix_span_t ordm, rank4_span_t trdm ) = 0;
 #endif
 
 

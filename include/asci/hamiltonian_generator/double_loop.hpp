@@ -1,6 +1,7 @@
 #pragma once
 #include <asci/hamiltonian_generator.hpp>
 #include <asci/sd_operations.hpp>
+#include <asci/util/rdms.hpp>
 
 namespace asci {
 
@@ -13,6 +14,8 @@ public:
   using full_det_t        = typename base_type::full_det_t;
   using spin_det_t        = typename base_type::spin_det_t;
   using full_det_iterator = typename base_type::full_det_iterator;
+  using matrix_span_t = typename base_type::matrix_span_t;
+  using rank4_span_t  = typename base_type::rank4_span_t;
 
   template <typename index_t>
   using sparse_matrix_type = sparsexx::csr_matrix<double,index_t>;
@@ -124,7 +127,7 @@ public:
     full_det_iterator bra_end,
     full_det_iterator ket_begin,
     full_det_iterator ket_end,
-    double *C, matrix_span<double> ordm, rank4_span<double> trdm ) override {
+    double *C, matrix_span_t ordm, rank4_span_t trdm ) override {
 
     
     const size_t nbra_dets = std::distance( bra_begin, bra_end );
@@ -163,8 +166,8 @@ public:
 
               // Compute Matrix Element
               if(std::abs(val) > 1e-16) {
-                this->rdm_contributions( bra_alpha, ket_alpha,
-                  ex_alpha, bra_beta, ket_beta, ex_beta, bra_occ_alpha,
+                rdm_contributions( bra_alpha, ket_alpha, ex_alpha, 
+                  bra_beta, ket_beta, ex_beta, bra_occ_alpha,
                   bra_occ_beta, val, ordm, trdm );
               }
             } // Possible non-zero connection (Hamming distance)

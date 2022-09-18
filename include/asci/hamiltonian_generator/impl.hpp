@@ -5,7 +5,7 @@ namespace asci {
 
 template <size_t N>
 HamiltonianGenerator<N>::HamiltonianGenerator( 
-  matrix_span<double> T, rank4_span<double> V ) :
+  matrix_span<double> T, rank4_span_t V ) :
   norb_(T.extent(0)), norb2_(norb_*norb_), 
   norb3_(norb2_*norb_), T_pq_(T), V_pqrs_(V) { 
 
@@ -16,7 +16,7 @@ HamiltonianGenerator<N>::HamiltonianGenerator(
 
 template <size_t N>
 void HamiltonianGenerator<N>::
-  generate_integral_intermediates(rank4_span<double> V) {
+  generate_integral_intermediates(rank4_span_t V) {
 
   if(V.extent(0) != norb_ or V.extent(1) != norb_ or
      V.extent(2) != norb_ or V.extent(3) != norb_) 
@@ -30,7 +30,7 @@ void HamiltonianGenerator<N>::
   // G(i,j,k,l) = V(i,j,k,l) - V(i,l,k,j)
   G_pqrs_data_ = std::vector<double>( begin(V), end(V) );
   G_pqrs_ = 
-    rank4_span<double>(G_pqrs_data_.data(),no,no,no,no);
+    rank4_span_t(G_pqrs_data_.data(),no,no,no,no);
   for( auto i = 0ul; i < no; ++i )
   for( auto j = 0ul; j < no; ++j )
   for( auto k = 0ul; k < no; ++k )
@@ -42,8 +42,8 @@ void HamiltonianGenerator<N>::
   // V_red(i,j,k) = V(i,j,k,k) = V(k,k,i,j)
   G_red_data_.resize(no3);
   V_red_data_.resize(no3);
-  G_red_ = rank3_span<double>(G_red_data_.data(),no,no,no);
-  V_red_ = rank3_span<double>(V_red_data_.data(),no,no,no);
+  G_red_ = rank3_span_t(G_red_data_.data(),no,no,no);
+  V_red_ = rank3_span_t(V_red_data_.data(),no,no,no);
   for( auto j = 0ul; j < no; ++j ) 
   for( auto i = 0ul; i < no; ++i )
   for( auto k = 0ul; k < no; ++k ) {
