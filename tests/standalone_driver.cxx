@@ -148,9 +148,13 @@ int main(int argc, char** argv) {
   // MCSCF Settings
   asci::MCSCFSettings mcscf_settings;
   OPT_KEYWORD("MCSCF.MAX_MACRO_ITER", mcscf_settings.max_macro_iter,     size_t);
+  OPT_KEYWORD("MCSCF.MAX_ORB_STEP",   mcscf_settings.max_orbital_step,   double);
   OPT_KEYWORD("MCSCF.MCSCF_ORB_TOL" , mcscf_settings.orb_grad_tol_mcscf, double);
-  OPT_KEYWORD("MCSCF.BFGS_TOL",       mcscf_settings.orb_grad_tol_bfgs,  double);
-  OPT_KEYWORD("MCSCF.BFGS_MAX_ITER",  mcscf_settings.max_bfgs_iter,      size_t);
+  //OPT_KEYWORD("MCSCF.BFGS_TOL",       mcscf_settings.orb_grad_tol_bfgs,  double);
+  //OPT_KEYWORD("MCSCF.BFGS_MAX_ITER",  mcscf_settings.max_bfgs_iter,      size_t);
+  OPT_KEYWORD("MCSCF.ENABLE_DIIS",    mcscf_settings.enable_diis,        bool  );
+  OPT_KEYWORD("MCSCF.DIIS_START_ITER",mcscf_settings.diis_start_iter,    size_t);
+  OPT_KEYWORD("MCSCF.DIIS_NKEEP",     mcscf_settings.diis_nkeep,         size_t);
   OPT_KEYWORD("MCSCF.CI_RES_TOL",     mcscf_settings.ci_res_tol,         double);
   OPT_KEYWORD("MCSCF.CI_MAX_SUB",     mcscf_settings.ci_max_subspace,    size_t);
   OPT_KEYWORD("MCSCF.CI_MATEL_TOL",   mcscf_settings.ci_matel_tol,       double);

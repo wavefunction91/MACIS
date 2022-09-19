@@ -73,12 +73,18 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
     "NACTIVE",    nact.get(),
     "NVIRTUAL",  nvirt.get()
   );
+  logger->info("  {:13} = {:3}, {:13} = {:3}, {:13} = {:3}",
+    "ENABLE_DIIS", settings.enable_diis,
+    "DIIS_START",  settings.diis_start_iter,
+    "DIIS_NKEEP",  settings.diis_nkeep
+  );
   logger->info( "  {:13} = {:.6f}", "E_CORE", E_core);
   logger->info( 
-    "  {:13} = {:.6e}, {:13} = {:.6e}, {:13} = {:3}",
-    "ORBGRAD_TOL", settings.orb_grad_tol_mcscf,
-    "BFGS_TOL",    settings.orb_grad_tol_bfgs,
-    "BFGS_MAX_ITER", settings.max_bfgs_iter
+    "  {:13} = {:.6e}, {:13} = {:.6e}",
+    "MAX_ORB_STEP", settings.max_orbital_step,
+    "ORBGRAD_TOL", settings.orb_grad_tol_mcscf
+    //"BFGS_TOL",    settings.orb_grad_tol_bfgs,
+    //"BFGS_MAX_ITER", settings.max_bfgs_iter
    );
   logger->info("  {:13} = {:.6e}, {:13} = {:.6e}, {:13} = {:3}",
     "CI_RES_TOL",  settings.ci_res_tol,
@@ -143,7 +149,7 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
   std::vector<double> U_total(no2, 0.0), K_total(no2, 0.0);
 
   // DIIS Object
-  DIIS<std::vector<double>> diis;
+  DIIS<std::vector<double>> diis(settings.diis_nkeep);
 
 
 
@@ -273,9 +279,11 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
        step_nrm, step_amax);
 
      // Scale step if necessacary 
-     if( step_amax > 0.5 ) { 
-       logger->info("  * decresing step from {:.2f} to {:.2f}", step_amax, 0.5);
-       blas::scal(orb_rot_sz, 0.5 / step_amax, K_step_linear.data(), 1);
+     const auto max_step = settings.max_orbital_step;
+     if( step_amax > max_step ) { 
+       logger->info("  * decresing step from {:.2f} to {:.2f}", 
+         step_amax, max_step);
+       blas::scal(orb_rot_sz, max_step / step_amax, K_step_linear.data(), 1);
      }
 
      // Expand info full matrix
@@ -286,9 +294,9 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
      blas::axpy(no2, 1.0, K_step.data(), 1, K_total.data(), 1);
 
      // DIIS Extrapolation
-     if(iter > 2) {
+     if(settings.enable_diis and iter >= settings.diis_start_iter) {
        diis.add_vector(K_total, OG);
-       if(iter > 4) {
+       if(iter >= (settings.diis_start_iter+2)) {
          K_total = diis.extrapolate();
        }
      }

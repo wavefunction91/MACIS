@@ -8,13 +8,19 @@ namespace asci {
 struct MCSCFSettings {
 
   size_t max_macro_iter     = 100;
+  double max_orbital_step   = 0.5;
   double orb_grad_tol_mcscf = 5e-6;
-  double orb_grad_tol_bfgs  = 5e-7;
-  size_t max_bfgs_iter      = 100;
+
+  bool   enable_diis        = true;
+  size_t diis_start_iter    = 3;
+  size_t diis_nkeep         = 10;
+
+  //size_t max_bfgs_iter      = 100;
+  //double orb_grad_tol_bfgs  = 5e-7;
+
   double ci_res_tol         = 1e-8;
   size_t ci_max_subspace    = 20;
   double ci_matel_tol       = std::numeric_limits<double>::epsilon();
-
 };
 
 void optimize_orbitals(MCSCFSettings settings, NumOrbital norb, 
