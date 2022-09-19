@@ -10,6 +10,7 @@
 
 #include "orbital_rotation_utilities.hpp"
 #include "orbital_hessian.hpp"
+#include "diis.hpp"
 
 namespace asci {
 
@@ -71,6 +72,7 @@ void fock_to_linear_orb_grad(NumInactive ni, NumActive na,
 
 struct bfgs_mcscf_functor {
     using argument_type = Eigen::VectorXd;
+    using arg_type = argument_type;
     using return_type   = double;
 
     NumOrbital  norb;
@@ -91,63 +93,21 @@ struct bfgs_mcscf_functor {
       norb(no), ninact(ni), nact(na), nvirt(nv), E_core(ec),
       T(t), V(v), A1RDM(d1), A2RDM(d2) {}
 
-    bool converged(const argument_type& X, const argument_type& G) {
+    bool converged(const arg_type& X, const arg_type& G) {
       return G.norm() < grad_tol; 
     }
 
-    return_type eval(const argument_type& K) {
-#if 0
-      auto [K_vi, K_va, K_ai] = split_linear_orb_rot(ninact,nact,nvirt,K.data());
-      auto n_vi = blas::nrm2(nvirt.get() * ninact.get(), K_vi, 1); 
-      auto n_va = blas::nrm2(nvirt.get() * nact.get(),   K_va, 1); 
-      auto n_ai = blas::nrm2(nact.get()  * ninact.get(), K_ai, 1);
-
-      spdlog::get("bfgs")->info("eval partition norms {:.8e} {:.8e} {:.8e} {:.8e} {:.8e}",
-        n_vi, n_va, n_ai, std::sqrt(n_vi*n_vi + n_va*n_va + n_ai*n_ai), K.norm()
-      ); 
-#endif
-
+    return_type eval(const arg_type& K) {
       // Expand linear rotation vector into full antisymmetric
       // matrix
       std::vector<double> K_expand(norb.get() * norb.get());
       linear_orb_rot_to_matrix(ninact, nact, nvirt, K.data(),
         K_expand.data(), norb.get());
 
-#if 0
-      std::cout << "K = [" << std::endl;
-      for(size_t i = 0; i < norb.get(); i++) {
-        for(size_t j = 0; j < norb.get(); ++j)
-          std::cout << K_expand[i + j*norb.get()] << " ";
-        std::cout << std::endl;
-      }
-      std::cout << "];" << std::endl;
-
-      std::vector<double> K_cpy(K_expand);
-      std::vector<std::complex<double>> K_ev(norb.get());
-      lapack::geev(lapack::Job::NoVec, lapack::Job::NoVec, norb.get(), K_cpy.data(), norb.get(), K_ev.data(), NULL, 1, NULL, 1);
-      std::cout << "K eigenvalues" << std::endl;
-      for( auto x : K_ev ) std::cout << x << std::endl; 
-#endif
-
       // Compute U = EXP[-K]
       std::vector<double> U(norb.get() * norb.get());
       compute_orbital_rotation(norb, 1.0, K_expand.data(), norb.get(),
         U.data(), norb.get() );
-
-#if 0
-      std::cout << "U = [" << std::endl;
-      for(size_t i = 0; i < norb.get(); i++) {
-        for(size_t j = 0; j < norb.get(); ++j)
-          std::cout << U[i + j*norb.get()] << " ";
-        std::cout << std::endl;
-      }
-      std::cout << "];" << std::endl;
-
-      std::vector<double> iden(U.size());
-      blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, norb.get(), norb.get(), norb.get(), 1.0, U.data(), norb.get(), U.data(), norb.get(), 0.0, iden.data(), norb.get());
-      for(auto i = 0 ; i < norb.get(); ++i) iden[i*(norb.get()+1)] -= 1.0;
-      std::cout << "|U2 - I| = " << blas::nrm2(U.size(), iden.data(), 1) << std::endl;
-#endif
 
       // Compute energy evaluated at rotated orbitals
       return orbital_rotated_energy(norb, ninact, nact, T, norb.get(),
@@ -156,17 +116,7 @@ struct bfgs_mcscf_functor {
 
     }
 
-    argument_type grad(const argument_type& K) {
-#if 0
-      auto [K_vi, K_va, K_ai] = split_linear_orb_rot(ninact,nact,nvirt,K.data());
-      auto n_vi = blas::nrm2(nvirt.get() * ninact.get(), K_vi, 1); 
-      auto n_va = blas::nrm2(nvirt.get() * nact.get(),   K_va, 1); 
-      auto n_ai = blas::nrm2(nact.get()  * ninact.get(), K_ai, 1);
-
-      spdlog::get("bfgs")->info("grad partition norms {:.8e} {:.8e} {:.8e} {:.8e} {:.8e}",
-        n_vi, n_va, n_ai, std::sqrt(n_vi*n_vi + n_va*n_va + n_ai*n_ai), K.norm()
-      ); 
-#endif
+    arg_type grad(const arg_type& K) {
 
       // Expand linear rotation vector into full antisymmetric
       // matrix
@@ -188,39 +138,35 @@ struct bfgs_mcscf_functor {
         T, no, V, no, A1RDM, nact.get(), A2RDM, nact.get(), U.data(), 
         no, Tt.data(), no, Vt.data(), no, F.data(), no);
 
-      argument_type G(K.size());
+      arg_type G(K.size());
       fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no,
         G.data());
     
       return G;
     }
 
-    return_type operator()(const argument_type& x, 
-      argument_type& g) {
+    return_type operator()(const arg_type& x, arg_type& g) {
         g = grad(x);
         return eval(x);
     }
 
-    static return_type dot( const argument_type& x, 
-      const argument_type& y ) {
+    static return_type dot( const arg_type& x, const arg_type& y ) {
         return x.dot(y);
     }
 
-    static void axpy( return_type alpha, 
-      const argument_type& x, argument_type& y ) {
+    static void axpy( return_type alpha, const arg_type& x, arg_type& y ) {
         y += alpha * x;
     }
 
-    static return_type norm( const argument_type& x ) {
+    static return_type norm( const arg_type& x ) {
       return x.norm();
     }
 
 
-    static void scal( return_type alpha, argument_type& x ) {
+    static void scal( return_type alpha, arg_type& x ) {
       x *= alpha;
     }
-    static argument_type subtract( const argument_type& x,
-      const argument_type& y ){
+    static arg_type subtract( const arg_type& x, const arg_type& y ){
         return x - y;
     }
 
@@ -320,11 +266,50 @@ void orb_orb_hessian_contract(NumOrbital norb, NumInactive ninact,
 
 namespace asci {
 
+struct AugHessianOperator {
+  
+  NumOrbital  norb;
+  NumInactive ninact;
+  NumActive   nact;
+  NumVirtual  nvirt;
+  const double *m_T, *m_V, *m_OG, *m_A1RDM, *m_A2RDM;
+
+  void operator_action(size_t m, double alpha, const double* V, size_t /* */,
+    double beta, double* AV, size_t /* */) const {
+
+    const size_t no = norb.get();
+    const size_t ni = ninact.get();
+    const size_t na = nact.get();
+    const size_t nv = nvirt.get();
+    const size_t orb_rot_sz = nv*(na + ni) + na*ni;
+  
+    // [AV0] = [0 G**T ] [ V0 ]
+    // [AK ]   [G H    ] [ K  ] 
+    const double* K  = V  + 1;
+    double* AK = AV + 1;
+
+    // AV0 = beta*AV0 + alpha * G**T * K
+    *AV = beta*(*AV) + alpha * blas::dot(orb_rot_sz, m_OG, 1, K, 1);
+
+    // HK = H*K
+    std::vector<double> HK(orb_rot_sz);
+    orb_orb_hessian_contract(norb, ninact, nact, nvirt, m_T, no,
+      m_V, no, m_A1RDM, na, m_A2RDM, na, m_OG, K, HK.data());
+
+    // AK = beta*AK + alpha*(H*K + V0*G)
+    blas::scal(orb_rot_sz, beta, AK, 1);
+    blas::axpy(orb_rot_sz, alpha, HK.data(), 1, AK, 1);
+    blas::axpy(orb_rot_sz, alpha*(*V), m_OG, 1, AK, 1);
+    
+  }
+
+};
+
 void optimize_orbitals(MCSCFSettings settings, NumOrbital norb, 
   NumInactive ninact, NumActive nact, NumVirtual nvirt, double E_core, 
   const double* T, size_t LDT, const double* V, size_t LDV, 
   const double* A1RDM, size_t LDD1, const double* A2RDM, size_t LDD2, 
-  double *K, size_t LDK) {
+  double* OG, double *K, size_t LDK) {
 
   const size_t no = norb.get(), ni = ninact.get(), na = nact.get(), nv = nvirt.get();
   const size_t orb_rot_sz = nv*(na+ni) + na*ni;
@@ -354,20 +339,43 @@ void optimize_orbitals(MCSCFSettings settings, NumOrbital norb,
     A1RDM, LDD1, F.data(), no, DH.data() );
 
   // Compute Gradient
-  std::vector<double> OG(orb_rot_sz);
-  fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no, OG.data());
+  ///std::vector<double> OG(orb_rot_sz);
+  fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no, OG);
 
+#if 1
   // Precondition the gradient
+  std::vector<double> step(orb_rot_sz);
   for(size_t p = 0; p < orb_rot_sz; ++p) {
-    OG[p] /= DH[p];
+    step[p] = OG[p] / DH[p];
   }
+#else
+  std::vector<double> AH_diag(DH.size()+1);
+  AH_diag[0] = 1.;
+  std::copy(DH.begin(), DH.end(), AH_diag.begin()+1);
+
+  AugHessianOperator op{norb, ninact, nact, nvirt, T, V, OG.data(),
+    A1RDM, A2RDM};
+
+  std::vector<double> X(AH_diag.size(), 0);
+  auto D_min = std::min_element(DH.begin(), DH.end());
+  auto min_idx = std::distance( DH.begin(), D_min );
+  std::cout << "DMIN = " << *D_min << std::endl;
+  X[min_idx+1] = 1.;
+
+  auto mu = davidson(AH_diag.size(), 100, op, AH_diag.data(), 1e-8, X.data() );
+
+  for(size_t p = 0; p < orb_rot_sz; ++p) {
+    OG[p] = X[p+1] / X[0];
+  }
+#endif
 
   // Get NRM of step
-  auto step_nrm = blas::nrm2(orb_rot_sz,OG.data(),1);
+  auto step_nrm = blas::nrm2(orb_rot_sz,step.data(),1);
 
   // Get ABSMAX of step
-  auto step_max = *std::max_element(OG.begin(), OG.end(),
+  auto step_max = *std::max_element(step.begin(), step.end(),
     [](auto a, auto b){return std::abs(a) < std::abs(b);});
+  step_max = std::abs(step_max);
 
   auto logger = spdlog::get("casscf");
   logger->debug("{:12}step_nrm = {:.4e}, step_amax = {:.4e}", "", 
@@ -375,13 +383,13 @@ void optimize_orbitals(MCSCFSettings settings, NumOrbital norb,
 
   if( step_max > 0.5 ) { 
     logger->info("  * decresing step from {:.2f} to {:.2f}", step_max, 0.5);
-    blas::scal(orb_rot_sz, -0.5 / step_max, OG.data(), 1);
+    blas::scal(orb_rot_sz, -0.5 / step_max, step.data(), 1);
   } else {
-    blas::scal(orb_rot_sz, -1.0, OG.data(), 1);
+    blas::scal(orb_rot_sz, -1.0, step.data(), 1);
   }
 
   // Expand into full matrix
-  linear_orb_rot_to_matrix(ninact, nact, nvirt, OG.data(), K, LDK);
+  linear_orb_rot_to_matrix(ninact, nact, nvirt, step.data(), K, LDK);
 
 #else
 
@@ -415,25 +423,20 @@ void optimize_orbitals(MCSCFSettings settings, NumOrbital norb,
 template <typename HamGen>
 double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb, 
   size_t nalpha, size_t nbeta, double* T, double* V, double* ORDM, 
-  double* TRDM, MPI_Comm comm) {
+  double* TRDM, std::vector<double>& C, MPI_Comm comm) {
 
   constexpr auto nbits = HamGen::nbits;
 
   int rank; MPI_Comm_rank(comm, &rank);
 
   // Hamiltonian Matrix Element Generator
-#if 0
-  asci::DoubleLoopHamiltonianGenerator<nbits> ham_gen( norb.get(), V, T );
-#else
   size_t no = norb.get();
-  asci::DoubleLoopHamiltonianGenerator<nbits> ham_gen( 
+  HamGen ham_gen( 
     matrix_span<double>(T,no,no),
     rank4_span<double>(V,no,no,no,no) 
   );
-#endif
   
   // Compute Lowest Energy Eigenvalue (ED)
-  std::vector<double> C;
   auto dets = asci::generate_hilbert_space<nbits>(norb.get(), nalpha, nbeta);
   double E0 = asci::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
     settings.ci_matel_tol, settings.ci_max_subspace, settings.ci_res_tol, C, 
@@ -447,52 +450,17 @@ double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb,
   return E0;
 }
 
-template <typename HamGen>
-double compute_casci_rdms2(MCSCFSettings settings, NumOrbital norb, 
-  NumInactive ninact, NumActive nact, size_t nalpha, size_t nbeta, 
-  double* T, double* V, double* ORDM, double* TRDM, MPI_Comm comm) {
-
-  constexpr auto nbits = HamGen::nbits;
-
-  int rank; MPI_Comm_rank(comm, &rank);
-
-  // Hamiltonian Matrix Element Generator
-  asci::DoubleLoopHamiltonianGenerator<nbits> ham_gen( norb.get(), V, T );
-  
-  // Compute Lowest Energy Eigenvalue (ED)
-  std::vector<double> C;
-  auto dets = asci::generate_hilbert_space<nbits>(nact.get(), nalpha, nbeta);
-
-  auto inactive_mask = full_mask<nbits/2>(ninact.get());
-  for(auto& d : dets) {
-    std::cout << d << std::endl;
-    auto d_alpha = truncate_bitset<nbits/2>(d);
-    auto d_beta  = truncate_bitset<nbits/2>(d >> (nbits/2));
-    std::cout << "  " << d_alpha << " " << d_beta << std::endl;
-    d_alpha = inactive_mask | (d_alpha << ninact.get());
-    d_beta = inactive_mask | (d_beta << ninact.get());
-    d = expand_bitset<nbits>(d_alpha) | 
-        expand_bitset<nbits>(d_beta) << (nbits/2);
-    std::cout << "  " << d << std::endl;
-  }
-
-  double E0 = asci::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
-    settings.ci_matel_tol, settings.ci_max_subspace, settings.ci_res_tol, C, 
-    comm, true);
-
-  // Compute RDMs
-  ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
-    C.data(), ORDM, TRDM);
-
-  return E0;
-}
-
 
 template <typename HamGen>
 void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha, 
   NumElectron nbeta, NumOrbital norb, NumInactive ninact, NumActive nact, 
   NumVirtual nvirt, double E_core, double* T, size_t LDT, double* V, size_t LDV, 
   double* A1RDM, size_t LDD1, double* A2RDM, size_t LDD2, MPI_Comm comm) {
+
+
+  /******************************************************************
+   *  Top of CASSCF Routine - Setup and print header info to logger *
+   ******************************************************************/
 
   auto logger = spdlog::get("casscf");
   if(!logger) logger = spdlog::stdout_color_mt("casscf");
@@ -523,6 +491,18 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
     "CI_MAX_SUB",   settings.ci_max_subspace
   );
 
+
+  // MCSCF Iteration format string
+  const std::string fmt_string = 
+    "iter = {:4} E(CI) = {:.10f}, dE = {:18.10e}, |orb_rms| = {:18.10e}";
+
+
+
+  /*********************************************************
+   *  Calculate persistant derived dimensions to be reused *
+   *  throughout this routine                              *
+   *********************************************************/
+
   const size_t no = norb.get(), ni = ninact.get(), na = nact.get(), 
                nv = nvirt.get();
 
@@ -535,36 +515,98 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
   const double rms_factor = std::sqrt(orb_rot_sz);
   logger->info("  {:13} = {}","ORB_ROT_SZ", orb_rot_sz);
 
-  // Compute Active Space Hamiltonian 
-  std::vector<double> T_active(na2), V_active(na4), F_inactive(no2);
-  active_hamiltonian(norb, nact, ninact, T, LDT, V, LDV, F_inactive.data(),
-    no, T_active.data(), na, V_active.data(), na);
 
+
+
+
+
+  /********************************************************
+   *               Allocate persistant data               *
+   ********************************************************/ 
+
+  // Energies
+  double E_inactive, E0;
+
+  // Convergence data
+  double grad_nrm;
+  bool converged = false;
+
+  // Storage for active space Hamitonian and inacive Fock
+  std::vector<double> T_active(na2), V_active(na4), F_inactive(no2);
+
+  // CI vector - will be resized on first CI call
+  std::vector<double> X_CI; 
+
+  // Orbital Gradient and Generalized Fock Matrix
+  std::vector<double> F(no2), OG(orb_rot_sz);
+
+  // Storage for transformed integrals
+  std::vector<double> transT(T, T+no2), transV(V, V+no4);
+
+  // Storage for total transformation
+  std::vector<double> U_total(no2, 0.0), K_total(no2, 0.0);
+
+  // DIIS Object
+  DIIS<std::vector<double>> diis;
+
+
+
+
+
+
+  /**************************************************************
+   *    Precompute Active Space Hamiltonian given input data    *
+   *                                                            *
+   *     This will be used to compute initial energies and      *
+   *      gradients to decide whether to proceed with the       *
+   *                   MCSCF optimization.                      *
+   **************************************************************/
+
+  // Compute Active Space Hamiltonian and Inactive Fock Matrix
+  active_hamiltonian(norb, nact, ninact, T, LDT, V, LDV, 
+    F_inactive.data(), no, T_active.data(), na, 
+    V_active.data(), na);
 
   // Compute Inactive Energy
-  auto E_inactive = inactive_energy(ninact, T, LDT, F_inactive.data(), no);
+  E_inactive = inactive_energy(ninact, T, LDT, F_inactive.data(), no);
   E_inactive += E_core;
 
+
+
+
+
+  /**************************************************************
+   *     Either compute or read initial RDMs from input         *
+   *                                                            *
+   * If the trace of the input 1RDM is != to the total number   *
+   * of active electrons, RDMs will be computed, otherwise the  *
+   *      input RDMs will be taken as an initial guess.         *
+   **************************************************************/
 
   // Compute the trace of the input A1RDM
   double iAtr = 0.0;
   for(size_t i = 0; i < na; ++i) iAtr += A1RDM[i*(LDD1+1)];
-
-  double E0;
   bool comp_rdms = std::abs(iAtr - nalpha.get() - nbeta.get()) > 1e-6; 
 
-  // Compute active RDMs
   if(comp_rdms) {
+    // Compute active RDMs
     logger->info("Computing Initial RDMs");
     std::fill_n(A1RDM, na2, 0.0);
     std::fill_n(A2RDM, na4, 0.0);
     compute_casci_rdms<HamGen>(settings, NumOrbital(na), nalpha.get(), 
-      nbeta.get(), T_active.data(), V_active.data(), A1RDM, A2RDM, comm) 
-      + E_inactive;
+      nbeta.get(), T_active.data(), V_active.data(), A1RDM, A2RDM, X_CI,
+      comm) + E_inactive;
   } else {
     logger->info("Using Passed RDMs");
   }
 
+
+  /***************************************************************
+   * Compute initial energy and gradient from computed (or read) * 
+   * RDMs                                                        *
+   ***************************************************************/
+
+  // Compute Energy from RDMs
   double E_1RDM = blas::dot(na2, A1RDM, 1, T_active.data(), 1);
   double E_2RDM = blas::dot(na4, A2RDM, 1, V_active.data(), 1);
 
@@ -573,80 +615,154 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
   logger->info("{:8} = {:20.12f}","E(2RDM)",E_2RDM);
   logger->info("{:8} = {:20.12f}","E(CI)",E0);
 
-#if 0
-  std::vector<double> full_ordm(no2), full_trdm(no4);
-  auto E0_full = compute_casci_rdms2<HamGen>(settings, norb, ninact, nact,
-    nalpha.get(), nbeta.get(), T, V, full_ordm.data(), full_trdm.data(), comm) + E_core;
-  std::cout << "TEST " << E0 << " " << E0_full << std::endl;
-  write_fcidump("FCIDUMP.dat", no, T, LDT, V, LDV, E_core);
-  write_rdms_binary("rdms.bin", no, full_ordm.data(), no, full_trdm.data(), no);
-#endif
 
-  const std::string fmt_string = "iter = {:4} E(CI) = {:.10f}, dE = {:18.10e}, |orb_rms| = {:18.10e}";
-
-  // Compute Gradient
-  bool converged = false;
+  // Compute initial Gradient
   {
-  std::vector<double> F(no2), OG(orb_rot_sz);
-  generalized_fock_matrix_comp_mat1( norb, ninact, nact, 
-    F_inactive.data(), no, V, LDV, A1RDM, LDD1, A2RDM, LDD2, 
-    F.data(), no);
-  fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no,
-    OG.data());
-
-  double grad_nrm = std::accumulate(OG.begin(),OG.end(),0.0,
-    [](auto a, auto b){ return a + b*b; });
-  grad_nrm = std::sqrt(grad_nrm);
-  converged = grad_nrm < settings.orb_grad_tol_mcscf;
-  logger->info(fmt_string, 0, E0, 0.0, grad_nrm/rms_factor);
-  }
-
-  // MCSCF Loop
-  for(size_t iter = 0; iter < settings.max_macro_iter; ++iter) {
-     if(converged) break;
-     // Save old E0
-     const double E0_old = E0;
-
-     // Optimize Orbitals
-     std::vector<double> K_opt(no2);
-     optimize_orbitals(settings, norb, ninact, nact, nvirt, E_core, T, LDT, 
-       V, LDV, A1RDM, LDD1, A2RDM, LDD2, K_opt.data(), no);
-
-     // Rotate MO Hamiltonian in place
-     std::vector<double> U(no2);
-     compute_orbital_rotation(norb, 1.0, K_opt.data(), no, U.data(), no );
-     two_index_transform(no, no, T, LDT, U.data(), no, T, LDT);
-     four_index_transform(no, no, 0, V, LDV, U.data(), no, V, LDV);
-
-     // Compute Active Space Hamiltonian 
-     active_hamiltonian(norb, nact, ninact, T, LDT, V, LDV, F_inactive.data(),
-       no, T_active.data(), na, V_active.data(), na);
-
-     // Compute Inactive Energy
-     E_inactive = inactive_energy(ninact, T, LDT, F_inactive.data(), no) + E_core;
-
-     // Compute active RDMs
-     for( auto i = 0; i < na2; ++i ) A1RDM[i] = 0.0;
-     for( auto i = 0; i < na4; ++i ) A2RDM[i] = 0.0;
-     E0 = compute_casci_rdms<HamGen>(settings, NumOrbital(na), 
-       nalpha.get(), nbeta.get(), T_active.data(), V_active.data(), A1RDM, 
-       A2RDM, comm) + E_inactive;
-
-    // Compute Gradient
-    std::vector<double> F(no2), OG(orb_rot_sz);
     generalized_fock_matrix_comp_mat1( norb, ninact, nact, 
       F_inactive.data(), no, V, LDV, A1RDM, LDD1, A2RDM, LDD2, 
       F.data(), no);
     fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no,
       OG.data());
+  }
+
+
+
+
+
+  /**************************************************************
+   *      Compute initial Gradient norm and decide whether      *
+   *           input data is sufficiently converged             *
+   **************************************************************/
+
+  grad_nrm = blas::nrm2(OG.size(), OG.data(), 1);
+  converged = grad_nrm < settings.orb_grad_tol_mcscf;
+  logger->info(fmt_string, 0, E0, 0.0, grad_nrm/rms_factor);
+
+
+
+
+
+  /**************************************************************
+   *                     MCSCF Iterations                       *
+   **************************************************************/
+
+  for(size_t iter = 0; iter < settings.max_macro_iter; ++iter) {
+
+     // Check for convergence signal
+     if(converged) break;
+
+     // Save old data 
+     const double E0_old = E0;
+     std::vector<double> K_total_sav(K_total); 
+
+    /************************************************************
+     *                  Compute Orbital Step                    *
+     ************************************************************/
+
+     std::vector<double> K_step(no2);
+     std::fill(OG.begin(),OG.end(),0.0);
+     optimize_orbitals(settings, norb, ninact, nact, nvirt, E_core, 
+       transT.data(), no, transV.data(), no, A1RDM, LDD1, A2RDM, LDD2, 
+       OG.data(), K_step.data(), no);
+
+     // Increment total step
+     blas::axpy(no2, 1.0, K_step.data(), 1, K_total.data(), 1);
+
+     // DIIS Extrapolation
+     if(iter > 2) {
+       diis.add_vector(K_total, OG);
+       if(iter > 4) {
+         K_total = diis.extrapolate();
+       }
+     }
+
+
+
+    /************************************************************
+     *   Compute orbital rotation matrix corresponding to the   * 
+     *                 total (accumulated) step                 *
+     ************************************************************/
+     if(!iter) {
+
+       // If its the first iteration U_total = EXP[-K_total]
+       compute_orbital_rotation(norb, 1.0, K_total.data(), no, 
+         U_total.data(), no );
+
+     } else {
+
+       // Compute the rotation matrix for the *actual* step taken, 
+       // accounting for possible extrapolation
+       // 
+       // U_step = EXP[-(K_total - K_total_old)]
+       std::vector<double> U_step(no2);
+       blas::axpy(no2, -1.0, K_total.data(), 1, K_total_sav.data(), 1);
+       blas::scal(no2, -1.0, K_total_sav.data(), 1);
+       compute_orbital_rotation(norb, 1.0, K_total_sav.data(), no, 
+         U_step.data(), no );
+
+       // U_total = U_total * U_step
+       std::vector<double> tmp(no2);
+       blas::gemm(blas::Layout::ColMajor,
+         blas::Op::NoTrans, blas::Op::NoTrans,
+         no, no, no, 
+         1.0, U_total.data(), no, U_step.data(), no,
+         0.0, tmp.data(), no
+       );
+
+       U_total = std::move(tmp);
+     }
+
+
+    /************************************************************
+     *          Transform Hamiltonian into new MO basis         * 
+     ************************************************************/
+     two_index_transform(no, no, T, LDT, U_total.data(), no, 
+       transT.data(), no);
+     four_index_transform(no, no, 0, V, LDV, U_total.data(), no, 
+       transV.data(), no);
+
+     
+    /************************************************************
+     *      Compute Active Space Hamiltonian and associated     *
+     *                    scalar quantities                     *
+     ************************************************************/
+
+     // Compute Active Space Hamiltonian 
+     active_hamiltonian(norb, nact, ninact, transT.data(), no, transV.data(), no, 
+      F_inactive.data(), no, T_active.data(), na, V_active.data(), na);
+
+     // Compute Inactive Energy
+     E_inactive = inactive_energy(ninact, transT.data(), no, 
+       F_inactive.data(), no) + E_core;
+
+
+
+    /************************************************************
+     *       Compute new Active Space RDMs and GS energy        *
+     ************************************************************/
+
+     std::fill_n( A1RDM, na2, 0.0);
+     std::fill_n( A2RDM, na4, 0.0);
+     E0 = compute_casci_rdms<HamGen>(settings, NumOrbital(na), 
+       nalpha.get(), nbeta.get(), T_active.data(), V_active.data(), A1RDM, 
+       A2RDM, X_CI, comm) + E_inactive;
+
+    /************************************************************
+     *               Compute new Orbital Gradient               *
+     ************************************************************/
+
+    std::fill(F.begin(), F.end(), 0.0);
+    generalized_fock_matrix_comp_mat1( norb, ninact, nact, 
+      F_inactive.data(), no, transV.data(), no, A1RDM, LDD1, A2RDM, LDD2, 
+      F.data(), no);
+    fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no,
+      OG.data());
 
     // Gradient Norm
-     double grad_nrm = std::accumulate(OG.begin(),OG.end(),0.0,
-       [](auto a, auto b){ return a + b*b; });
-     grad_nrm = std::sqrt(grad_nrm);
-     logger->info(fmt_string, iter+1, E0, E0 - E0_old, grad_nrm/rms_factor);
+    auto grad_nrm = blas::nrm2(OG.size(), OG.data(), 1);
+    logger->info(fmt_string, iter+1, E0, E0 - E0_old, grad_nrm/rms_factor);
 
-     converged = grad_nrm/rms_factor < settings.orb_grad_tol_mcscf;
+    converged = grad_nrm/rms_factor < settings.orb_grad_tol_mcscf;
   }
 
   if(converged) logger->info("CASSCF Converged");

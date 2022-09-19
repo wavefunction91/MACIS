@@ -10,6 +10,63 @@ namespace asci {
 
 
 
+template <typename SpMatType>
+double selected_ci_diag( 
+  const SpMatType&     H,
+  size_t               davidson_max_m,
+  double               davidson_res_tol,
+  std::vector<double>& C_local,
+  MPI_Comm             comm
+) {
+
+  auto logger = spdlog::get("ci_solver");
+  if(!logger) {
+    logger = spdlog::stdout_color_mt("ci_solver");
+  }
+
+  using clock_type = std::chrono::high_resolution_clock;
+  using duration_type = std::chrono::duration<double, std::milli>;
+
+  // Resize eigenvector size
+  C_local.resize( H.local_row_extent(), 0 );
+
+  // Extract Diagonal
+  auto D_local = extract_diagonal_elements( H.diagonal_tile() );
+
+  // Setup guess
+  auto max_c = *std::max_element(C_local.begin(), C_local.end(),
+    [](auto a, auto b){ return std::abs(a) < std::abs(b); });
+  max_c = std::abs(max_c);
+
+  if(max_c > (1./C_local.size())) {
+    logger->info("  * Will use passed vector as guess");
+  } else {
+    logger->info("  * Will generate identity guess");
+    p_diagonal_guess(C_local.size(), H, C_local.data());
+  }
+
+  // Setup Davidson Functor
+  SparseMatrixOperator op(H);
+
+  // Solve EVP
+  MPI_Barrier(comm); auto dav_st = clock_type::now();
+
+  double E = p_davidson( H.local_row_extent(), davidson_max_m, op, 
+    D_local.data(), davidson_res_tol, C_local.data(), H.comm() );
+
+  MPI_Barrier(comm); auto dav_en = clock_type::now();
+
+  logger->info("  {} = {:.6e} Eh, {} = {:.5e} ms", 
+    "E0", E,
+    "DAVIDSON_DUR", duration_type(dav_en-dav_st).count());
+
+  return E;
+
+}
+
+
+
+
 
 template <size_t N, typename index_t = int32_t>
 double selected_ci_diag( 
@@ -37,20 +94,6 @@ double selected_ci_diag(
     "MAX_SUB",   davidson_max_m
   );
 
-  //if( !quiet )
-  //{
-  //  std::cout << "* Diagonalizing CI Hamiltonian over " 
-  //            << std::distance(dets_begin,dets_end)
-  //            << " Determinants" << std::endl;
-
-  //  std::cout << "  * Hamiltonian Knobs:" << std::endl
-  //            << "    * Hamiltonian Element Tolerance = " << h_el_tol << std::endl;
-
-  //  std::cout << "  * Davidson Knobs:" << std::endl
-  //            << "    * Residual Tol = " << davidson_res_tol << std::endl
-  //            << "    * Max M        = " << davidson_max_m << std::endl;
-  //}
-
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
 
@@ -70,33 +113,9 @@ double selected_ci_diag(
     "NNZ", total_nnz, "H_DUR", duration_type(H_en-H_st).count()
   );
 
-  // Resize eigenvector size
-  C_local.resize( H.local_row_extent() );
-
-  // Setup guess
-  auto D_local = extract_diagonal_elements( H.diagonal_tile() );
-  p_diagonal_guess(C_local.size(), H, C_local.data());
-
-  // Setup Davidson Functor
-  SparseMatrixOperator op(H);
-
   // Solve EVP
-  MPI_Barrier(comm); auto dav_st = clock_type::now();
-
-  double E = p_davidson( H.local_row_extent(), davidson_max_m, op, 
-    D_local.data(), davidson_res_tol, C_local.data(), H.comm() );
-
-  MPI_Barrier(comm); auto dav_en = clock_type::now();
-
-  if( !quiet )
-  {
-    std::cout << "    * Davidson                 = " 
-      << duration_type(dav_en-dav_st).count() << std::endl;
-    std::cout << std::endl;
-  } 
-  logger->info("  {} = {:.6e} Eh, {} = {:.5e} ms", 
-    "E0", E,
-    "DAVIDSON_DUR", duration_type(dav_en-dav_st).count());
+  auto E = selected_ci_diag(H, davidson_max_m, 
+    davidson_res_tol, C_local, comm);
 
   return E;
 
