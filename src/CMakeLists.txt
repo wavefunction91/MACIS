@@ -8,6 +8,7 @@ add_library( asci
   orbital_energies.cxx
   orbital_rotation_utilities.cxx
   orbital_hessian.cxx
+  orbital_steps.cxx
 )
 
 target_include_directories( asci PUBLIC 
