@@ -22,6 +22,8 @@ int main( int argn, char *argv[] )
     qs[3][0] = 0.; qs[3][1] = 0.; qs[3][2] = 0.; qs[3][3] = 1.; 
     int nLanIts = 4;
     constexpr size_t nbits = 8;
+    std::vector<double> evals;
+    std::vector<double> X;
     
     // Read Input
     std::string in_file = argv[1];
@@ -46,9 +48,11 @@ int main( int argn, char *argv[] )
       auto dets = dbwy::generate_full_hilbert_space<nbits>( norb, nalpha, nbeta );
       auto mat  = dbwy::make_dist_csr_hamiltonian<int32_t>( MPI_COMM_WORLD, dets.begin(), dets.end(), ham_gen, 1.E-10 );
       cmz::ed::MyBandLan<double>(mat, qs, bandH, nLanIts);
+      
+
       MPI_Finalize();
     }// MPI scope
- 
+
     cout << "bandH : " << endl;
     for(int i = 0; i < bandH.size(); i++){
       for(int j = 0; j < bandH[i].size(); j++) cout << bandH[i][j] << "  ";
@@ -70,6 +74,11 @@ int main( int argn, char *argv[] )
       for(int j = 0; j < eigvecs[i].size(); j++) cout << eigvecs[i][j] << ", ";
       cout << "]" << endl;
     }
+  }
+  catch( std::runtime_error e )
+  {
+    std::cout << "Caught std::runtime_error!" << std::endl;
+    std::cout << e.what() << std::endl;
   }
   catch( std::exception e )
   {

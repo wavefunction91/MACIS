@@ -3,6 +3,7 @@ list(APPEND SOURCES_CXX
      cmz_ed/eigsolver.c++
      cmz_ed/combins.c++
      cmz_ed/bandlan.c++
+     cmz_ed/lobpcg_call.c++
      cmz_ed/slaterdet.c++
      cmz_ed/hamil.c++
      cmz_ed/ed.c++

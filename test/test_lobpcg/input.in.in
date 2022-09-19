@@ -1,0 +1,6 @@
+norbs 4
+nups 2
+ndos 2
+nstates 2
+maxLobpcgIts 36
+fcidump_file @PATH_TO_TEST@/test_lobpcg/FCIDUMP.fcidump

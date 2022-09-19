@@ -43,9 +43,9 @@ namespace cmz
     bool QRdecomp_tr(std::vector<std::vector<double> > &Q, std::vector<std::vector<double> > &R);
   
     bool GetEigsys(std::vector<std::vector<double> > & mat, std::vector<double> &eigvals, std::vector<std::vector<double> > & eigvecs);
-  
-    bool GetEigsysBand(std::vector<std::vector<double> > & mat, int nSupDiag, std::vector<double> &eigvals, std::vector<std::vector<double> > & eigvecs);
-  
+
+    bool GetEigsysBand( std::vector<std::vector<double> > &mat, int nSupDiag, std::vector<double> &eigvals, std::vector<std::vector<double> > &eigvecs );
+
     /**
      * @brief Perform a band Lanczos calculation on the Hamiltonian operator H, starting from vectors qs, for at most nLanIts
      *        iterations. The resulting band-diagonal matrix Hamiltonian will be stored in bandH. Note that this implementation

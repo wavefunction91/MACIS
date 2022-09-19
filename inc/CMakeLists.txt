@@ -7,6 +7,7 @@ list(APPEND ASCI_SOURCES_HXX
      cmz_ed/integrals.h++
      cmz_ed/lanczos.h++
      cmz_ed/bandlan.h++
+     cmz_ed/lobpcg_call.h++
      cmz_ed/rdms.h++
      cmz_ed/combins.h++
      cmz_ed/slaterdet.h++
