@@ -86,4 +86,19 @@ inline void matrix_to_linear_orb_rot(NumInactive ni, NumActive na,
 
 }
 
+
+
+
+void fock_to_linear_orb_grad(NumInactive _ni, NumActive _na,
+  NumVirtual _nv, const double* F, size_t LDF, 
+  double* G_vi, double* G_va, double* G_ai ); 
+
+inline void fock_to_linear_orb_grad(NumInactive ni, NumActive na,
+  NumVirtual nv, const double* F, size_t LDF, double* G_lin ) {
+
+  auto [G_vi, G_va, G_ai] = split_linear_orb_rot(ni,na,nv,G_lin);
+  fock_to_linear_orb_grad(ni, na, nv, F, LDF, G_vi, G_va, G_ai);
+
+}
+
 }
