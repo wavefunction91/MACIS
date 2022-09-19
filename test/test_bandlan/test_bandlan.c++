@@ -22,8 +22,6 @@ int main( int argn, char *argv[] )
     qs[3][0] = 0.; qs[3][1] = 0.; qs[3][2] = 0.; qs[3][3] = 1.; 
     int nLanIts = 4;
     constexpr size_t nbits = 8;
-    std::vector<double> evals;
-    std::vector<double> X;
     
     // Read Input
     std::string in_file = argv[1];
