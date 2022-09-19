@@ -53,7 +53,7 @@ TEST_CASE("Davidson") {
     std::vector<double> X(H.n());
     asci::diagonal_guess(H.n(), H, X.data());
     auto D = sparsexx::extract_diagonal_elements(H);
-    auto E0 = asci::davidson(H.n(), 15, asci::SparseMatrixOperator(H), 
+    auto [niter,E0] = asci::davidson(H.n(), 15, asci::SparseMatrixOperator(H), 
       D.data(), 1e-8, X.data());
 
     REQUIRE( E0 + E_core == Approx(E0_ref) );
@@ -113,8 +113,9 @@ TEST_CASE("Parallel Davidson") {
     std::vector<double> X_local(H.local_row_extent());
     asci::p_diagonal_guess(X_local.size(), H, X_local.data());
     auto D_local = sparsexx::extract_diagonal_elements(H.diagonal_tile());
-    auto E0 = asci::p_davidson(X_local.size(), 15, asci::SparseMatrixOperator(H), 
-      D_local.data(), 1e-8, X_local.data(), MPI_COMM_WORLD);
+    auto [niter,E0] = 
+      asci::p_davidson(X_local.size(), 15, asci::SparseMatrixOperator(H), 
+        D_local.data(), 1e-8, X_local.data(), MPI_COMM_WORLD);
 
     REQUIRE( E0 + E_core == Approx(E0_ref) );
     double nrm = blas::dot(X_local.size(), X_local.data(), 1, X_local.data(), 1);

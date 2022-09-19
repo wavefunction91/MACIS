@@ -113,7 +113,7 @@ void gram_schmidt( int64_t N, int64_t K, const double* V_old, int64_t LDV,
 
 
 template <typename Functor>
-double davidson( int64_t N, int64_t max_m, const Functor& op, 
+auto davidson( int64_t N, int64_t max_m, const Functor& op, 
   const double* D, double tol, double* X ) {
 
   if(!X) throw std::runtime_error("Davidson: No Guess Provided");
@@ -145,7 +145,8 @@ double davidson( int64_t N, int64_t max_m, const Functor& op,
 
 
   bool converged = false;
-  for( int64_t i = 1; i < max_m; ++i ) {
+  size_t iter = 1;
+  for( int64_t i = 1; i < max_m; ++i, ++iter ) {
 
     const auto k = i + 1; // Current subspace dimension after new vector
 
@@ -193,7 +194,7 @@ double davidson( int64_t N, int64_t max_m, const Functor& op,
   if(!converged) throw std::runtime_error("Davidson Did Not Converge!");
   logger->info("Davidson Converged!");
 
-  return LAM[0];
+  return std::make_pair(iter,LAM[0]);
 }
 
 
@@ -265,7 +266,7 @@ void p_rayleigh_ritz( int64_t N_local, int64_t K, const double* X, int64_t LDX,
 
 
 template <typename Functor>
-double p_davidson( int64_t N_local, int64_t max_m, const Functor& op, 
+auto p_davidson( int64_t N_local, int64_t max_m, const Functor& op, 
   const double* D_local, double tol, double* X_local, MPI_Comm comm ) {
 
   if(N_local and !X_local) 
@@ -304,7 +305,8 @@ double p_davidson( int64_t N_local, int64_t max_m, const Functor& op,
     V_local.data()+N_local, comm);
 
   bool converged = false;
-  for( int64_t i = 1; i < max_m; ++i ) {
+  int64_t iter = 1;
+  for( int64_t i = 1; i < max_m; ++i, ++iter ) {
 
     const auto k = i + 1; // Current subspace dimension after new vector
 
@@ -358,8 +360,7 @@ double p_davidson( int64_t N_local, int64_t max_m, const Functor& op,
   if(!converged) throw std::runtime_error("Davidson Did Not Converge!");
   logger->info("Davidson Converged!");
 
-  return LAM[0];
-
+  return std::make_pair(iter,LAM[0]);
 }
 
 

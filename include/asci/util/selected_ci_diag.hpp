@@ -51,12 +51,13 @@ double selected_ci_diag(
   // Solve EVP
   MPI_Barrier(comm); auto dav_st = clock_type::now();
 
-  double E = p_davidson( H.local_row_extent(), davidson_max_m, op, 
+  auto [niter, E] = p_davidson( H.local_row_extent(), davidson_max_m, op, 
     D_local.data(), davidson_res_tol, C_local.data(), H.comm() );
 
   MPI_Barrier(comm); auto dav_en = clock_type::now();
 
-  logger->info("  {} = {:.6e} Eh, {} = {:.5e} ms", 
+  logger->info("  {} = {:4}, {} = {:.6e} Eh, {} = {:.5e} ms", 
+    "DAV_NITER", niter,
     "E0", E,
     "DAVIDSON_DUR", duration_type(dav_en-dav_st).count());
 

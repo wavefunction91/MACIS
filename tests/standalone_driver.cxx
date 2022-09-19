@@ -91,6 +91,9 @@ int main(int argc, char** argv) {
   // Create Logger
   auto console = spdlog::stdout_color_mt("standalone driver");
   //auto bfgs_logger = spdlog::null_logger_mt("bfgs");
+  auto davidson_logger = spdlog::null_logger_mt("davidson");
+  auto ci_logger = spdlog::null_logger_mt("ci_solver");
+  auto diis_logger = spdlog::null_logger_mt("diis");
 
   // Read Input Options
   std::vector< std::string > opts( argc );
