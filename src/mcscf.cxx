@@ -62,18 +62,19 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
 
   logger->info("[MCSCF Settings]:");
   logger->info(
-    "  {:13} = {:3}, {:13} = {:3}, {:13} = {:3}",
+    "  {:13} = {:4}, {:13} = {:3}, {:13} = {:3}",
     "NACTIVE_ALPHA", nalpha.get(),
     "NACTIVE_BETA" , nbeta.get(),
     "NORB_TOTAL",    norb.get()
   );
   logger->info(
-    "  {:13} = {:3}, {:13} = {:3}, {:13} = {:3}",
+    "  {:13} = {:4}, {:13} = {:3}, {:13} = {:3}",
     "NINACTIVE", ninact.get(),
     "NACTIVE",    nact.get(),
     "NVIRTUAL",  nvirt.get()
   );
-  logger->info("  {:13} = {:3}, {:13} = {:3}, {:13} = {:3}",
+  logger->info(
+    "  {:13} = {:4}, {:13} = {:3}, {:13} = {:3}",
     "ENABLE_DIIS", settings.enable_diis,
     "DIIS_START",  settings.diis_start_iter,
     "DIIS_NKEEP",  settings.diis_nkeep
