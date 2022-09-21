@@ -1,4 +1,5 @@
 #pragma once
+#include <sparsexx/sparsexx_config.hpp>
 #if SPARSEXX_ENABLE_MKL
 
 #if __has_include(<mkl.h>)

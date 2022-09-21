@@ -4,12 +4,27 @@
 #include <sparsexx/util/submatrix.hpp>
 #include <sparsexx/util/permute.hpp>
 
-#include <metis.h>
 #include <algorithm>
 #include <numeric>
 #include <omp.h>
 
 namespace sparsexx {
+
+namespace detail {
+
+template <typename IndexType>
+void metis_kway_partitioning(int64_t _nvert, int64_t _npart, IndexType* _xadj, 
+  IndexType* _adjncy, std::vector<IndexType>& _part); 
+
+extern template
+void metis_kway_partitioning(int64_t _nvert, int64_t _npart, int32_t* _xadj, 
+  int32_t* _adjncy, std::vector<int32_t>& _part); 
+
+extern template
+void metis_kway_partitioning(int64_t _nvert, int64_t _npart, int64_t* _xadj, 
+  int64_t* _adjncy, std::vector<int64_t>& _part); 
+
+}
 
 template <typename SpMatType>
 detail::enable_if_csr_matrix_t< SpMatType,
@@ -68,16 +83,16 @@ detail::enable_if_csr_matrix_t< SpMatType,
 }
 
 template <typename SpMatType>
-detail::enable_if_csr_matrix_t<SpMatType, std::vector<idx_t>>
-  kway_partition( int64_t npart, const SpMatType& A ) {
+auto kway_partition( int64_t npart, const SpMatType& A ) {
 
   auto [adj_rp, adj_ci] = extract_adjacency( A, 0 );
 
   if( npart < 2 )
     throw std::runtime_error("KWayPart only works for K > 1");
 
-  std::vector<idx_t> part(A.m());
+  std::vector<int32_t> part(A.m());
 
+#if 0
   idx_t nweights = 1;
   idx_t nvert    = A.m();
   idx_t nparts   = npart;
@@ -86,6 +101,10 @@ detail::enable_if_csr_matrix_t<SpMatType, std::vector<idx_t>>
   METIS_PartGraphKway( &nvert, &nweights, adj_rp.data(), 
     adj_ci.data(), NULL, NULL, NULL, &nparts, NULL, NULL,
     NULL, &obj, part.data() );
+#else
+  detail::metis_kway_partitioning( A.m(), npart, adj_rp.data(), adj_ci.data(),
+    part );
+#endif
 
   return part;
 

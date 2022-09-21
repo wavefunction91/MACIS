@@ -1,15 +1,6 @@
 cmake_minimum_required( VERSION 3.18 FATAL_ERROR )
 project( sparsexx VERSION 0.1.0 LANGUAGES C CXX )
 
-# Append local cmake directory to find CMAKE Modules
-#if( CMAKE_MODULE_PATH )
-#  list( APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
-#else()
-#  set( CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
-#endif()
-#list( APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
-#list( APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules/linalg-modules")
-
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   include( FetchContent )
@@ -28,14 +19,14 @@ endif()
 find_package( MPI      REQUIRED )
 find_package( OpenMP   REQUIRED )
 
-option( SPARSEXX_ENABLE_MKL       "Enable MKL Bindings"             ON )
-option( SPARSEXX_ENABLE_CEREAL    "Enable serialization via cereal" ON )
-option( SPARSEXX_ENABLE_RANGES_V3 "Enable Ranges-v3"                ON )
+option( SPARSEXX_ENABLE_MKL       "Enable MKL Bindings"             OFF )
+option( SPARSEXX_ENABLE_CEREAL    "Enable serialization via cereal" OFF )
+option( SPARSEXX_ENABLE_RANGES_V3 "Enable Ranges-v3"                OFF )
+option( SPARSEXX_ENABLE_METIS     "Enable METIS"                    OFF )
 
 if( SPARSEXX_ENABLE_MKL )
   find_package( IntelMKL COMPONENTS lp64 REQUIRED )
   if( TARGET IntelMKL::IntelMKL )
-    target_compile_definitions( IntelMKL::IntelMKL INTERFACE "SPARSEXX_ENABLE_MKL=1" )
     set( SPARSEXX_EXTERNAL_LIBRARIES IntelMKL::IntelMKL )
   endif()
 endif()
@@ -53,22 +44,24 @@ include( FetchContent )
 
 
 # METIS 
-FetchContent_Declare(
-  metis_download
-  #URL http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
-  URL https://src.fedoraproject.org/lookaside/pkgs/metis/metis-5.1.0.tar.gz/5465e67079419a69e0116de24fce58fe/metis-5.1.0.tar.gz
-  #GIT_REPOSITORY https://github.com/KarypisLab/METIS.git
-)
-
-FetchContent_GetProperties(metis_download)
-if(NOT metis_download_POPULATED)
-  FetchContent_Populate(metis_download)
-  set( GKLIB_PATH ${metis_download_SOURCE_DIR}/GKlib CACHE PATH  "path to GKlib" )
-  add_subdirectory(${metis_download_SOURCE_DIR} ${metis_download_BINARY_DIR})
-  target_link_libraries( metis OpenMP::OpenMP_C )
-  target_include_directories( metis PUBLIC ${metis_download_SOURCE_DIR}/include )
+if(SPARSEXX_ENABLE_METIS)
+  FetchContent_Declare(
+    metis_download
+    #URL http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
+    URL https://src.fedoraproject.org/lookaside/pkgs/metis/metis-5.1.0.tar.gz/5465e67079419a69e0116de24fce58fe/metis-5.1.0.tar.gz
+    #GIT_REPOSITORY https://github.com/KarypisLab/METIS.git
+  )
+  
+  FetchContent_GetProperties(metis_download)
+  if(NOT metis_download_POPULATED)
+    FetchContent_Populate(metis_download)
+    set( GKLIB_PATH ${metis_download_SOURCE_DIR}/GKlib CACHE PATH  "path to GKlib" )
+    add_subdirectory(${metis_download_SOURCE_DIR} ${metis_download_BINARY_DIR})
+    target_link_libraries( metis OpenMP::OpenMP_C )
+    target_include_directories( metis PUBLIC ${metis_download_SOURCE_DIR}/include )
+  endif()
+  list(APPEND SPARSEXX_EXTERNAL_LIBRARIES metis)
 endif()
-list(APPEND SPARSEXX_EXTERNAL_LIBRARIES metis)
 
 
 
@@ -111,13 +104,85 @@ if( SPARSEXX_ENABLE_CEREAL )
 endif()
 
 
-add_library               ( sparsexx INTERFACE                               )
-target_compile_features   ( sparsexx INTERFACE cxx_std_17                    )
-target_link_libraries     ( sparsexx INTERFACE MPI::MPI_CXX OpenMP::OpenMP_CXX )
-target_link_libraries     ( sparsexx INTERFACE ${SPARSEXX_EXTERNAL_LIBRARIES} )
-target_include_directories( sparsexx INTERFACE ${PROJECT_SOURCE_DIR}/include )
+add_library               ( sparsexx src/metis_wrapper.cxx            )
+target_compile_features   ( sparsexx PUBLIC cxx_std_17                    )
+target_link_libraries     ( sparsexx PUBLIC MPI::MPI_CXX OpenMP::OpenMP_CXX )
+#target_link_libraries     ( sparsexx PRIVATE metis )
+target_include_directories( sparsexx PUBLIC 
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
 
 #target_compile_options( sparsexx PRIVATE "-Wall" "-Wextra" "-Wpedantic" "-Wnon-virtual-dtor")
+
+configure_file( 
+  ${PROJECT_SOURCE_DIR}/include/sparsexx/sparsexx_config.hpp.in
+  ${PROJECT_BINARY_DIR}/include/sparsexx/sparsexx_config.hpp
+)
+
+# Installation
+include( GNUInstallDirs )
+add_library(sparsexx::sparsexx ALIAS sparsexx)
+install( TARGETS sparsexx 
+  EXPORT sparsexx-targets
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+
+
+set_target_properties( sparsexx PROPERTIES EXPORT_NAME sparsexx )
+
+# Export build tree
+export(EXPORT sparsexx-targets
+      NAMESPACE sparsexx::
+      FILE "${PROJECT_BINARY_DIR}/sparsexx-targets.cmake")
+
+# Install staic headers
+install( 
+  DIRECTORY   ${PROJECT_SOURCE_DIR}/include
+  DESTINATION ${CMAKE_INSTALL_PREFIX}
+  FILES_MATCHING PATTERN "*.hpp"
+)
+
+# Install generated headers
+install(
+  FILES       ${PROJECT_BINARY_DIR}/include/sparsexx/sparsexx_config.hpp
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/sparsexx
+)
+
+   
+# Export target to script
+set( INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/sparsexx )
+install( EXPORT sparsexx-targets
+  FILE         sparsexx-targets.cmake
+  NAMESPACE    sparsexx::
+  DESTINATION  ${INSTALL_CONFIGDIR}
+)
+
+# Create config-version.cmake file
+include( CMakePackageConfigHelpers )
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/sparsexx-config-version.cmake
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY AnyNewerVersion
+)
+
+
+# Setup sparsexx-config.cmake
+configure_package_config_file(
+  ${PROJECT_SOURCE_DIR}/cmake/sparsexx-config.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/sparsexx-config.cmake
+  INSTALL_DESTINATION ${INSTALL_CONFIGDIR}
+)
+
+# Install CMake files
+install( FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/sparsexx-config.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/sparsexx-config-version.cmake
+  DESTINATION ${INSTALL_CONFIGDIR}
+)
 
 add_subdirectory( examples )
 add_subdirectory( tests )

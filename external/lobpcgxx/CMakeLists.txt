@@ -3,19 +3,24 @@ project( lobpcgxx VERSION 0.0.1 LANGUAGES C CXX )
 
 
 find_package( OpenMP )
+find_package( LAPACK REQUIRED )
+find_package( BLAS REQUIRED )
 # BLAS++/LAPACK++
+find_package(lapackpp CONFIG QUIET)
+if(NOT lapackpp_FOUND )
 include( FetchContent )
-FetchContent_Declare( blaspp
-  GIT_REPOSITORY https://bitbucket.org/icl/blaspp.git 
-  GIT_TAG 2021.04.01
-)
-FetchContent_Declare( lapackpp
-  GIT_REPOSITORY https://bitbucket.org/icl/lapackpp.git 
-)
-
-FetchContent_MakeAvailable( blaspp )
-FetchContent_MakeAvailable( lapackpp )
-target_compile_definitions( lapackpp PUBLIC LAPACK_COMPLEX_CPP )
+  FetchContent_Declare( blaspp
+    GIT_REPOSITORY https://bitbucket.org/icl/blaspp.git 
+    GIT_TAG 2021.04.01
+  )
+  FetchContent_Declare( lapackpp
+    GIT_REPOSITORY https://bitbucket.org/icl/lapackpp.git 
+  )
+  
+  FetchContent_MakeAvailable( blaspp )
+  FetchContent_MakeAvailable( lapackpp )
+  target_compile_definitions( lapackpp PUBLIC LAPACK_COMPLEX_CPP )
+endif()
 
 add_library( lobpcgxx INTERFACE )
 target_link_libraries( lobpcgxx INTERFACE blaspp lapackpp )

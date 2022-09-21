@@ -1,0 +1,24 @@
+cmake_minimum_required( VERSION 3.14 FATAL_ERROR )
+
+get_filename_component( asci_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH )
+
+#list( APPEND CMAKE_MODULE_PATH ${asci_CMAKE_DIR} )
+include( CMakeFindDependencyMacro )
+find_dependency( MPI )
+find_dependency( OpenMP )
+find_dependency( Threads )
+find_dependency( Eigen3 )
+find_dependency( lapackpp )
+find_dependency( lobpcgxx )
+find_dependency( sparsexx )
+find_dependency( mdspan )
+find_dependency( spdlog )
+
+
+#list(REMOVE_AT CMAKE_MODULE_PATH -1)
+
+if(NOT TARGET asci::asci)
+    include("${asci_CMAKE_DIR}/asci-targets.cmake")
+endif()
+
+set(asci_LIBRARIES asci::asci)

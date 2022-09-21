@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include <sparsexx/sparsexx_config.hpp>
 #include <sparsexx/spblas/type_traits.hpp>
 
 namespace sparsexx::spblas {

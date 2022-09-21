@@ -93,7 +93,7 @@ void p_diagonal_guess( size_t N_local, const SpMatType& A, double* X ) {
 
 }
 
-void gram_schmidt( int64_t N, int64_t K, const double* V_old, int64_t LDV,
+inline void gram_schmidt( int64_t N, int64_t K, const double* V_old, int64_t LDV,
   double* V_new ) {
 
   std::vector<double> inner(K);
@@ -208,7 +208,7 @@ auto davidson( int64_t N, int64_t max_m, const Functor& op,
 
 
 
-void p_gram_schmidt( int64_t N_local, int64_t K, const double* V_old, int64_t LDV,
+inline void p_gram_schmidt( int64_t N_local, int64_t K, const double* V_old, int64_t LDV,
   double* V_new, MPI_Comm comm ) {
 
   std::vector<double> inner(K);
@@ -239,7 +239,7 @@ void p_gram_schmidt( int64_t N_local, int64_t K, const double* V_old, int64_t LD
 
 }  
 
-void p_rayleigh_ritz( int64_t N_local, int64_t K, const double* X, int64_t LDX,
+inline void p_rayleigh_ritz( int64_t N_local, int64_t K, const double* X, int64_t LDX,
   const double* AX, int64_t LDAX, double* W, double* C, int64_t LDC, 
   MPI_Comm comm ) {
 

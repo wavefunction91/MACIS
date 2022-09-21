@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sparsexx/sparsexx_config.hpp>
 #include <sparsexx/matrix_types/csr_matrix.hpp>
 #include <sparsexx/matrix_types/type_traits.hpp>
 

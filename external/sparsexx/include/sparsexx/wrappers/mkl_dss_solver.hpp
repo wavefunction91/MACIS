@@ -1,4 +1,5 @@
 #pragma once
+#include <sparsexx/sparsexx_config.hpp>
 #if SPARSEXX_ENABLE_MKL
 
 #include <sparsexx/matrix_types/type_traits.hpp>
