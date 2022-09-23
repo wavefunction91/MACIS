@@ -47,7 +47,7 @@ double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb,
 
 
 template <typename HamGen>
-void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha, 
+double casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha, 
   NumElectron nbeta, NumOrbital norb, NumInactive ninact, NumActive nact, 
   NumVirtual nvirt, double E_core, double* T, size_t LDT, double* V, size_t LDV, 
   double* A1RDM, size_t LDD1, double* A2RDM, size_t LDD2, MPI_Comm comm) {
@@ -399,17 +399,18 @@ void casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
   }
 
   if(converged) logger->info("CASSCF Converged");
+  return E0;
 }
 
 
 
-void casscf_bfgs(MCSCFSettings settings, NumElectron nalpha, NumElectron nbeta, 
+double casscf_bfgs(MCSCFSettings settings, NumElectron nalpha, NumElectron nbeta, 
   NumOrbital norb, NumInactive ninact, NumActive nact, NumVirtual nvirt, 
   double E_core, double* T, size_t LDT, double* V, size_t LDV, 
   double* A1RDM, size_t LDD1, double* A2RDM, size_t LDD2, MPI_Comm comm) { 
 
   using generator_t = DoubleLoopHamiltonianGenerator<64>;
-  casscf_bfgs_impl<generator_t>(settings, nalpha, nbeta, norb, ninact, nact, 
+  return casscf_bfgs_impl<generator_t>(settings, nalpha, nbeta, norb, ninact, nact, 
     nvirt, E_core, T, LDT, V, LDV, A1RDM, LDD1, A2RDM, LDD2, comm);
 
 }

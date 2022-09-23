@@ -23,13 +23,15 @@ struct MCSCFSettings {
   double ci_matel_tol       = std::numeric_limits<double>::epsilon();
 };
 
+#if 0
 void optimize_orbitals(MCSCFSettings settings, NumOrbital norb, 
   NumInactive ninact, NumActive nact, NumVirtual nvirt, double E_core, 
   const double* T, size_t LDT, const double* V, size_t LDV, 
   const double* A1RDM, size_t LDD1, const double* A2RDM, size_t LDD2, 
   double *K, size_t LDK);
+#endif
 
-void casscf_bfgs(MCSCFSettings settings, NumElectron nalpha, NumElectron nbeta, 
+double casscf_bfgs(MCSCFSettings settings, NumElectron nalpha, NumElectron nbeta, 
   NumOrbital norb, NumInactive ninact, NumActive nact, NumVirtual nvirt, 
   double E_core, double* T, size_t LDT, double* V, size_t LDV, 
   double* A1RDM, size_t LDD1, double* A2RDM, size_t LDD2, MPI_Comm comm); 
