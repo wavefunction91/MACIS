@@ -176,6 +176,28 @@ public:
   //   END - Routines for fast diagonal elements     //
   /////////////////////////////////////////////////////
 
+  ///////////////////////////////////////////////////////////
+  //   Virtual routine to symmetrize degenerate states     //
+  ///////////////////////////////////////////////////////////
+
+  virtual void SymmDegStates( double*           sym_vec,
+                              const double*     deg_vecs,
+			      const int         nvecs,
+			      full_det_iterator dets_begin,
+			      full_det_iterator dets_end,
+			      const size_t      dim
+			    ) const
+  {
+    // Default behaviour, when there is no symmetry implemented
+    // Just copy the first vector, no symmetrization occurring.
+    for( int i = 0; i < dim; i++ )
+      *(sym_vec + i) = *( deg_vecs + i );
+  }
+
+  /////////////////////////////////////////////////////////////////
+  //   END - Virtual routine to symmetrize degenerate states     //
+  /////////////////////////////////////////////////////////////////
+
   inline double matrix_element( full_det_t bra, full_det_t ket ) {
     auto bra_alpha = truncate_bitset<N/2>(bra);
     auto ket_alpha = truncate_bitset<N/2>(ket);

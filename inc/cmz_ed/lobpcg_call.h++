@@ -51,7 +51,7 @@ namespace cmz
       size_t nstates,
       std::vector<double> &evals,
       std::vector<double> &X,
-      int & maxIts, 
+      int maxIts, 
       double tol  = 1.E-8,
       bool print = false );
 

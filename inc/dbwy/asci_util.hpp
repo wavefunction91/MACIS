@@ -1,5 +1,6 @@
 #pragma once
 #include "sd_operations.hpp"
+#include "cmz_ed/lobpcg_call.h++"
 #include <ips4o.hpp>
 #include <sparsexx/matrix_types/dense_conversions.hpp>
 
@@ -665,7 +666,8 @@ double selected_ci_diag(
   double                                         davidson_res_tol,
   std::vector<double>&                           C_local,
   MPI_Comm                                       comm,
-  const bool                                     quiet = false
+  const bool                                     quiet = false,
+  const int                                      nstates = 1
 ) {
 
   if( !quiet )
@@ -713,8 +715,47 @@ double selected_ci_diag(
   // Solve EVP
   MPI_Barrier(comm);
   auto dav_st = clock_type::now();
+  double E = 0.;
   #if 1
-  double E = p_davidson( davidson_max_m, H, davidson_res_tol, C_local.data() );
+  if( nstates == 1 )
+  {
+    E = p_davidson( davidson_max_m, H, davidson_res_tol, C_local.data() );
+  }
+  else
+  {
+    std::vector<double> evals;
+    std::vector<double> evecs;
+    size_t dimH = std::distance(dets_begin,dets_end);
+    cmz::ed::LobpcgGS( H, dimH, nstates, evals, evecs, 10000, davidson_res_tol );
+    if(!quiet)
+    {
+      std::cout << "  * Hamiltonian eigenvalues: ";
+      for( const auto eval : evals )
+        std::cout << eval << ", ";
+      std::cout << std::endl;
+    }
+    // Check for ground state degeneracies
+    double deg_tol = 1.E-7;
+    int ngs = 1;
+    for( int i = 1; i < evals.size(); i++ )
+    {
+      if( std::abs(evals[i] - evals[0]) > deg_tol )
+	break;
+      ngs++;
+    }
+    E = evals[0];
+    // In case of degeneracy, symmetrize
+    if( ngs == 1 )
+    {
+      for( int ii = 0; ii < dimH; ii++ )
+        C_local[ii] = evecs[ii];
+    }
+    else
+    {
+      ham_gen.SymmDegStates( C_local.data(), evecs.data(), ngs, 
+                             dets_begin, dets_end, dimH );
+    }
+  }
   #else
   const size_t ndets = std::distance(dets_begin,dets_end);
   std::vector<double> H_dense(ndets*ndets);
@@ -750,7 +791,7 @@ auto asci_iter( size_t ndets, size_t ncdets, double E0,
   std::vector<std::bitset<N>> wfn, std::vector<double> X_local, 
   HamiltonianGenerator<N>& ham_gen, size_t norb,
   double ham_tol, size_t eig_max_subspace, double eig_res_tol,
-  const bool quiet = false ) {
+  const bool quiet = false, int nstates = 1 ) {
 
   // Sort wfn on coefficient weights
   if( wfn.size() > 1 ) reorder_ci_on_coeff( wfn, X_local, MPI_COMM_WORLD );
@@ -765,7 +806,7 @@ auto asci_iter( size_t ndets, size_t ncdets, double E0,
 
   // Rediagonalize
   auto E = selected_ci_diag<N,index_t>( wfn.begin(), wfn.end(), ham_gen, 
-    ham_tol, eig_max_subspace, eig_res_tol, X_local, MPI_COMM_WORLD, quiet);
+    ham_tol, eig_max_subspace, eig_res_tol, X_local, MPI_COMM_WORLD, quiet, nstates);
 
   return std::make_tuple(E, wfn, X_local);
 
@@ -777,7 +818,7 @@ auto asci_grow( size_t ndets_max, size_t ncdets, size_t grow_factor,
   HamiltonianGenerator<N>& ham_gen, size_t norb,
   double ham_tol, size_t eig_max_subspace, double eig_res_tol,
   const std::function<void(double)>& print_asci = std::function<void(double)>(),
-  const bool quiet = false ) {
+  const bool quiet = false, int nstates = 1 ) {
 
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
@@ -793,7 +834,7 @@ auto asci_grow( size_t ndets_max, size_t ncdets, size_t grow_factor,
     size_t ndets_new = std::min(std::max(100ul,wfn.size() * grow_factor), ndets_max);
     std::tie(E0, wfn, X_local) = asci_iter<N,index_t>( ndets_new, ncdets, E0,
       std::move(wfn), std::move(X_local), ham_gen, norb, ham_tol,
-      eig_max_subspace, eig_res_tol, quiet);
+      eig_max_subspace, eig_res_tol, quiet, nstates);
     if( print_asci && !quiet ) print_asci( E0 );
     if( std::abs( float(wfn.size() - prev_size) / float(wfn.size())) < 1.E-3 )
       break;
@@ -810,7 +851,7 @@ auto asci_grow_with_rot( size_t ndets_max, size_t ncdets, size_t grow_factor,
   HamiltonianGenerator<N>& ham_gen, size_t norb,
   double ham_tol, size_t eig_max_subspace, double eig_res_tol,
   const std::function<void(double)>& print_asci = std::function<void(double)>(),
-  const int nrots = 4, const bool quiet = false ) {
+  const int nrots = 4, const bool quiet = false, int nstates = 1 ) {
 
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
@@ -827,7 +868,7 @@ auto asci_grow_with_rot( size_t ndets_max, size_t ncdets, size_t grow_factor,
     size_t ndets_new = std::min(std::max(100ul,wfn.size() * grow_factor), ndets_max);
     std::tie(E0, wfn, X_local) = asci_iter<N,index_t>( ndets_new, ncdets, E0,
       std::move(wfn), std::move(X_local), ham_gen, norb, ham_tol,
-      eig_max_subspace, eig_res_tol, quiet);
+      eig_max_subspace, eig_res_tol, quiet, nstates);
     if( print_asci && !quiet ) print_asci( E0 );
     its++;
     if( its > 4 && its < nrots )
@@ -841,7 +882,7 @@ auto asci_grow_with_rot( size_t ndets_max, size_t ncdets, size_t grow_factor,
       ham_gen.SetJustSingles( false );
       // Rediagonalize
       E0 = selected_ci_diag<N,index_t>( wfn.begin(), wfn.end(), ham_gen, 
-        ham_tol, eig_max_subspace, eig_res_tol, X_local, MPI_COMM_WORLD, true);
+        ham_tol, eig_max_subspace, eig_res_tol, X_local, MPI_COMM_WORLD, true, nstates);
       auto orbrot_en = clock_type::now();
       if( !quiet )
         std::cout << "\n  * Rotating to natural orbitals: " << 
@@ -863,7 +904,7 @@ auto asci_refine( size_t ncdets, double asci_tol, size_t max_iter, double E0,
   HamiltonianGenerator<N>& ham_gen, size_t norb,
   double ham_tol, size_t eig_max_subspace, double eig_res_tol,
   const std::function<void(double)>& print_asci = std::function<void(double)>(),
-  const bool quiet = false ) {
+  const bool quiet = false, int nstates = 1 ) {
 
 
   size_t ndets = wfn.size();
@@ -877,7 +918,7 @@ auto asci_refine( size_t ncdets, double asci_tol, size_t max_iter, double E0,
     double E;
     std::tie(E, wfn, X_local) = asci_iter<N,index_t>( ndets, ncdets, E0,
       std::move(wfn), std::move(X_local), ham_gen, norb, ham_tol,
-      eig_max_subspace, eig_res_tol, quiet);
+      eig_max_subspace, eig_res_tol, quiet, nstates);
 
     // Print iteration results
     if( print_asci ) print_asci(E);

@@ -128,6 +128,8 @@ auto run_asci_w_GF(
   size_t ncdets_max    = cmz::ed::getParam<int>( input, "ncdets_max" );
   size_t niter_max     = cmz::ed::getParam<int>( input, "niter_max" );
   double coeff_thresh  = cmz::ed::getParam<int>( input, "coeff_thresh" );
+  int nstates          = 1;
+  try { nstates = cmz::ed::getParam<int>( input, "nstates" ); } catch(...){ }
   int    n_orb_rots    = 0;
   try{ n_orb_rots = cmz::ed::getParam<int>( input, "n_orb_rots" ); } catch(...){ }
   {
@@ -147,16 +149,16 @@ auto run_asci_w_GF(
   if( n_orb_rots > 0 )
     std::tie(EASCI, dets, X_local) = dbwy::asci_grow_with_rot( ntdets_max, ncdets_max, 8, EASCI,
       std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
-      print_asci, n_orb_rots, quiet );
+      print_asci, n_orb_rots, quiet, nstates );
   else
     std::tie(EASCI, dets, X_local) = dbwy::asci_grow( ntdets_max, ncdets_max, 8, EASCI,
       std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
-      print_asci, quiet );
+      print_asci, quiet, nstates );
   
   // Refine wfn
   std::tie(EASCI, dets, X_local) = dbwy::asci_refine( ncdets_max, 1e-6, niter_max,
     EASCI, std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
-    print_asci, quiet );
+    print_asci, quiet, nstates );
   
   Eret = EASCI + ints.core_energy;
   } // ASCI 
@@ -291,6 +293,8 @@ auto run_asci_w_1rdm(
   size_t ncdets_max    = cmz::ed::getParam<int>( input, "ncdets_max" );
   size_t niter_max     = cmz::ed::getParam<int>( input, "niter_max" );
   double coeff_thresh  = cmz::ed::getParam<int>( input, "coeff_thresh" );
+  int nstates          = 1;
+  try { nstates = cmz::ed::getParam<int>( input, "nstates" ); } catch(...){ }
   int    n_orb_rots    = 0;
   try{ n_orb_rots = cmz::ed::getParam<int>( input, "n_orb_rots" ); } catch(...) { }
   {
@@ -310,16 +314,16 @@ auto run_asci_w_1rdm(
   if( n_orb_rots > 0 )
     std::tie(EASCI, dets, X_local) = dbwy::asci_grow_with_rot( ntdets_max, ncdets_max, 8, EASCI,
       std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
-      print_asci, n_orb_rots, quiet );
+      print_asci, n_orb_rots, quiet, nstates );
   else
     std::tie(EASCI, dets, X_local) = dbwy::asci_grow( ntdets_max, ncdets_max, 8, EASCI,
       std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
-      print_asci, quiet );
+      print_asci, quiet, nstates );
   
   // Refine wfn
   std::tie(EASCI, dets, X_local) = dbwy::asci_refine( ncdets_max, 1e-6, niter_max,
     EASCI, std::move(dets), std::move(X_local), ham_gen, norb, 1e-12, 100, 1e-8,
-    print_asci, quiet );
+    print_asci, quiet, nstates );
   
   Eret = EASCI + ints.core_energy;
   
@@ -454,12 +458,14 @@ auto run_ed_w_1rdm(
   {
   if(world_size != 1) throw "NO MPI"; // Disable MPI for now
   
+  int nstates          = 1;
+  try { nstates = cmz::ed::getParam<int>( input, "nstates" ); } catch(...){ }
   // Fill the determinant list with all possible dets
   dets = dbwy::generate_full_hilbert_space<nbits>( norb, nalpha, nbeta );
   if(world_rank == 0 && !quiet)
     std::cout << "* NDETS in ED = " << dets.size() << std::endl;
   auto EED = dbwy::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
-    1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD, quiet );
+    1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD, quiet, nstates );
   Eret = EED + ints.core_energy;
   print_ed( EED );
   
@@ -609,12 +615,14 @@ auto run_ed_w_GF(
   {
   if(world_size != 1) throw "NO MPI"; // Disable MPI for now
   
+  int nstates          = 1;
+  try { nstates = cmz::ed::getParam<int>( input, "nstates" ); } catch(...){ }
   // Fill the determinant list with all possible dets
   dets = dbwy::generate_full_hilbert_space<nbits>( norb, nalpha, nbeta );
   if(world_rank == 0 && !quiet)
     std::cout << "* NDETS in ED = " << dets.size() << std::endl;
   auto EED = dbwy::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
-    1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD, quiet );
+    1e-12, 100, 1e-8, X_local, MPI_COMM_WORLD, quiet, nstates );
   Eret = EED + ints.core_energy;
   std::cout << "EED = " << EED << std::endl;
   print_ed( EED );

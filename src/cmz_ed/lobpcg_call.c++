@@ -12,7 +12,7 @@ namespace cmz
       size_t nstates,
       std::vector<double> &evals,
       std::vector<double> &X,
-      int & maxIts, 
+      int maxIts, 
       double tol,
       bool print)
     {
