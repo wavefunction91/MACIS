@@ -6,6 +6,7 @@
 #include <sparsexx/spblas/spmbv.hpp>
 
 #include <sparsexx/util/permute.hpp>
+#include <numeric>
 
 namespace sparsexx::spblas {
 
