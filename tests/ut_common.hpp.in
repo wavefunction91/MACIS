@@ -8,7 +8,7 @@
   if(mpi_rank > 0 ) return;
 
 
-#define REF_DATA_PREFIX "/home/dbwy/devel/casscf/ASCI-CI/tests/ref_data"
+#cmakedefine REF_DATA_PREFIX "@REF_DATA_PREFIX@"
 const std::string water_ccpvdz_fcidump = 
   REF_DATA_PREFIX "/h2o.ccpvdz.fci.dat";
 const std::string water_ccpvdz_rdms_fname = 
