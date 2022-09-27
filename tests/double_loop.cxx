@@ -5,23 +5,20 @@
 #include <iostream>
 #include <iomanip>
 
-const std::string ref_fcidump = "/home/dbwy/devel/casscf/ASCI-CI/tests/ref_data/h2o.ccpvdz.fci.dat";
-const std::string ref_wfn     = "/home/dbwy/devel/casscf/ASCI-CI/tests/ref_data/ch4.wfn.dat";
-
 TEST_CASE("Double Loop") {
 
   ROOT_ONLY(MPI_COMM_WORLD);
 
-  auto norb         = asci::read_fcidump_norb(ref_fcidump);
+  auto norb         = asci::read_fcidump_norb(water_ccpvdz_fcidump);
   const auto norb2  = norb  * norb;
   const auto norb3  = norb2 * norb;
   const size_t nocc = 5;
 
   std::vector<double> T(norb*norb);
   std::vector<double> V(norb*norb*norb*norb);
-  auto E_core = asci::read_fcidump_core(ref_fcidump);
-  asci::read_fcidump_1body(ref_fcidump, T.data(), norb);
-  asci::read_fcidump_2body(ref_fcidump, V.data(), norb);
+  auto E_core = asci::read_fcidump_core(water_ccpvdz_fcidump);
+  asci::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
+  asci::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
   using generator_type = asci::DoubleLoopHamiltonianGenerator<64>;
 
@@ -243,7 +240,7 @@ TEST_CASE("RDMS") {
   SECTION("CI") {
 
     std::vector<std::bitset<128>> states; std::vector<double> coeffs;
-    asci::read_wavefunction<128>( ref_wfn, states, coeffs );
+    asci::read_wavefunction<128>( ch4_wfn_fname, states, coeffs );
 
 
     coeffs.resize(5000);

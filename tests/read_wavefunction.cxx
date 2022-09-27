@@ -3,14 +3,13 @@
 #include <iostream>
 #include <iomanip>
 
-const std::string ref_file = "/home/dbwy/devel/casscf/ASCI-CI/tests/ref_data/ch4.wfn.dat";
 TEST_CASE("Read Wavefunction") {
 
   ROOT_ONLY(MPI_COMM_WORLD);
 
   std::vector<std::bitset<64>> states;
   std::vector<double>          coeffs;
-  asci::read_wavefunction( ref_file, states, coeffs );
+  asci::read_wavefunction( ch4_wfn_fname, states, coeffs );
 
   std::vector<std::bitset<64>> ref_states = {
     0x1f0000001f,0x100f0000100f,0x401b0000401b,0x201700002017,0x4f0000004f,

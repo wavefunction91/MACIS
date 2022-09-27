@@ -3,13 +3,10 @@
 #include <asci/util/fock_matrices.hpp>
 #include <iomanip>
 
-const std::string fci_file = "/home/dbwy/devel/casscf/ASCI-CI/tests/ref_data/h2o.ccpvdz.fci.dat";
-const std::string rdm_file = "/home/dbwy/devel/casscf/ASCI-CI/tests/ref_data/h2o.ccpvdz.cas88.rdms.bin";
-
 TEST_CASE("Fock Matrices") {
   ROOT_ONLY(MPI_COMM_WORLD);
 
-  const size_t norb  = asci::read_fcidump_norb(fci_file);
+  const size_t norb  = asci::read_fcidump_norb(water_ccpvdz_fcidump);
   const size_t norb2 = norb  * norb;
   const size_t norb4 = norb2 * norb2;
 
@@ -19,8 +16,8 @@ TEST_CASE("Fock Matrices") {
   using asci::NumVirtual;
 
   std::vector<double> T(norb2), V(norb4);
-  asci::read_fcidump_1body(fci_file, T.data(), norb);
-  asci::read_fcidump_2body(fci_file, V.data(), norb);
+  asci::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
+  asci::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
   SECTION("Inactive Fock Matrix + Energy") {
 
@@ -116,7 +113,7 @@ TEST_CASE("Fock Matrices") {
     size_t na2 = nact.get() * nact.get();
     size_t na4 = na2 * na2;
     std::vector<double> active_1rdm(na2), active_2rdm(na4);
-    asci::read_rdms_binary(rdm_file, nact.get(), active_1rdm.data(), nact.get(),
+    asci::read_rdms_binary(water_ccpvdz_rdms_fname, nact.get(), active_1rdm.data(), nact.get(),
       active_2rdm.data(), nact.get());
 
     REQUIRE(active_1rdm.size() == nact.get()*nact.get());
@@ -136,7 +133,7 @@ TEST_CASE("Fock Matrices") {
     size_t na2 = nact.get() * nact.get();
     size_t na4 = na2 * na2;
     std::vector<double> active_1rdm(na2), active_2rdm(na4);
-    asci::read_rdms_binary(rdm_file, nact.get(), active_1rdm.data(), nact.get(),
+    asci::read_rdms_binary(water_ccpvdz_rdms_fname, nact.get(), active_1rdm.data(), nact.get(),
       active_2rdm.data(), nact.get());
 
     std::vector<double> Q(nact.get()*norb);
@@ -154,7 +151,7 @@ TEST_CASE("Fock Matrices") {
     size_t na2 = nact.get() * nact.get();
     size_t na4 = na2 * na2;
     std::vector<double> active_1rdm(na2), active_2rdm(na4);
-    asci::read_rdms_binary(rdm_file, nact.get(), active_1rdm.data(), nact.get(),
+    asci::read_rdms_binary(water_ccpvdz_rdms_fname, nact.get(), active_1rdm.data(), nact.get(),
       active_2rdm.data(), nact.get());
 
     // Compute Intermediates
@@ -202,7 +199,7 @@ TEST_CASE("Fock Matrices") {
     size_t na2 = nact.get() * nact.get();
     size_t na4 = na2 * na2;
     std::vector<double> active_1rdm(na2), active_2rdm(na4);
-    asci::read_rdms_binary(rdm_file, nact.get(), active_1rdm.data(), nact.get(),
+    asci::read_rdms_binary(water_ccpvdz_rdms_fname, nact.get(), active_1rdm.data(), nact.get(),
       active_2rdm.data(), nact.get());
 
     // Compute Fock

@@ -6,9 +6,6 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/null_sink.h>
 
-const std::string fci_file = "/home/dbwy/devel/casscf/ASCI-CI/tests/ref_data/h2o.ccpvdz.fci.dat";
-const std::string rdm_file = "/home/dbwy/devel/casscf/ASCI-CI/tests/ref_data/h2o.ccpvdz.cas88.rdms.bin";
-
 TEST_CASE("MCSCF") {
 
   ROOT_ONLY(MPI_COMM_WORLD);
@@ -18,7 +15,7 @@ TEST_CASE("MCSCF") {
   spdlog::null_logger_mt("diis");
   spdlog::null_logger_mt("casscf");
 
-  const size_t norb  = asci::read_fcidump_norb(fci_file);
+  const size_t norb  = asci::read_fcidump_norb(water_ccpvdz_fcidump);
   const size_t norb2 = norb  * norb;
   const size_t norb4 = norb2 * norb2;
 
@@ -29,9 +26,9 @@ TEST_CASE("MCSCF") {
   using asci::NumElectron;
 
   std::vector<double> T(norb2), V(norb4);
-  auto E_core = asci::read_fcidump_core(fci_file);
-  asci::read_fcidump_1body(fci_file, T.data(), norb);
-  asci::read_fcidump_2body(fci_file, V.data(), norb);
+  auto E_core = asci::read_fcidump_core(water_ccpvdz_fcidump);
+  asci::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
+  asci::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
   size_t n_inactive = 1;
   size_t n_active   = 8;
@@ -61,8 +58,8 @@ TEST_CASE("MCSCF") {
 
   
   SECTION("CASSCF - With Guess - Singlet") {
-    asci::read_rdms_binary(rdm_file, n_active, active_ordm.data(), n_active,
-      active_trdm.data(), n_active);
+    asci::read_rdms_binary(water_ccpvdz_rdms_fname, n_active, 
+      active_ordm.data(), n_active, active_trdm.data(), n_active);
      auto E = asci::casscf_bfgs(settings, nalpha, nalpha, NumOrbital(norb),
        ninact, nact, nvirt, E_core, T.data(), norb, V.data(), norb,
        active_ordm.data(), n_active, active_trdm.data(), n_active,
