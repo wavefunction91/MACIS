@@ -29,3 +29,5 @@ configure_file( ut_common.hpp.in ${PROJECT_BINARY_DIR}/tests/ut_common.hpp)
 #FetchContent_MakeAvailable(pybind11)
 #pybind11_add_module(pyasci pymod.cxx)
 #target_link_libraries(pyasci PUBLIC asci)
+
+add_test( NAME ASCI_SERIAL_TEST COMMAND $<TARGET_FILE:asci_test> )
