@@ -5,6 +5,44 @@
 namespace asci {
 
 
+double inactive_energy( NumInactive _ninact, const double* T,
+  size_t LDT, const double* Fi, size_t LDF ) {
+
+  const auto ninact = _ninact.get();
+
+  double E = 0.0;
+  for( size_t i = 0; i < ninact; ++i )
+    E += T[i*(LDT+1)] + Fi[i*(LDF+1)];
+  return E;
+
+}
+
+void inactive_fock_matrix( NumOrbital _norb, NumInactive _ninact,
+  const double* T, size_t LDT, const double* V, size_t LDV, 
+  double* Fi, size_t LDF ) {
+
+  const auto norb   = _norb.get();
+  const auto ninact = _ninact.get();
+
+  const size_t LDV2 = LDV  * LDV;
+  const size_t LDV3 = LDV2 * LDV;
+
+  for(size_t p = 0; p < norb;   ++p)
+  for(size_t q = 0; q < norb;   ++q) {
+    double tmp = 0.0;
+    for(size_t i = 0; i < ninact; ++i) {
+      tmp += 2 * V[p + q*LDV  + i*(LDV2 + LDV3)] -
+                 V[p + q*LDV3 + i*(LDV  + LDV2)];
+    }
+    Fi[p + q*LDF] = T[p + q*LDT] + tmp;
+  }
+}
+
+
+
+
+
+
 void active_submatrix_1body(NumActive _nact, NumInactive _ninact,
   const double* A_full, size_t LDAF, double* A_sub,
   size_t LDAS) {
@@ -64,38 +102,10 @@ void active_hamiltonian(NumOrbital norb, NumActive nact, NumInactive ninact,
   
 }
 
-double inactive_energy( NumInactive _ninact, const double* T,
-  size_t LDT, const double* Fi, size_t LDF ) {
 
-  const auto ninact = _ninact.get();
 
-  double E = 0.0;
-  for( size_t i = 0; i < ninact; ++i )
-    E += T[i*(LDT+1)] + Fi[i*(LDF+1)];
-  return E;
 
-}
 
-void inactive_fock_matrix( NumOrbital _norb, NumInactive _ninact,
-  const double* T, size_t LDT, const double* V, size_t LDV, 
-  double* Fi, size_t LDF ) {
-
-  const auto norb   = _norb.get();
-  const auto ninact = _ninact.get();
-
-  const size_t LDV2 = LDV  * LDV;
-  const size_t LDV3 = LDV2 * LDV;
-
-  for(size_t p = 0; p < norb;   ++p)
-  for(size_t q = 0; q < norb;   ++q) {
-    double tmp = 0.0;
-    for(size_t i = 0; i < ninact; ++i) {
-      tmp += 2 * V[p + q*LDV  + i*(LDV2 + LDV3)] -
-                 V[p + q*LDV3 + i*(LDV  + LDV2)];
-    }
-    Fi[p + q*LDF] = T[p + q*LDT] + tmp;
-  }
-}
 
 void active_fock_matrix( NumOrbital _norb, NumInactive _ninact,
   NumActive _nact, const double* V, size_t LDV, 

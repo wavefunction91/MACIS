@@ -10,6 +10,7 @@ add_executable( asci_test
   csr_hamiltonian.cxx
   davidson.cxx
   transform.cxx
+  fock_matrices.cxx
 )
 target_link_libraries( asci_test PUBLIC asci Catch2::Catch2 )
 
