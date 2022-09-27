@@ -11,6 +11,7 @@ add_executable( asci_test
   davidson.cxx
   transform.cxx
   fock_matrices.cxx
+  mcscf.cxx
 )
 target_link_libraries( asci_test PUBLIC asci Catch2::Catch2 )
 
