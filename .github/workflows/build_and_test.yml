@@ -90,17 +90,17 @@ jobs:
       shell: bash
       run: cmake --build ${{runner.workspace}}/build --target install
 
-    - name: CMake Subproject Configure
-      shell: bash
-      run: cmake -H$GITHUB_WORKSPACE/tests/cmake/subproject 
-                 -B${{runner.workspace}}/cmake_subproject_build 
-                 -DGITHUB_REPOSITORY=$GITHUB_ACTOR/ASCI-CI
-                 -DGIT_REVISION=$GITHUB_HEAD_REF 
-                 -DCMAKE_TOOLCHAIN_FILE=${GITHUB_WORKSPACE}/${GH_ACTIONS_TOOLCHAIN}
+    #- name: CMake Subproject Configure
+    #  shell: bash
+    #  run: cmake -H$GITHUB_WORKSPACE/tests/cmake/subproject 
+    #             -B${{runner.workspace}}/cmake_subproject_build 
+    #             -DGITHUB_REPOSITORY=$GITHUB_ACTOR/ASCI-CI
+    #             -DGIT_REVISION=$GITHUB_HEAD_REF 
+    #             -DCMAKE_TOOLCHAIN_FILE=${GITHUB_WORKSPACE}/${GH_ACTIONS_TOOLCHAIN}
 
-    - name: CMake Subproject Build
-      shell: bash
-      run: cmake --build ${{runner.workspace}}/cmake_subproject_build -j2
+    #- name: CMake Subproject Build
+    #  shell: bash
+    #  run: cmake --build ${{runner.workspace}}/cmake_subproject_build -j2
 
 
     - name: CMake Discovery Configure
