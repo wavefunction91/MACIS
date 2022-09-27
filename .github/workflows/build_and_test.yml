@@ -44,7 +44,7 @@ jobs:
  
     - name: Ubuntu Apt Setup
       shell: bash
-      run: sudo apt install software-properties-common &&
+      run: sudo apt install software-properties-common libeigen3-dev &&
            sudo add-apt-repository ppa:ubuntu-toolchain-r/test 
 
     - name: Install GNU Compiler Version
