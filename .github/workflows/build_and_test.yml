@@ -17,12 +17,10 @@ jobs:
         build_type: [Release, Debug]
         mpi_flag: [ON, OFF]
         compiler_suite: [gnu,llvm]
-        compiler_version: [9,10]
+        compiler_version: [9,10,11]
         exclude:
           - compiler_suite: llvm
-            compiler_version: 7
-          - compiler_suite: llvm
-            compiler_version: 8
+            compiler_version: 9
 
     steps:
     - uses: actions/checkout@v2
