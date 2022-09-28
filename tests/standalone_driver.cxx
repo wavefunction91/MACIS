@@ -6,6 +6,7 @@
 #include <iostream>
 #include <iomanip>
 #include <mpi.h>
+#include <map>
 
 #include "ini_input.hpp"
 
@@ -21,56 +22,38 @@ using asci::NumInactive;
 using asci::NumActive;
 using asci::NumVirtual;
 
+enum class Job {
+  CI,
+  MCSCF
+};
+
+enum class CIExpansion {
+  CAS,
+  ASCI
+};
+
+std::map<std::string, Job> job_map = {
+  {"CI",    Job::CI},
+  {"MCSCF", Job::MCSCF}
+};
+
+std::map<std::string, CIExpansion> ci_exp_map = {
+  {"CAS", CIExpansion::CAS},
+  {"ASCI", CIExpansion::ASCI}
+};
+
+
+
 
 template <typename T>
 T vec_sum(const std::vector<T>& x) {
   return std::accumulate(x.begin(), x.end(), T(0));
 }
 
-#if 0
-template <size_t nbits>
-auto compute_casci_rdms(asci::NumOrbital norb, size_t nalpha, size_t nbeta,
-  double* T, double* V, double* ORDM, double* TRDM, MPI_Comm comm) {
-
-  int rank; MPI_Comm_rank(comm, &rank);
-
-  // Hamiltonian Matrix Element Generator
-#if 0
-  asci::DoubleLoopHamiltonianGenerator<nbits> ham_gen( norb.get(), V, T );
-#else
-  size_t no = norb.get();
-  asci::DoubleLoopHamiltonianGenerator<nbits> ham_gen( 
-    asci::matrix_span<double>(T,no,no),
-    asci::rank4_span<double>(V,no,no,no,no) 
-  );
-#endif
-
-  // Compute HF Energy
-  const auto hf  = asci::canonical_hf_determinant<nbits>(nalpha, nbeta);
-  double     EHF = ham_gen.matrix_element(hf, hf);
-  
-  // Compute Lowest Energy Eigenvalue (ED)
-  std::vector<double> C;
-  auto dets = asci::generate_hilbert_space<nbits>(norb.get(), nalpha, nbeta);
-  double E0 = asci::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
-    1e-16, 20, 1e-8, C, comm);
-
-  // Compute RDMs
-  ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
-    C.data(), asci::matrix_span<double>(ORDM,no,no),
-    asci::rank4_span<double>(TRDM,no,no,no,no));
-
-  return std::make_pair(EHF, E0);
-}
-#endif
-
-
-
 
 int main(int argc, char** argv) {
 
   std::cout << std::scientific << std::setprecision(12);
-  //spdlog::set_level(spdlog::level::debug);
   spdlog::cfg::load_env_levels();
   spdlog::set_pattern("[%n] %v");
 
@@ -83,11 +66,7 @@ int main(int argc, char** argv) {
   MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
   {
   // Create Logger
-  auto console = spdlog::stdout_color_mt("standalone driver");
-  //auto bfgs_logger = spdlog::null_logger_mt("bfgs");
-  //auto davidson_logger = spdlog::null_logger_mt("davidson");
-  //auto ci_logger = spdlog::null_logger_mt("ci_solver");
-  auto diis_logger = spdlog::null_logger_mt("diis");
+  auto console = spdlog::stdout_color_mt("standalone_driver");
 
   // Read Input Options
   std::vector< std::string > opts( argc );
@@ -120,6 +99,20 @@ int main(int argc, char** argv) {
   if(input.containsData(STR)) {        \
     RES = input.getData<DTYPE>(STR);   \
   }
+
+  // Set up job
+  std::string job_str = "MCSCF";
+  OPT_KEYWORD("CI.JOB", job_str, std::string);
+  Job job;
+  try { job = job_map.at(job_str); }
+  catch(...){ throw std::runtime_error("Job Not Recognized"); }
+
+  std::string ciexp_str = "CAS";
+  OPT_KEYWORD("CI.EXPANSION", ciexp_str, std::string);
+  CIExpansion ci_exp;
+  try { ci_exp = ci_exp_map.at(ciexp_str); }
+  catch(...){ throw std::runtime_error("CI Expansion Not Recognized"); }
+
   
   // Set up active space
   size_t n_inactive = 0;
@@ -158,8 +151,9 @@ int main(int argc, char** argv) {
 
   if( !world_rank ) {
     console->info("[Wavefunction Data]:");
+    console->info("  * JOB     = {}", job_str);
+    console->info("  * CIEXP   = {}", ciexp_str);
     console->info("  * FCIDUMP = {}", fcidump_fname );
-    if( rdm_fname.size() ) console->info("  * RDMFILE = {}", rdm_fname );
     if( fci_out_fname.size() ) 
       console->info("  * FCIDUMP_OUT = {}", fci_out_fname);
 
@@ -170,10 +164,18 @@ int main(int argc, char** argv) {
     console->debug("VSUM  = {:.12f}", vec_sum(V));
   }
 
-  // Compute canonical orbital energies
-  //std::vector<double> eps(norb);
-  //asci::canonical_orbital_energies(NumOrbital(norb), NumInactive(nalpha),
-  //  T.data(), norb, V.data(), norb, eps.data());
+  // Setup printing
+  bool print_davidson = false, print_ci = false, print_mcscf = true,
+       print_diis = false;
+  OPT_KEYWORD("PRINT.DAVIDSON", print_davidson, bool );
+  OPT_KEYWORD("PRINT.CI",       print_ci,       bool );
+  OPT_KEYWORD("PRINT.MCSCF",    print_mcscf,    bool );
+  OPT_KEYWORD("PRINT.DIIS",     print_diis,     bool );
+
+  if(not print_davidson) spdlog::null_logger_mt("davidson");
+  if(not print_ci)       spdlog::null_logger_mt("ci_solver");
+  if(not print_mcscf)    spdlog::null_logger_mt("mcscf");
+  if(not print_diis)     spdlog::null_logger_mt("diis");
   
   // Copy integrals into active subsets
   std::vector<double> T_active(n_active * n_active);
@@ -200,65 +202,52 @@ int main(int argc, char** argv) {
   std::vector<double> active_ordm(n_active * n_active);
   std::vector<double> active_trdm( active_ordm.size() * active_ordm.size() );
   
-  // Compute or Read active RDMs
-  double EHF, E0;
-  if(rdm_fname.size()) {
-    std::vector<double> full_ordm(norb2), full_trdm(norb4);
-    asci::read_rdms_binary(rdm_fname, norb, full_ordm.data(), norb,
-      full_trdm.data(), norb );
-    asci::active_submatrix_1body(NumActive(n_active), NumInactive(n_inactive),
-      full_ordm.data(), norb, active_ordm.data(), n_active);
-    asci::active_subtensor_2body(NumActive(n_active), NumInactive(n_inactive),
-      full_trdm.data(), norb, active_trdm.data(), n_active);
-  } else {
+  double E0;
+
+  // CI
+  if( job == Job::CI ) {
+
     std::vector<double> C_local;
+    using generator_t = asci::DoubleLoopHamiltonianGenerator<64>;
     E0 = 
-      asci::compute_casci_rdms<asci::DoubleLoopHamiltonianGenerator<64>>(
-        asci::MCSCFSettings{}, NumOrbital(n_active), nalpha, nbeta, 
-        T_active.data(), V_active.data(), active_ordm.data(), active_trdm.data(),
-        C_local, MPI_COMM_WORLD);
-    //console->info("E(HF)   = {:.12f} Eh", EHF + E_inactive + E_core);
-    console->info("E(CI)   = {:.12f} Eh", E0  + E_inactive + E_core);
+    asci::CASRDMFunctor<generator_t>::rdms(mcscf_settings, NumOrbital(n_active), 
+      nalpha, nbeta, T_active.data(), V_active.data(), active_ordm.data(), 
+      active_trdm.data(), C_local, MPI_COMM_WORLD);
+    E0 += E_inactive + E_core;
+
+  // MCSCF
+  } else if( job == Job::MCSCF ) {
+
+    // Possibly read active RDMs
+    if(rdm_fname.size()) {
+      console->info("  * RDMFILE = {}", rdm_fname );
+      std::vector<double> full_ordm(norb2), full_trdm(norb4);
+      asci::read_rdms_binary(rdm_fname, norb, full_ordm.data(), norb,
+        full_trdm.data(), norb );
+      asci::active_submatrix_1body(NumActive(n_active), NumInactive(n_inactive),
+        full_ordm.data(), norb, active_ordm.data(), n_active);
+      asci::active_subtensor_2body(NumActive(n_active), NumInactive(n_inactive),
+        full_trdm.data(), norb, active_trdm.data(), n_active);
+
+      // Compute CI energy from RDMs
+      double ERDM = blas::dot( active_ordm.size(), active_ordm.data(), 1, 
+        T_active.data(), 1 );
+      ERDM += blas::dot( active_trdm.size(), active_trdm.data(), 1, 
+        V_active.data(), 1 );
+      console->info("E(RDM)  = {:.12f} Eh", ERDM + E_inactive + E_core);
+    }
+
+
+    // CASSCF
+    E0 =
+    asci::casscf_diis( mcscf_settings, NumElectron(nalpha), NumElectron(nbeta),
+      NumOrbital(norb), NumInactive(n_inactive), NumActive(n_active),
+      NumVirtual(n_virtual), E_core, T.data(), norb, V.data(), norb, 
+      active_ordm.data(), n_active, active_trdm.data(), n_active,
+      MPI_COMM_WORLD);
   }
 
-  console->debug("ORDMSUM = {:.12f}", vec_sum(active_ordm));
-  console->debug("TRDMSUM = {:.12f}", vec_sum(active_trdm));
-
-  // Compute CI energy from RDMs
-  double ERDM = blas::dot( active_ordm.size(), active_ordm.data(), 1, T_active.data(), 1 );
-  ERDM += blas::dot( active_trdm.size(), active_trdm.data(), 1, V_active.data(), 1 );
-  console->info("E(RDM)  = {:.12f} Eh", ERDM + E_inactive + E_core);
-
-#if 0
-  // Compute Generalized Fock matrix
-  std::vector<double> F(norb2);
-#if 0
-  // Compute given inactive Fock
-  asci::generalized_fock_matrix_comp_mat1(norb, n_inactive, 
-    n_active, F_inactive.data(), norb, V.data(), norb,
-    active_ordm.data(), n_active, active_trdm.data(), 
-    n_active, F.data(), norb);
-#else
-  // Compute directly from full MO tensors and active RDMs
-  asci::generalized_fock_matrix_comp_mat2(NumOrbital(norb), 
-    NumInactive(n_inactive), NumActive(n_active), T.data(), 
-    norb, V.data(), norb, active_ordm.data(), n_active, 
-    active_trdm.data(), n_active, F.data(), norb);
-#endif
-
-  // Compute Energy from Generalied Fock Matrix
-  auto E_FOCK = asci::energy_from_generalized_fock(
-    NumInactive(n_inactive), NumActive(n_active), T.data(), 
-    norb, active_ordm.data(), n_active, F.data(), norb);
-  console->info("E(FOCK) = {:.12f} Eh", E_FOCK + E_core);
-#endif
-
-  // CASSCF
-  asci::casscf_diis( mcscf_settings, NumElectron(nalpha), NumElectron(nbeta),
-    NumOrbital(norb), NumInactive(n_inactive), NumActive(n_active),
-    NumVirtual(n_virtual), E_core, T.data(), norb, V.data(), norb, 
-    active_ordm.data(), n_active, active_trdm.data(), n_active,
-    MPI_COMM_WORLD);
+  console->info("E(CI)  = {:.12f} Eh", E0);
 
   if(fci_out_fname.size())
     asci::write_fcidump(fci_out_fname,norb, T.data(), norb, V.data(), norb, E_core);

@@ -23,8 +23,8 @@ double mcscf_impl(MCSCFSettings settings, NumElectron nalpha,
    *  Top of MCSCF Routine - Setup and print header info to logger  *
    ******************************************************************/
 
-  auto logger = spdlog::get("casscf");
-  if(!logger) logger = spdlog::stdout_color_mt("casscf");
+  auto logger = spdlog::get("mcscf");
+  if(!logger) logger = spdlog::stdout_color_mt("mcscf");
 
   logger->info("[MCSCF Settings]:");
   logger->info(

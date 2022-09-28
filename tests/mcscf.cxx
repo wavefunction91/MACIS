@@ -13,7 +13,7 @@ TEST_CASE("MCSCF") {
   spdlog::null_logger_mt("davidson");
   spdlog::null_logger_mt("ci_solver");
   spdlog::null_logger_mt("diis");
-  spdlog::null_logger_mt("casscf");
+  spdlog::null_logger_mt("mcscf");
 
   const size_t norb  = asci::read_fcidump_norb(water_ccpvdz_fcidump);
   const size_t norb2 = norb  * norb;
