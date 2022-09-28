@@ -1,12 +1,9 @@
+#pragma once
 #include <asci/util/mcscf.hpp>
 #include <asci/util/orbital_gradient.hpp>
 #include <asci/util/fock_matrices.hpp>
 #include <asci/util/transform.hpp>
-#include <asci/util/selected_ci_diag.hpp>
-#include <asci/hamiltonian_generator/double_loop.hpp>
-#include <asci/davidson.hpp>
 #include <asci/fcidump.hpp>
-#include <Eigen/Core>
 
 #include "orbital_rotation_utilities.hpp"
 #include "orbital_hessian.hpp"
@@ -15,46 +12,15 @@
 
 namespace asci {
 
-template <typename HamGen>
-double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb, 
-  size_t nalpha, size_t nbeta, double* T, double* V, double* ORDM, 
-  double* TRDM, std::vector<double>& C, MPI_Comm comm) {
-
-  constexpr auto nbits = HamGen::nbits;
-
-  int rank; MPI_Comm_rank(comm, &rank);
-
-  // Hamiltonian Matrix Element Generator
-  size_t no = norb.get();
-  HamGen ham_gen( 
-    matrix_span<double>(T,no,no),
-    rank4_span<double>(V,no,no,no,no) 
-  );
-  
-  // Compute Lowest Energy Eigenvalue (ED)
-  auto dets = asci::generate_hilbert_space<nbits>(norb.get(), nalpha, nbeta);
-  double E0 = asci::selected_ci_diag( dets.begin(), dets.end(), ham_gen,
-    settings.ci_matel_tol, settings.ci_max_subspace, settings.ci_res_tol, C, 
-    comm, true);
-
-  // Compute RDMs
-  ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
-    C.data(), matrix_span<double>(ORDM,no,no), 
-    rank4_span<double>(TRDM,no,no,no,no));
-
-  return E0;
-}
-
-
-template <typename HamGen>
-double casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha, 
+template <typename Functor>
+double mcscf_impl(MCSCFSettings settings, NumElectron nalpha, 
   NumElectron nbeta, NumOrbital norb, NumInactive ninact, NumActive nact, 
   NumVirtual nvirt, double E_core, double* T, size_t LDT, double* V, size_t LDV, 
   double* A1RDM, size_t LDD1, double* A2RDM, size_t LDD2, MPI_Comm comm) {
 
 
   /******************************************************************
-   *  Top of CASSCF Routine - Setup and print header info to logger *
+   *  Top of MCSCF Routine - Setup and print header info to logger  *
    ******************************************************************/
 
   auto logger = spdlog::get("casscf");
@@ -196,7 +162,7 @@ double casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
     logger->info("Computing Initial RDMs");
     std::fill_n(A1RDM, na2, 0.0);
     std::fill_n(A2RDM, na4, 0.0);
-    compute_casci_rdms<HamGen>(settings, NumOrbital(na), nalpha.get(), 
+    Functor::rdms(settings, NumOrbital(na), nalpha.get(), 
       nbeta.get(), T_active.data(), V_active.data(), A1RDM, A2RDM, X_CI,
       comm) + E_inactive;
   } else {
@@ -369,7 +335,7 @@ double casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
 
      std::fill_n( A1RDM, na2, 0.0);
      std::fill_n( A2RDM, na4, 0.0);
-     E0 = compute_casci_rdms<HamGen>(settings, NumOrbital(na), 
+     E0 = Functor::rdms(settings, NumOrbital(na), 
        nalpha.get(), nbeta.get(), T_active.data(), V_active.data(), A1RDM, 
        A2RDM, X_CI, comm) + E_inactive;
 
@@ -398,21 +364,8 @@ double casscf_bfgs_impl(MCSCFSettings settings, NumElectron nalpha,
     converged = grad_nrm/rms_factor < settings.orb_grad_tol_mcscf;
   }
 
-  if(converged) logger->info("CASSCF Converged");
+  if(converged) logger->info("MCSCF Converged");
   return E0;
-}
-
-
-
-double casscf_bfgs(MCSCFSettings settings, NumElectron nalpha, NumElectron nbeta, 
-  NumOrbital norb, NumInactive ninact, NumActive nact, NumVirtual nvirt, 
-  double E_core, double* T, size_t LDT, double* V, size_t LDV, 
-  double* A1RDM, size_t LDD1, double* A2RDM, size_t LDD2, MPI_Comm comm) { 
-
-  using generator_t = DoubleLoopHamiltonianGenerator<64>;
-  return casscf_bfgs_impl<generator_t>(settings, nalpha, nbeta, norb, ninact, nact, 
-    nvirt, E_core, T, LDT, V, LDV, A1RDM, LDD1, A2RDM, LDD2, comm);
-
 }
 
 }

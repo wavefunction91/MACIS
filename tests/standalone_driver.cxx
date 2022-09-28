@@ -1,21 +1,13 @@
 #include <asci/fcidump.hpp>
-#include <asci/davidson.hpp>
+#include <asci/util/cas.hpp>
 #include <asci/hamiltonian_generator/double_loop.hpp>
-#include <asci/csr_hamiltonian.hpp>
-#include <asci/util/selected_ci_diag.hpp>
 #include <asci/util/fock_matrices.hpp>
-#include <asci/util/transform.hpp>
-#include <asci/util/mcscf.hpp>
-#include <asci/util/orbital_energies.hpp>
-#include <asci/util/orbital_gradient.hpp>
 
 #include <iostream>
 #include <iomanip>
 #include <mpi.h>
 
 #include "ini_input.hpp"
-#include <Eigen/Core>
-#include <unsupported/Eigen/MatrixFunctions>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -35,6 +27,7 @@ T vec_sum(const std::vector<T>& x) {
   return std::accumulate(x.begin(), x.end(), T(0));
 }
 
+#if 0
 template <size_t nbits>
 auto compute_casci_rdms(asci::NumOrbital norb, size_t nalpha, size_t nbeta,
   double* T, double* V, double* ORDM, double* TRDM, MPI_Comm comm) {
@@ -69,6 +62,7 @@ auto compute_casci_rdms(asci::NumOrbital norb, size_t nalpha, size_t nbeta,
 
   return std::make_pair(EHF, E0);
 }
+#endif
 
 
 
@@ -91,8 +85,8 @@ int main(int argc, char** argv) {
   // Create Logger
   auto console = spdlog::stdout_color_mt("standalone driver");
   //auto bfgs_logger = spdlog::null_logger_mt("bfgs");
-  auto davidson_logger = spdlog::null_logger_mt("davidson");
-  auto ci_logger = spdlog::null_logger_mt("ci_solver");
+  //auto davidson_logger = spdlog::null_logger_mt("davidson");
+  //auto ci_logger = spdlog::null_logger_mt("ci_solver");
   auto diis_logger = spdlog::null_logger_mt("diis");
 
   // Read Input Options
@@ -177,9 +171,9 @@ int main(int argc, char** argv) {
   }
 
   // Compute canonical orbital energies
-  std::vector<double> eps(norb);
-  asci::canonical_orbital_energies(NumOrbital(norb), NumInactive(nalpha),
-    T.data(), norb, V.data(), norb, eps.data());
+  //std::vector<double> eps(norb);
+  //asci::canonical_orbital_energies(NumOrbital(norb), NumInactive(nalpha),
+  //  T.data(), norb, V.data(), norb, eps.data());
   
   // Copy integrals into active subsets
   std::vector<double> T_active(n_active * n_active);
@@ -217,11 +211,13 @@ int main(int argc, char** argv) {
     asci::active_subtensor_2body(NumActive(n_active), NumInactive(n_inactive),
       full_trdm.data(), norb, active_trdm.data(), n_active);
   } else {
-    std::tie(EHF, E0) = 
-      compute_casci_rdms<nwfn_bits>(NumOrbital(n_active), nalpha, nbeta, 
+    std::vector<double> C_local;
+    E0 = 
+      asci::compute_casci_rdms<asci::DoubleLoopHamiltonianGenerator<64>>(
+        asci::MCSCFSettings{}, NumOrbital(n_active), nalpha, nbeta, 
         T_active.data(), V_active.data(), active_ordm.data(), active_trdm.data(),
-        MPI_COMM_WORLD);
-    console->info("E(HF)   = {:.12f} Eh", EHF + E_inactive + E_core);
+        C_local, MPI_COMM_WORLD);
+    //console->info("E(HF)   = {:.12f} Eh", EHF + E_inactive + E_core);
     console->info("E(CI)   = {:.12f} Eh", E0  + E_inactive + E_core);
   }
 
@@ -233,6 +229,7 @@ int main(int argc, char** argv) {
   ERDM += blas::dot( active_trdm.size(), active_trdm.data(), 1, V_active.data(), 1 );
   console->info("E(RDM)  = {:.12f} Eh", ERDM + E_inactive + E_core);
 
+#if 0
   // Compute Generalized Fock matrix
   std::vector<double> F(norb2);
 #if 0
@@ -254,17 +251,10 @@ int main(int argc, char** argv) {
     NumInactive(n_inactive), NumActive(n_active), T.data(), 
     norb, active_ordm.data(), n_active, F.data(), norb);
   console->info("E(FOCK) = {:.12f} Eh", E_FOCK + E_core);
+#endif
 
-#if 0
-  // Optimize Orbitals
-  std::vector<double> K(norb2);
-  asci::optimize_orbitals(NumOrbital(norb), NumInactive(n_inactive),
-    NumActive(n_active), NumVirtual(n_virtual), E_core, T.data(), norb,
-    V.data(), norb, active_ordm.data(), n_active, active_trdm.data(),
-    n_active, K.data(), norb);
-#else
   // CASSCF
-  asci::casscf_bfgs( mcscf_settings, NumElectron(nalpha), NumElectron(nbeta),
+  asci::casscf_diis( mcscf_settings, NumElectron(nalpha), NumElectron(nbeta),
     NumOrbital(norb), NumInactive(n_inactive), NumActive(n_active),
     NumVirtual(n_virtual), E_core, T.data(), norb, V.data(), norb, 
     active_ordm.data(), n_active, active_trdm.data(), n_active,
@@ -272,7 +262,6 @@ int main(int argc, char** argv) {
 
   if(fci_out_fname.size())
     asci::write_fcidump(fci_out_fname,norb, T.data(), norb, V.data(), norb, E_core);
-#endif
 
   } // MPI Scope
 

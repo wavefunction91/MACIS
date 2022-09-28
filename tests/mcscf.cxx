@@ -48,7 +48,7 @@ TEST_CASE("MCSCF") {
   const double ref_E = -76.1114493227;
   
   SECTION("CASSCF - No Guess - Singlet") {
-     auto E = asci::casscf_bfgs(settings, nalpha, nalpha, NumOrbital(norb),
+     auto E = asci::casscf_diis(settings, nalpha, nalpha, NumOrbital(norb),
        ninact, nact, nvirt, E_core, T.data(), norb, V.data(), norb,
        active_ordm.data(), n_active, active_trdm.data(), n_active,
        MPI_COMM_WORLD);
@@ -60,7 +60,7 @@ TEST_CASE("MCSCF") {
   SECTION("CASSCF - With Guess - Singlet") {
     asci::read_rdms_binary(water_ccpvdz_rdms_fname, n_active, 
       active_ordm.data(), n_active, active_trdm.data(), n_active);
-     auto E = asci::casscf_bfgs(settings, nalpha, nalpha, NumOrbital(norb),
+     auto E = asci::casscf_diis(settings, nalpha, nalpha, NumOrbital(norb),
        ninact, nact, nvirt, E_core, T.data(), norb, V.data(), norb,
        active_ordm.data(), n_active, active_trdm.data(), n_active,
        MPI_COMM_WORLD);

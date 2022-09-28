@@ -3,7 +3,7 @@ add_library( asci
   fock_matrices.cxx
   transform.cxx
   orbital_gradient.cxx
-  mcscf.cxx
+  casscf.cxx
   #rdms.cxx
   orbital_energies.cxx
   orbital_rotation_utilities.cxx
