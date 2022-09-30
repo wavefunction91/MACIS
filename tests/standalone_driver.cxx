@@ -1,5 +1,9 @@
 #include <asci/fcidump.hpp>
 #include <asci/util/cas.hpp>
+//#include <asci/util/asci_search.hpp>
+//#include <asci/util/asci_iter.hpp>
+#include <asci/util/asci_grow.hpp>
+#include <asci/util/asci_refine.hpp>
 #include <asci/hamiltonian_generator/double_loop.hpp>
 #include <asci/util/fock_matrices.hpp>
 
@@ -202,18 +206,58 @@ int main(int argc, char** argv) {
   std::vector<double> active_ordm(n_active * n_active);
   std::vector<double> active_trdm( active_ordm.size() * active_ordm.size() );
   
-  double E0;
+  double E0 = 0;
 
   // CI
   if( job == Job::CI ) {
 
-    std::vector<double> C_local;
     using generator_t = asci::DoubleLoopHamiltonianGenerator<64>;
-    E0 = 
-    asci::CASRDMFunctor<generator_t>::rdms(mcscf_settings, NumOrbital(n_active), 
-      nalpha, nbeta, T_active.data(), V_active.data(), active_ordm.data(), 
-      active_trdm.data(), C_local, MPI_COMM_WORLD);
-    E0 += E_inactive + E_core;
+    std::vector<double> C_local;
+    if( ci_exp == CIExpansion::CAS ) {
+      E0 = 
+      asci::CASRDMFunctor<generator_t>::rdms(mcscf_settings, NumOrbital(n_active), 
+        nalpha, nbeta, T_active.data(), V_active.data(), active_ordm.data(), 
+        active_trdm.data(), C_local, MPI_COMM_WORLD);
+      E0 += E_inactive + E_core;
+    } else {
+
+      spdlog::null_logger_mt("asci_search");
+      asci::ASCISettings asci_settings;
+      asci_settings.ntdets_max = 100000;
+      asci_settings.ncdets_max = 10000;
+      asci_settings.grow_factor = 2;
+      std::vector<asci::wfn_t<64>> dets = {
+        asci::canonical_hf_determinant<64>(nalpha, nalpha)
+      };
+
+      generator_t ham_gen( 
+        asci::matrix_span<double>(T_active.data(),n_active,n_active),
+        asci::rank4_span<double>(V_active.data(),n_active,n_active,n_active,
+          n_active)
+      );
+
+      E0 = ham_gen.matrix_element(dets[0], dets[0]);
+      C_local = {1.0};
+      #if 0
+      dets = asci::asci_search(asci_settings, 100, dets.begin(), dets.end(), EHF,
+        C_local, n_active, T_active.data(), ham_gen.G_red(), ham_gen.V_red(),
+        ham_gen.G(), V_active.data(), ham_gen, MPI_COMM_WORLD);
+      #elif 0
+      std::tie(E0, dets, C_local) = asci::asci_iter( asci_settings, mcscf_settings,
+        100, E0, std::move(dets), std::move(C_local), ham_gen, n_active, 
+        MPI_COMM_WORLD );
+      #else
+      std::tie(E0, dets, C_local) = asci::asci_grow( asci_settings, 
+        mcscf_settings, E0, std::move(dets), std::move(C_local), ham_gen, 
+        n_active, MPI_COMM_WORLD );
+      std::tie(E0, dets, C_local) = asci::asci_refine( asci_settings, 
+        mcscf_settings, E0, std::move(dets), std::move(C_local), ham_gen, 
+        n_active, MPI_COMM_WORLD );
+      #endif
+      E0 += E_inactive + E_core;
+        
+    }
+
 
   // MCSCF
   } else if( job == Job::MCSCF ) {

@@ -81,6 +81,12 @@ public:
 
   void generate_integral_intermediates(rank4_span_t V);
 
+  inline auto* T() const { return T_pq_.data_handle(); }
+  inline auto* G_red() const { return G_red_data_.data(); }
+  inline auto* V_red() const { return V_red_data_.data(); }
+  inline auto* G() const { return G_pqrs_data_.data(); }
+  inline auto* V() const { return V_pqrs_.data_handle(); }
+
 
   double matrix_element_4( spin_det_t bra, spin_det_t ket, 
     spin_det_t ex ) const; 
