@@ -804,6 +804,7 @@ auto asci_iter( size_t ndets, size_t ncdets, double E0,
     norb, ham_gen.T_pq_, ham_gen.G_red_.data(), ham_gen.V_red_.data(), 
     ham_gen.G_pqrs_.data(), ham_gen.V_pqrs_, ham_gen, quiet );
 
+  ham_gen.SymmTruncation( wfn );
   // Rediagonalize
   auto E = selected_ci_diag<N,index_t>( wfn.begin(), wfn.end(), ham_gen, 
     ham_tol, eig_max_subspace, eig_res_tol, X_local, MPI_COMM_WORLD, quiet, nstates);

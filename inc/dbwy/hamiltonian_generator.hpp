@@ -194,6 +194,11 @@ public:
       *(sym_vec + i) = *( deg_vecs + i );
   }
 
+  virtual void SymmTruncation( std::vector<full_det_t>& dets ) const
+  {
+    return;
+  }
+
   /////////////////////////////////////////////////////////////////
   //   END - Virtual routine to symmetrize degenerate states     //
   /////////////////////////////////////////////////////////////////
