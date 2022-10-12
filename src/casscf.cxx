@@ -1,5 +1,5 @@
 #include <asci/util/mcscf.hpp>
-#include "mcscf_impl.hpp"
+#include <asci/util/mcscf_impl.hpp>
 #include <asci/util/cas.hpp>
 #include <asci/hamiltonian_generator/double_loop.hpp>
 
