@@ -5,15 +5,15 @@
 #include <asci/util/transform.hpp>
 #include <asci/fcidump.hpp>
 
-#include "orbital_rotation_utilities.hpp"
-#include "orbital_hessian.hpp"
-#include "orbital_steps.hpp"
-#include "diis.hpp"
+#include <asci/util/orbital_rotation_utilities.hpp>
+#include <asci/util/orbital_hessian.hpp>
+#include <asci/util/orbital_steps.hpp>
+#include <asci/util/diis.hpp>
 
 namespace asci {
 
 template <typename Functor>
-double mcscf_impl(MCSCFSettings settings, NumElectron nalpha, 
+double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings, NumElectron nalpha, 
   NumElectron nbeta, NumOrbital norb, NumInactive ninact, NumActive nact, 
   NumVirtual nvirt, double E_core, double* T, size_t LDT, double* V, size_t LDV, 
   double* A1RDM, size_t LDD1, double* A2RDM, size_t LDD2, MPI_Comm comm) {
@@ -162,7 +162,7 @@ double mcscf_impl(MCSCFSettings settings, NumElectron nalpha,
     logger->info("Computing Initial RDMs");
     std::fill_n(A1RDM, na2, 0.0);
     std::fill_n(A2RDM, na4, 0.0);
-    Functor::rdms(settings, NumOrbital(na), nalpha.get(), 
+    rdm_op.rdms(settings, NumOrbital(na), nalpha.get(), 
       nbeta.get(), T_active.data(), V_active.data(), A1RDM, A2RDM, X_CI,
       comm) + E_inactive;
   } else {
@@ -335,7 +335,7 @@ double mcscf_impl(MCSCFSettings settings, NumElectron nalpha,
 
      std::fill_n( A1RDM, na2, 0.0);
      std::fill_n( A2RDM, na4, 0.0);
-     E0 = Functor::rdms(settings, NumOrbital(na), 
+     E0 = rdm_op.rdms(settings, NumOrbital(na), 
        nalpha.get(), nbeta.get(), T_active.data(), V_active.data(), A1RDM, 
        A2RDM, X_CI, comm) + E_inactive;
 

@@ -51,7 +51,7 @@ TEST_CASE("MCSCF") {
      auto E = asci::casscf_diis(settings, nalpha, nalpha, NumOrbital(norb),
        ninact, nact, nvirt, E_core, T.data(), norb, V.data(), norb,
        active_ordm.data(), n_active, active_trdm.data(), n_active,
-       MPI_COMM_WORLD);
+       MPI_COMM_SELF /*b/c root only*/ );
 
      REQUIRE(E == Approx(ref_E).margin(1e-7));
   }
@@ -63,7 +63,7 @@ TEST_CASE("MCSCF") {
      auto E = asci::casscf_diis(settings, nalpha, nalpha, NumOrbital(norb),
        ninact, nact, nvirt, E_core, T.data(), norb, V.data(), norb,
        active_ordm.data(), n_active, active_trdm.data(), n_active,
-       MPI_COMM_WORLD);
+       MPI_COMM_SELF /*b/c root only*/);
 
      REQUIRE(E == Approx(ref_E).margin(1e-7));
   }

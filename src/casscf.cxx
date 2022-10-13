@@ -1,5 +1,5 @@
 #include <asci/util/mcscf.hpp>
-#include "mcscf_impl.hpp"
+#include <asci/util/mcscf_impl.hpp>
 #include <asci/util/cas.hpp>
 #include <asci/hamiltonian_generator/double_loop.hpp>
 
@@ -12,7 +12,8 @@ double casscf_diis(MCSCFSettings settings, NumElectron nalpha, NumElectron nbeta
 
   using generator_t = DoubleLoopHamiltonianGenerator<64>;
   using functor_t   = CASRDMFunctor<generator_t>;
-  return mcscf_impl<functor_t>(settings, nalpha, nbeta, norb, ninact, nact, 
+  functor_t op;
+  return mcscf_impl<functor_t>(op, settings, nalpha, nbeta, norb, ninact, nact, 
     nvirt, E_core, T, LDT, V, LDV, A1RDM, LDD1, A2RDM, LDD2, comm);
 
 }
