@@ -4,7 +4,7 @@ add_library( asci
   transform.cxx
   orbital_gradient.cxx
   casscf.cxx
-  #rdms.cxx
+  moller_plesset.cxx
   orbital_energies.cxx
   orbital_rotation_utilities.cxx
   orbital_hessian.cxx
