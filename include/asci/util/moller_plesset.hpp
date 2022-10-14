@@ -13,4 +13,8 @@ void mp2_1rdm(NumOrbital norb, NumCanonicalOccupied nocc,
   NumCanonicalVirtual nvir, const double* T, size_t LDT, 
   const double* V, size_t LDV, double* ORDM, size_t LDD);
 
+void mp2_natural_orbitals(NumOrbital norb, NumCanonicalOccupied nocc, 
+  NumCanonicalVirtual nvir, const double* T, size_t LDT, 
+  const double* V, size_t LDV, double* ON, double* NO_C, size_t LDC);
+
 }

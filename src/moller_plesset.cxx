@@ -1,8 +1,8 @@
 #include <asci/util/moller_plesset.hpp>
 #include <asci/util/orbital_energies.hpp>
-#include <asci/util/transform.hpp>
 
 #include <iostream>
+#include <lapack.hh>
 
 namespace asci {
 
@@ -113,6 +113,34 @@ void mp2_1rdm(NumOrbital _norb, NumCanonicalOccupied _nocc,
     }
     ORDM[a+nocc + (b+nocc)*LDD] = 2*tmp;
   }
+
+}
+
+
+
+void mp2_natural_orbitals(NumOrbital norb, NumCanonicalOccupied nocc, 
+  NumCanonicalVirtual nvir, const double* T, size_t LDT, 
+  const double* V, size_t LDV, double* ON, double* NO_C, size_t LDC) {
+
+
+  // Compute MP2 1-RDM
+  mp2_1rdm(norb, nocc, nvir, T, LDT, V, LDV, NO_C, LDC);
+
+  // Compute MP2 Natural Orbitals
+
+  // 1. First negate to ensure diagonalization sorts eigenvalues in
+  //    decending order
+  for(size_t i = 0; i < norb.get(); ++i)
+  for(size_t j = 0; j < norb.get(); ++j) {
+    NO_C[i + j*LDC] *= -1.0;
+  }
+
+  // 2. Solve eigenvalue problem PC = CO
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, norb.get(), 
+    NO_C, LDC, ON);
+
+  // 3. Undo negation
+  for(size_t i = 0; i < norb.get(); ++i) ON[i] *= -1.0;
 
 }
 

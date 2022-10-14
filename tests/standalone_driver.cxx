@@ -4,11 +4,10 @@
 //#include <asci/util/asci_iter.hpp>
 #include <asci/util/asci_grow.hpp>
 #include <asci/util/asci_refine.hpp>
-#include <asci/util/orbital_energies.hpp>
 #include <asci/hamiltonian_generator/double_loop.hpp>
 #include <asci/util/fock_matrices.hpp>
-#include <asci/util/transform.hpp>
 #include <asci/util/moller_plesset.hpp>
+#include <asci/util/transform.hpp>
 
 #include <iostream>
 #include <iomanip>
@@ -190,99 +189,25 @@ int main(int argc, char** argv) {
   {
   size_t nocc_canon = n_inactive + nalpha;
   size_t nvir_canon = norb - nocc_canon;
-  size_t noc2 = nocc_canon * nocc_canon;
-  size_t nvc2 = nvir_canon * nvir_canon;
   std::vector<double> MP2_RDM(norb*norb,0.0);
-
+  std::vector<double> W_occ(norb);
 
 #if 0
-  // Compute canonical eigenenergies
-  // XXX: This will not generally replicate full precision
-  // with respect to those returned by the eigen solver
-  std::vector<double> eps(norb);
-  asci::canonical_orbital_energies(NumOrbital(norb), 
-    NumInactive(nocc_canon), T.data(), norb, V.data(), norb, 
-    eps.data() );
-
-  std::vector<double> T2(noc2 * nvc2);
-
-  for( auto i = 0ul; i < nocc_canon; ++i )
-  for( auto j = 0ul; j < nocc_canon; ++j )
-  for( auto a = 0ul; a < nvir_canon; ++a )
-  for( auto b = 0ul; b < nvir_canon; ++b ) {
-    const auto a_off = a + nocc_canon;
-    const auto b_off = b + nocc_canon;
-
-    // T2(i,j,a,b) = (ia|jb) / (eps[i] + eps[j] - eps[a] - eps[b])
-    T2[i + j*nocc_canon + a*noc2 + b*noc2*nvir_canon] =
-      V[i + a_off*norb + j*norb2 + b_off*norb3] /
-      (
-         eps[i] + eps[j] - eps[a_off] - eps[b_off]
-      );
-  }
-
-  double EMP2 = 0.0;
-  for( auto i = 0ul; i < nocc_canon; ++i )
-  for( auto j = 0ul; j < nocc_canon; ++j )
-  for( auto a = 0ul; a < nvir_canon; ++a )
-  for( auto b = 0ul; b < nvir_canon; ++b ) {
-    const auto a_off = a + nocc_canon;
-    const auto b_off = b + nocc_canon;
-    const double V_abij = V[a_off + i*norb + b_off*norb2 + j*norb3];
-    const double V_abji = V[a_off + j*norb + b_off*norb2 + i*norb3];
-
-    const double t2_ijab = T2[i + j*nocc_canon + a*noc2 + b*noc2*nvir_canon];
-    EMP2 += t2_ijab * ( 2*V_abij - V_abji );
-  }
-
-  std::cout << "EMP2 = " << EMP2 << std::endl;
-  
-  // OO-block
-  for( auto i = 0ul; i < nocc_canon; ++i )
-  for( auto j = 0ul; j < nocc_canon; ++j ) {
-    double tmp = 0.0;
-    for(auto k = 0ul; k < nocc_canon; ++k )
-    for(auto a = 0ul; a < nvir_canon; ++a )
-    for(auto b = 0ul; b < nvir_canon; ++b ) {
-      // D(i,j) -= T2(i,k,a,b) * (2*T2(j,k,a,b) - T2(j,k,b,a))
-      tmp += T2[i + k*nocc_canon + a*noc2 + b*noc2*nvir_canon] *
-        (
-          2 * T2[j + k*nocc_canon + a*noc2 + b*noc2*nvir_canon] - 
-              T2[j + k*nocc_canon + b*noc2 + a*noc2*nvir_canon] 
-        );
-    }
-    MP2_RDM[i + j*norb] = -2*tmp;
-    if(i == j) MP2_RDM[i + j*norb] += 2.0;
-  }
-
-  // VV-block
-  for(auto a = 0ul; a < nvir_canon; ++a )
-  for(auto b = 0ul; b < nvir_canon; ++b ) {
-    double tmp = 0;
-    for(auto i = 0ul; i < nocc_canon; ++i )
-    for(auto j = 0ul; j < nocc_canon; ++j ) 
-    for(auto c = 0ul; c < nvir_canon; ++c ) {
-      // D(a,b) -= T2(i,j,c,a) * (2*T2(i,j,c,b) - T2(i,j,b,c))
-      tmp += T2[i + j*nocc_canon + c*noc2 + a*noc2*nvir_canon] *
-        (
-          2 * T2[i + j*nocc_canon + c*noc2 + b*noc2*nvir_canon] - 
-              T2[i + j*nocc_canon + b*noc2 + c*noc2*nvir_canon] 
-        );
-    }
-    MP2_RDM[a+nocc_canon + (b+nocc_canon)*norb] = 2*tmp;
-  }
-#else
+  // Compute MP2 1-RDM
   asci::mp2_1rdm( NumOrbital(norb), NumCanonicalOccupied(nocc_canon),
     NumCanonicalVirtual(nvir_canon), T.data(), norb, V.data(), norb,
     MP2_RDM.data(), norb);
-#endif
 
-
-  for( auto& x : MP2_RDM ) x = -x;
-  std::vector<double> W_occ(norb);
+  // Compute MP2 Natural Orbitals
+  for( auto& x : MP2_RDM ) x = -x; // negate to sort eigenvalues in decending order
   lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, norb, 
     MP2_RDM.data(), norb, W_occ.data());
-  for(auto& x : W_occ) x = -x;
+  for(auto& x : W_occ) x = -x; // undo negation
+#else
+  asci::mp2_natural_orbitals(NumOrbital(norb), 
+    NumCanonicalOccupied(nocc_canon), NumCanonicalVirtual(nvir_canon),
+    T.data(), norb, V.data(), norb, W_occ.data(), MP2_RDM.data(), norb);
+#endif
 
   // Transform Hamiltonian
   asci::two_index_transform(norb,norb,T.data(),norb,MP2_RDM.data(),
