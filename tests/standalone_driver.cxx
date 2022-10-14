@@ -157,6 +157,9 @@ int main(int argc, char** argv) {
   OPT_KEYWORD("MCSCF.CI_MAX_SUB",     mcscf_settings.ci_max_subspace,    size_t);
   OPT_KEYWORD("MCSCF.CI_MATEL_TOL",   mcscf_settings.ci_matel_tol,       double);
 
+  bool mp2_guess = false;
+  OPT_KEYWORD("MCSCF.MP2_GUESS", mp2_guess, bool );
+
   if( !world_rank ) {
     console->info("[Wavefunction Data]:");
     console->info("  * JOB     = {}", job_str);
@@ -164,6 +167,7 @@ int main(int argc, char** argv) {
     console->info("  * FCIDUMP = {}", fcidump_fname );
     if( fci_out_fname.size() ) 
       console->info("  * FCIDUMP_OUT = {}", fci_out_fname);
+    console->info("  * MP2_GUESS = {}", mp2_guess );
 
     console->debug("READ {} 1-body integrals and {} 2-body integrals", 
       T.size(), V.size());
@@ -186,35 +190,23 @@ int main(int argc, char** argv) {
   if(not print_diis)     spdlog::null_logger_mt("diis");
 
   // MP2 Guess Orbitals
-  {
-  size_t nocc_canon = n_inactive + nalpha;
-  size_t nvir_canon = norb - nocc_canon;
-  std::vector<double> MP2_RDM(norb*norb,0.0);
-  std::vector<double> W_occ(norb);
+  if(mp2_guess) {
+    console->info("Calculating MP2 Natural Orbitals");
+    size_t nocc_canon = n_inactive + nalpha;
+    size_t nvir_canon = norb - nocc_canon;
 
-#if 0
-  // Compute MP2 1-RDM
-  asci::mp2_1rdm( NumOrbital(norb), NumCanonicalOccupied(nocc_canon),
-    NumCanonicalVirtual(nvir_canon), T.data(), norb, V.data(), norb,
-    MP2_RDM.data(), norb);
+    // Compute MP2 Natural Orbitals
+    std::vector<double> MP2_RDM(norb*norb,0.0);
+    std::vector<double> W_occ(norb);
+    asci::mp2_natural_orbitals(NumOrbital(norb), 
+      NumCanonicalOccupied(nocc_canon), NumCanonicalVirtual(nvir_canon),
+      T.data(), norb, V.data(), norb, W_occ.data(), MP2_RDM.data(), norb);
 
-  // Compute MP2 Natural Orbitals
-  for( auto& x : MP2_RDM ) x = -x; // negate to sort eigenvalues in decending order
-  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, norb, 
-    MP2_RDM.data(), norb, W_occ.data());
-  for(auto& x : W_occ) x = -x; // undo negation
-#else
-  asci::mp2_natural_orbitals(NumOrbital(norb), 
-    NumCanonicalOccupied(nocc_canon), NumCanonicalVirtual(nvir_canon),
-    T.data(), norb, V.data(), norb, W_occ.data(), MP2_RDM.data(), norb);
-#endif
-
-  // Transform Hamiltonian
-  asci::two_index_transform(norb,norb,T.data(),norb,MP2_RDM.data(),
-    norb,T.data(),norb);
-  asci::four_index_transform(norb,norb,981230128,V.data(),norb,MP2_RDM.data(),
-    norb,V.data(),norb);
-
+    // Transform Hamiltonian
+    asci::two_index_transform(norb,norb,T.data(),norb,MP2_RDM.data(),
+      norb,T.data(),norb);
+    asci::four_index_transform(norb,norb,0,V.data(),norb,MP2_RDM.data(),
+      norb,V.data(),norb);
   }
 
 
