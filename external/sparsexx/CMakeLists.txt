@@ -57,7 +57,8 @@ include( FetchContent )
 # METIS 
 FetchContent_Declare(
   metis_download
-  URL http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
+  #URL http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz
+  URL https://src.fedoraproject.org/lookaside/pkgs/metis/metis-5.1.0.tar.gz/5465e67079419a69e0116de24fce58fe/metis-5.1.0.tar.gz
   #GIT_REPOSITORY https://github.com/KarypisLab/METIS.git
 )
 

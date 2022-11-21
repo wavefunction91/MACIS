@@ -7,6 +7,7 @@
 #include <sstream>
 #include <set>
 #include <algorithm>
+#include <memory>
 
 namespace sparsexx {
 
