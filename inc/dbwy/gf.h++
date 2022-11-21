@@ -77,7 +77,8 @@ namespace cmz
       double E0,
       bool ispart,
       int nLanIts = 1000,
-      bool saveABtofile = false){
+      bool saveABtofile = false,
+      std::string fpref = ""){
       
       //FIRST, WE HAVE TO COMPUTE THE LANCZOS alphas AND betas
       double tol = 1.E-6;
@@ -96,11 +97,13 @@ namespace cmz
 
       if( saveABtofile )
       {
-        std::ofstream ofile("alphas.dat", std::ios::out);
-        for(int i = 0; i <= kry_size; i++) ofile << alphas[i] << std::endl;
+        std::ofstream ofile( fpref + "alphas.dat", std::ios::out);
+	ofile.precision( dbl::max_digits10 );
+        for(int i = 0; i <= kry_size; i++) ofile << scientific << alphas[i] << std::endl;
         ofile.close();
-        ofile.open("betas.dat", std::ios::out);
-        for(int i = 0; i <= kry_size; i++) ofile << betas[i] << std::endl;
+        ofile.open(fpref + "betas.dat", std::ios::out);
+	ofile.precision( dbl::max_digits10 );
+        for(int i = 0; i <= kry_size; i++) ofile << scientific << betas[i] << std::endl;
         ofile.close();
       }
     
@@ -475,6 +478,8 @@ namespace cmz
       bool print, writeGF;
       try{ print = getParam<bool>( input, "nLanIts" ); } catch(...){ print = false;}
       try{ writeGF = getParam<bool>( input, "writeGF" ); } catch(...){ writeGF = false;}
+      bool saveGFmats;
+      try{ saveGFmats = getParam<bool>( input, "saveGFmats" ); } catch(...){ saveGFmats = false;}
 
       time_t loop1 = time(NULL), loop2 = time(NULL);
       auto loop1C = Clock::now(), loop2C = Clock::now();
@@ -524,7 +529,7 @@ namespace cmz
     
        if( use_bandLan )
        {
-         BandResolvent(hamil, wfns, ws, GF, nLanIts, energ, is_part);
+         BandResolvent(hamil, wfns, ws, GF, nLanIts, energ, is_part, print, saveGFmats);
        }
        else
        {
@@ -537,7 +542,9 @@ namespace cmz
            //DIAGONAL ELEMENT
            std::cout << "DOING ELEMENT (" << i << ", " << i << ")" << std::endl;
            VectorXd twfn = Eigen::Map<VectorXd, Eigen::Unaligned>(wfns[i].data(), nterms);
-           GF_Diag<SparsexDistSpMatOp>(twfn, hamil_wrap, ws, tGF, energ, is_part, nLanIts);
+	   std::string fpref_basis = is_part ? "particle" : "hole";
+	   std::string fpref = fpref_basis + "_" + std::to_string( i ) + "_" + std::to_string( i );
+           GF_Diag<SparsexDistSpMatOp>(twfn, hamil_wrap, ws, tGF, energ, is_part, nLanIts, saveGFmats, fpref);
            for(int iw = 0; iw < ws.size(); iw++) 
              GF[iw][i][i] = tGF[iw];
            for(int j = i+1; j < wfns.size(); j++)
@@ -546,11 +553,13 @@ namespace cmz
              std::cout << "DOING ELEMENT (" << i << ", " << j << ")" << std::endl;
              for(size_t iii = 0; iii < nterms; iii++)
                twfn(iii) = wfns[i][iii] + wfns[j][iii];
-             GF_Diag<SparsexDistSpMatOp>(twfn, hamil_wrap, ws, tGF, energ, is_part, nLanIts);
+	     fpref = fpref_basis + "_" + std::to_string( i ) + "_" + std::to_string( j ) + "_a";
+             GF_Diag<SparsexDistSpMatOp>(twfn, hamil_wrap, ws, tGF, energ, is_part, nLanIts, saveGFmats, fpref);
              for(int iw = 0; iw < ws.size(); iw++) 
                GF[iw][i][j] += 0.25 * tGF[iw];
              for(size_t iii = 0; iii < nterms; iii++)
                twfn(iii) = wfns[i][iii] - wfns[j][iii];
+	     fpref = fpref_basis + "_" + std::to_string( i ) + "_" + std::to_string( j ) + "_b";
              GF_Diag<SparsexDistSpMatOp>(twfn, hamil_wrap, ws, tGF, energ, is_part, nLanIts);
              for(int iw = 0; iw < ws.size(); iw++)
              { 

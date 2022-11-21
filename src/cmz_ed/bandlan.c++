@@ -325,7 +325,8 @@ namespace cmz
       int nLanIts,
       double E0,
       bool ispart, 
-      bool print ) 
+      bool print,
+      bool saveGFmats ) 
     {
       //COMPUTES THE RESOLVENT (ws - H)^-1 IN MATRIX FORM FOR THE "BASIS" GIVEN BY THE
       //vecs VECTORS AND THE FREQUENCY GRID IN ws. USES THE BAND LANCZOS ALGORITHM. IT
@@ -447,6 +448,26 @@ namespace cmz
             for(int l = 0; l < n; l++) S[i_lan][j_n] += eigvecs[i_lan][l] * R[l][j_n];
           }
         }
+	if( saveGFmats )
+	{
+	  std::cout << "WRITING S MATRIX AND BAND-LANCZOS EIGENVALUES TO FILE!" << std::endl;
+	  std::string fprefix = ispart ? "particle" : "hole";
+	  std::ofstream ofile( fprefix + "_S.mat", std::ios::out );
+	  ofile.precision( dbl::max_digits10 );
+	  for( int i_lan = 0; i_lan < nLanIts; i_lan++)
+	  {
+	    for( int k = 0; k < n; k++ )
+	      ofile << scientific << S[i_lan][k] << " ";
+	    ofile << std::endl;
+	  }
+	  ofile.close();
+	  ofile.open( fprefix + "_BLevals.dat", std::ios::out);
+	  ofile.precision( dbl::max_digits10 );
+	  for( int i_lan = 0; i_lan < nLanIts; i_lan++ )
+	    ofile << scientific << eigvals[i_lan] << std::endl;
+	  ofile.close();
+
+	}
         std::cout << "DONE! COMPUTING RESOLVENT ...";
         #pragma omp parallel for
         for(int iw = 0; iw < ws.size(); iw++){

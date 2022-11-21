@@ -175,7 +175,8 @@ namespace cmz
       int nLanIts,
       double E0,
       bool ispart, 
-      bool print = false ); 
+      bool print = false,
+      bool saveGFmats = false ); 
   
   }// namespace ed 
 }// namespace cmz
