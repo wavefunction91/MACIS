@@ -25,6 +25,7 @@
 #include <Eigen/Core>
 #include <Eigen/SparseCore>
 #include <unsupported/Eigen/MatrixFunctions>
+#include <exception>
 
 using namespace std;
 using namespace Eigen;
@@ -335,6 +336,41 @@ namespace cmz
     eigMatD GetMatExp(const eigMatD &A);
     
     /**
+     * @brief Exception class to identify attempt to define same parameter twice
+     *        when reading input dictionary. Basic wrapper around std::runtime_error.
+     *
+     * @author Carlos Mejuto Zaera
+     * @date 24/11/2022
+     */ 
+    class InputRepeatedParamExcp: virtual public std::runtime_error {
+          
+      public:
+      
+          explicit 
+          InputRepeatedParamExcp(const std::string& msg):
+              std::runtime_error(msg)
+              {}
+      };
+    
+    /**
+     * @brief Exception class to identify missing keys when reading/accessing
+     *        input dictionary. Basic wrapper around std::runtime_error.
+     *
+     * @author Carlos Mejuto Zaera
+     * @date 24/11/2022
+     */ 
+    class InputMissingKeyExcp: virtual public std::runtime_error {
+          
+      public:
+      
+          explicit 
+          InputMissingKeyExcp(const std::string& msg):
+              std::runtime_error(msg)
+              {}
+      };
+
+    
+    /**
      * @brief Adds parameter into Input_t dictionary. Corresponding
      *        key cannot exist in dictionary.
      *
@@ -368,7 +404,7 @@ namespace cmz
     inline void setParam( Input_t &input, const string key, const string val )
     {
       if(input.find(key) == input.end())
-        throw("Error in setParam( Input_t&, const string, const string )! Input has no parameter with this key = " + key);
+        throw( InputMissingKeyExcp("Error in setParam( Input_t&, const string, const string )! Input has no parameter with this key = " + key) );
       input[key] = val; 
     }
 
@@ -405,7 +441,7 @@ namespace cmz
     inline double getParam<double>(const Input_t &input, const string key)
     {
       if(input.find(key) == input.end())
-        throw ("Input did not specify parameter " + key);
+        throw ( InputMissingKeyExcp("Input did not specify parameter " + key) );
       
       return std::stod(input.at(key));
     }
@@ -426,8 +462,8 @@ namespace cmz
     inline VecD getParam<VecD>(const Input_t &input, const string key)
     {
       if(input.find(key) == input.end())
-        throw ("Input did not specify parameter " + key);
-      
+        throw ( InputMissingKeyExcp("Input did not specify parameter " + key) );
+
       std::istringstream iss( input.at(key) );
       VecD res;
       double tmp;
@@ -452,7 +488,7 @@ namespace cmz
     inline string getParam<string>(const Input_t &input, const string key)
     {
       if(input.find(key) == input.end())
-        throw ("Input did not specify parameter " + key);
+        throw ( InputMissingKeyExcp("Input did not specify parameter " + key) );
       
       return input.at(key);
     }
@@ -473,7 +509,7 @@ namespace cmz
     inline std::vector<std::string> getParam<std::vector<std::string> >(const Input_t &input, const string key)
     {
       if(input.find(key) == input.end())
-        throw ("Input did not specify parameter " + key);
+        throw ( InputMissingKeyExcp("Input did not specify parameter " + key) );
       
       std::istringstream iss( input.at(key) );
       std::vector<std::string> res;
@@ -499,7 +535,7 @@ namespace cmz
     inline int getParam<int>(const Input_t &input, const string key)
     {
       if(input.find(key) == input.end())
-        throw ("Input did not specify parameter " + key);
+        throw ( InputMissingKeyExcp("Input did not specify parameter " + key) );
       
       return std::stoi(input.at(key));
     }
@@ -520,7 +556,7 @@ namespace cmz
     inline VecInt getParam<VecInt>(const Input_t &input, const string key)
     {
       if(input.find(key) == input.end())
-        throw ("Input did not specify parameter " + key);
+        throw ( InputMissingKeyExcp("Input did not specify parameter " + key) );
       
       std::istringstream iss( input.at(key) );
       VecInt res;
@@ -546,7 +582,7 @@ namespace cmz
     inline bool getParam<bool>(const Input_t &input, const string key)
     {
       if(input.find(key) == input.end())
-        throw ("Input did not specify parameter " + key);
+        throw ( InputMissingKeyExcp("Input did not specify parameter " + key) );
       
       if(input.at(key) != "T" && input.at(key) != "F")
         throw ("Boolean input parameter " + key + " ill defined! You have to specify T of F!");
@@ -569,7 +605,7 @@ namespace cmz
     inline std::vector<bool> getParam<std::vector<bool> >(const Input_t &input, const string key)
     {
       if(input.find(key) == input.end())
-        throw ("Input did not specify parameter " + key);
+        throw ( InputMissingKeyExcp("Input did not specify parameter " + key) );
       
       std::istringstream iss( input.at(key) );
       std::vector<bool> res;
