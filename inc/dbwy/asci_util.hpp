@@ -472,7 +472,8 @@ std::vector<std::bitset<N>> asci_search(
   const double rv_prune_val = 1e-6;
   const size_t pair_size_cutoff = 1e9;
   #endif
-
+  
+  std::vector<uint32_t> as_orbs = ham_gen.GetAS_orbs();
   if( !quiet )
   {
     std::cout << "* Performing ASCI Search over " << ndets << " Determinants" 
@@ -498,8 +499,21 @@ std::vector<std::bitset<N>> asci_search(
     auto coeff       = C[i];
 
     // Get occupied and virtual indices
-    bitset_to_occ_vir( norb, state_alpha, occ_alpha, vir_alpha ); 
-    bitset_to_occ_vir( norb, state_beta,  occ_beta,  vir_beta  ); 
+    if( as_orbs.size() < norb )
+    {
+      // Consider active space
+      bitset_to_occ_vir_as( norb, state_alpha, occ_alpha, vir_alpha, as_orbs ); 
+      bitset_to_occ_vir_as( norb, state_beta,  occ_beta,  vir_beta,  as_orbs  ); 
+    }
+    else
+    { 
+      as_orbs.resize(norb);
+      for( int iorb = 0; iorb < norb; iorb++ )
+         as_orbs[iorb] = iorb;
+      // No active space
+      bitset_to_occ_vir( norb, state_alpha, occ_alpha, vir_alpha ); 
+      bitset_to_occ_vir( norb, state_beta,  occ_beta,  vir_beta  ); 
+    }
 
     auto hdiag = ham_gen.matrix_element( state, state );
 
@@ -519,9 +533,24 @@ std::vector<std::bitset<N>> asci_search(
       size_t nimp = ham_gen.GetNimp();
       if( nimp < N/2 )
       {
+        // Consider only impurities in the active space!
         std::vector<uint32_t> imp_orbs( nimp, 0 );
-        for( int ii = 0; ii < nimp; ii++ )
-          imp_orbs[ii] = ii;
+        if( as_orbs.size() < norb )
+        {
+          int cont = 0;
+          for( const auto as_orb : as_orbs )
+            if( as_orb < nimp )
+            {
+              imp_orbs[cont] = as_orb;
+              cont++;
+            }
+          imp_orbs.resize(cont);
+        }
+        else
+        {
+          for( int ii = 0; ii < nimp; ii++ )
+            imp_orbs[ii] = ii;
+        }
         bitset_to_occ_vir_as( norb, state_alpha, occ_alpha, vir_alpha, imp_orbs ); 
         bitset_to_occ_vir_as( norb, state_beta,  occ_beta,  vir_beta,  imp_orbs  ); 
       }

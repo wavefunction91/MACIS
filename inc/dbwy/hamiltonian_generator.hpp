@@ -77,6 +77,7 @@ public:
     V_pqrs_(V), T_pq_(T) {
 
     generate_integral_intermediates(no, V_pqrs_);
+    InitAS_orbs();
 
   }
 
@@ -202,6 +203,40 @@ public:
   /////////////////////////////////////////////////////////////////
   //   END - Virtual routine to symmetrize degenerate states     //
   /////////////////////////////////////////////////////////////////
+
+  /////////////////////////////////////////////////////////////////
+  //    Infrastructure to consider an active space structure     //
+  /////////////////////////////////////////////////////////////////
+
+private:
+  std::vector<uint32_t> as_orbs;
+
+public: 
+
+  void InitAS_orbs()
+  {
+    as_orbs.resize(norb_);
+    for( int i = 0; i < norb_; i++ ) as_orbs[i] = i;
+  }
+
+  void SetAS_orbs( const std::vector<uint32_t> &_as_orbs )
+  {
+    if( _as_orbs.size() > norb_ )
+      throw( std::runtime_error("Error in SetInitAS_orbs in HamiltonianGenerator! Input active space is larger than the full space!") );
+    for( const auto aorb : _as_orbs )
+      if( aorb > norb_ )
+        throw( std::runtime_error("Error in SetInitAS_orbs in HamiltonianGenerator! Active space orbital indices are larger than the full space allows!") );
+    as_orbs = _as_orbs;
+  }
+
+  std::vector<uint32_t>  GetAS_orbs( ) const
+  {
+    return as_orbs;
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  //    END - Infrastructure to consider active space structure     //
+  ////////////////////////////////////////////////////////////////////
 
   inline double matrix_element( full_det_t bra, full_det_t ket ) {
     auto bra_alpha = truncate_bitset<N/2>(bra);
