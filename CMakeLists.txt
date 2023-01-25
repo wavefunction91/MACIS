@@ -9,8 +9,8 @@ list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )
 include( asci-cmake-modules )
 
 # Packaged Dependencies
-add_subdirectory(external/lobpcgxx)
-add_subdirectory(external/sparsexx)
+#add_subdirectory(external/lobpcgxx)
+#add_subdirectory(external/sparsexx)
 
 # ASCI library
 add_subdirectory(src)
