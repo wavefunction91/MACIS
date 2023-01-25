@@ -1,6 +1,0 @@
-set( CMAKE_C_COMPILER icc         )
-set( CMAKE_CXX_COMPILER icpc      )
-set( CMAKE_Fortran_COMPILER ifort )
-
-set( SPARSEXX_ENABLE_CEREAL    OFF CACHE BOOL "")
-set( SPARSEXX_ENABLE_RANGES_V3 OFF CACHE BOOL "")

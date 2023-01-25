@@ -1,6 +1,8 @@
 cmake_minimum_required( VERSION 3.18 FATAL_ERROR )
 project( sparsexx VERSION 0.1.0 LANGUAGES C CXX )
 
+option( SPARSEXX_ENABLE_TESTS "Enable Testing" ON )
+
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   include( FetchContent )
@@ -16,8 +18,8 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 endif()
 
 
-find_package( MPI      REQUIRED )
-find_package( OpenMP   REQUIRED )
+find_package( MPI   REQUIRED )
+find_package( OpenMP         )
 
 option( SPARSEXX_ENABLE_MKL       "Enable MKL Bindings"             OFF )
 option( SPARSEXX_ENABLE_CEREAL    "Enable serialization via cereal" OFF )
@@ -57,7 +59,9 @@ if(SPARSEXX_ENABLE_METIS)
     FetchContent_Populate(metis_download)
     set( GKLIB_PATH ${metis_download_SOURCE_DIR}/GKlib CACHE PATH  "path to GKlib" )
     add_subdirectory(${metis_download_SOURCE_DIR} ${metis_download_BINARY_DIR})
-    target_link_libraries( metis OpenMP::OpenMP_C )
+    if( TARGET OpenMP::OpenMP_C )
+      target_link_libraries( metis OpenMP::OpenMP_C )
+    endif()
     target_include_directories( metis PUBLIC ${metis_download_SOURCE_DIR}/include )
   endif()
   list(APPEND SPARSEXX_EXTERNAL_LIBRARIES metis)
@@ -104,17 +108,18 @@ if( SPARSEXX_ENABLE_CEREAL )
 endif()
 
 
-add_library               ( sparsexx src/metis_wrapper.cxx            )
-target_compile_features   ( sparsexx PUBLIC cxx_std_17                    )
-target_link_libraries     ( sparsexx PUBLIC MPI::MPI_CXX OpenMP::OpenMP_CXX )
+add_library( sparsexx src/metis_wrapper.cxx )
+target_compile_features( sparsexx PUBLIC cxx_std_17 )
+target_link_libraries( sparsexx PUBLIC MPI::MPI_CXX  )
+if( TARGET OpenMP::OpenMP_CXX )
+  target_link_libraries( sparsexx PUBLIC OpenMP::OpenMP_CXX )
+endif()
 #target_link_libraries     ( sparsexx PRIVATE metis )
 target_include_directories( sparsexx PUBLIC 
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-
-#target_compile_options( sparsexx PRIVATE "-Wall" "-Wextra" "-Wpedantic" "-Wnon-virtual-dtor")
 
 configure_file( 
   ${PROJECT_SOURCE_DIR}/include/sparsexx/sparsexx_config.hpp.in
@@ -184,6 +189,9 @@ install( FILES
   DESTINATION ${INSTALL_CONFIGDIR}
 )
 
-add_subdirectory( examples )
-add_subdirectory( tests )
+include(CTest)
+if( CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND SPARSEXX_ENABLE_TESTS AND BUILD_TESTING )
+  add_subdirectory( examples )
+  add_subdirectory( tests )
+endif()
 
