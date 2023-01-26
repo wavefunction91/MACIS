@@ -1,9 +1,28 @@
 #pragma once
 #include <cassert>
 #include <bit>
+#include <climits>
 #include <asci/types.hpp>
 
 namespace asci {
+
+inline auto clz( unsigned int i ) {
+  return __builtin_clz(i);
+}
+inline auto clz( unsigned long int i ) {
+  return __builtin_clzl(i);
+}
+inline auto clz( unsigned long long int i ) {
+  return __builtin_clzll(i);
+}
+template <typename Integral>
+std::enable_if_t<
+  std::is_integral_v<Integral> and !std::is_signed_v<Integral>, 
+  unsigned
+> fls(Integral i) { 
+  return CHAR_BIT * sizeof(Integral) - clz(i) - 1;
+}
+
 
 template <size_t N>
 uint128_t to_uint128( std::bitset<N> bits ) {
@@ -45,6 +64,21 @@ uint32_t ffs( std::bitset<N> bits ) {
     uint32_t ind = 0;
     for( ind = 0; ind < N; ++ind )
     if( bits[ind] ) return (ind+1);
+    return ind;
+  }
+  abort();
+
+}
+
+template <size_t N>
+uint32_t fls( std::bitset<N> bits ) {
+
+  if constexpr (N <= 32)      return fls( bits.to_ulong() );
+  else if constexpr (N <= 64) return fls( bits.to_ullong() );
+  else {
+    uint32_t ind = 0;
+    for( ind = N-1; ind >= N; ind-- )
+    if( bits[ind] ) return ind;
     return ind;
   }
   abort();
