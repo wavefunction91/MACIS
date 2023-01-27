@@ -60,10 +60,10 @@ std::vector< wfn_t<N> > asci_search(
 
   
   // Expand Search Space
+  auto pairs_st = clock_type::now();
+  std::vector<asci_contrib<wfn_t<N>>> asci_pairs;
   std::vector<uint32_t> occ_alpha, vir_alpha;
   std::vector<uint32_t> occ_beta, vir_beta;
-  std::vector<asci_contrib<wfn_t<N>>> asci_pairs;
-  auto pairs_st = clock_type::now();
   for( size_t i = 0; i < ncdets; ++i ) {
 
     // Alias state data
@@ -111,6 +111,7 @@ std::vector< wfn_t<N> > asci_search(
     // Prune Down Contributions
     if( asci_pairs.size() > asci_settings.pair_size_max ) {
 
+      std::cout << "PRUNING" << std::endl;
       // Remove small contributions
       auto it = std::partition( asci_pairs.begin(), asci_pairs.end(),
         [=](const auto& x){ 
@@ -128,6 +129,169 @@ std::vector< wfn_t<N> > asci_search(
 
     } // Pruning 
   } // Loop over search determinants
+
+#if 0
+
+  // Get unique alpha strings
+  std::vector<wfn_t<N>> uniq_alpha_wfn(cdets_begin, cdets_end);
+  std::transform( uniq_alpha_wfn.begin(), uniq_alpha_wfn.end(),
+    uniq_alpha_wfn.begin(),
+    [=](const auto& w){ return w & full_mask<N/2,N>(); });
+  std::sort(uniq_alpha_wfn.begin(), uniq_alpha_wfn.end(),
+    bitset_less_comparator<N>{});
+  {
+    auto it = std::unique(uniq_alpha_wfn.begin(), uniq_alpha_wfn.end());
+    uniq_alpha_wfn.erase(it, uniq_alpha_wfn.end());
+  }
+  const size_t nuniq_alpha = uniq_alpha_wfn.size();
+
+
+  // For each unique alpha, create a list of beta string and store coeff
+  struct beta_coeff_data {
+    wfn_t<N> beta_string;
+    double coeff;
+  };
+  struct unique_alpha_data {
+    std::vector<beta_coeff_data> bcd;
+  };
+  std::vector<unique_alpha_data> uad(nuniq_alpha);
+  for(auto i = 0; i < nuniq_alpha; ++i) {
+    const auto wfn_a = uniq_alpha_wfn[i];
+    for(auto j = 0; j < ncdets; ++j) { 
+       const auto w = *(cdets_begin + j);
+      if( (w & full_mask<N/2,N>()) == wfn_a ) {
+        uad[i].bcd.push_back( {w >> (N/2), C_local[j]} );
+      }
+    }
+  }
+
+  size_t nacc = 0;
+  for( auto &x : uad ) nacc += x.bcd.size();
+
+  std::cout << "NTOT = " << ncdets << " NU = " << nuniq_alpha << " NACC = " << nacc << std::endl;
+
+  // Loop over triplets
+  std::vector<asci_contrib<wfn_t<N>>> new_asci_pairs;
+  for(int t_i = 0; t_i < norb; ++t_i)
+  for(int t_j = 0; t_j < t_i;  ++t_j)
+  for(int t_k = 0; t_k < t_j;  ++t_k) {
+
+    // Create masks
+    wfn_t<N> T(0); T.flip(t_i).flip(t_j).flip(t_k);
+    auto overfill = full_mask<N>(norb);
+    wfn_t<N> B(1); B <<= t_k; B = B.to_ullong() - 1;
+
+    const double h_el_tol = asci_settings.h_el_tol;
+    std::cout << "T " << t_i << " " << t_j << " " << t_k << std::endl;
+    // Loop over unique alpha strings
+    for( size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha ) {
+
+      //std::cout << "IALPHA = " << i_alpha << std::endl;
+      // Generate valid alpha excitation strings subject to T
+      const auto& det = uniq_alpha_wfn[i_alpha];
+      std::vector<wfn_t<N>> t_doubles, t_singles;
+      asci::generate_triplet_doubles( det, T, overfill, B, t_doubles );
+      asci::generate_triplet_singles( det, T, overfill, B, t_singles );
+
+      // AA excitations
+      for( auto s_aa : t_singles )
+      for( auto [beta, coeff] : uad[i_alpha].bcd ) {
+        auto state     = det  | (beta << N/2);
+        auto new_state = s_aa | (beta << N/2);
+        auto mat_el = ham_gen.matrix_element(state, new_state);
+        if( std::abs(mat_el) < h_el_tol ) continue;
+
+        auto h_diag = ham_gen.matrix_element(new_state, new_state);
+        mat_el /= E_ASCI - h_diag;
+        new_asci_pairs.push_back( {new_state, coeff * mat_el} );
+      }
+      //std::cout << "  AA Done" << std::endl;
+
+      // AAAA excitations
+      for( auto s_aa : t_doubles )
+      for( auto [beta, coeff] : uad[i_alpha].bcd ) {
+        auto state     = det  | (beta << N/2);
+        auto new_state = s_aa | (beta << N/2);
+        auto mat_el = ham_gen.matrix_element(state, new_state);
+        if( std::abs(mat_el) < h_el_tol ) continue;
+
+        auto h_diag = ham_gen.matrix_element(new_state, new_state);
+        mat_el /= E_ASCI - h_diag;
+        new_asci_pairs.push_back( {new_state, coeff * mat_el} );
+      }
+      //std::cout << "  AAAA Done" << std::endl;
+
+      // AABB excitations
+      for( auto s_aa : t_singles )
+      for( auto [beta, coeff] : uad[i_alpha].bcd ) {
+        auto state = det  | (beta << N/2);
+        std::vector<wfn_t<N>> beta_singles;
+        generate_singles(norb, beta, beta_singles);
+        for( auto s_bb : beta_singles) {
+          auto new_state = s_aa | (s_bb << N/2);
+          auto mat_el = ham_gen.matrix_element(state, new_state);
+          if( std::abs(mat_el) < h_el_tol ) continue;
+
+          auto h_diag = ham_gen.matrix_element(new_state, new_state);
+          mat_el /= E_ASCI - h_diag;
+          new_asci_pairs.push_back( {new_state, coeff * mat_el} );
+        }
+      }
+      //std::cout << "  AABB Done" << std::endl;
+
+      if( (det & T).count() == 3 and ((det ^ T) >> t_k).count() == 0 ) {
+
+        for( auto [beta, coeff] : uad[i_alpha].bcd ) {
+          auto state = det  | (beta << N/2);
+          std::vector<wfn_t<N>> beta_singles, beta_doubles;
+          generate_singles_doubles(norb, beta, beta_singles, beta_doubles);
+
+          // BB excitations
+          for( auto s_bb : beta_singles ) {
+            auto new_state = det | (s_bb << N/2);
+            auto mat_el = ham_gen.matrix_element(state, new_state);
+            if( std::abs(mat_el) < h_el_tol ) continue;
+
+            auto h_diag = ham_gen.matrix_element(new_state, new_state);
+            mat_el /= E_ASCI - h_diag;
+            new_asci_pairs.push_back( {new_state, coeff * mat_el} );
+          }
+
+          // BBBB excitations
+          for( auto d_bb : beta_doubles ) {
+            auto new_state = det | (d_bb << N/2);
+            auto mat_el = ham_gen.matrix_element(state, new_state);
+            if( std::abs(mat_el) < h_el_tol ) continue;
+
+            auto h_diag = ham_gen.matrix_element(new_state, new_state);
+            mat_el /= E_ASCI - h_diag;
+            new_asci_pairs.push_back( {new_state, coeff * mat_el} );
+          }
+        }
+      }
+    }
+
+  }
+
+  sort_and_accumulate_asci_pairs(new_asci_pairs);
+  sort_and_accumulate_asci_pairs(asci_pairs);
+
+  std::cout << std::scientific;
+  if( asci_pairs.size() != new_asci_pairs.size() )
+    throw std::runtime_error("Different Sizes");
+  for( int i = 0; i < asci_pairs.size(); ++i ) {
+    auto [ref_d, ref_c] = asci_pairs[i];
+    auto [new_d, new_c] = new_asci_pairs[i];
+    if( ref_d != new_d ) throw std::runtime_error("Different Det");
+    if( std::abs(ref_c - new_c) > 1e-12 ) {
+      std::cout << ref_c - new_c << std::endl;
+      throw std::runtime_error("Different Contrib");
+    }
+  }
+
+  //throw std::runtime_error("DIE DIE DIE");
+
+#endif
   auto pairs_en = clock_type::now();
 
   logger->info("  * ASCI Kept {} Pairs", asci_pairs.size());

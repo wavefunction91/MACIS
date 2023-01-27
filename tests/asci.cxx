@@ -107,7 +107,7 @@ TEST_CASE("Triplets") {
     // Histogram contribution from root determinant
     {
       const auto label = top_set_ordinal<3, num_bits/2>(wfn_a_uniq[i]);
-      hist[label] += n_singles + n_doubles;
+      hist[label] += n_singles + n_doubles + 1;
     }
 
     // Histogram contribtutions from single excitations
@@ -158,21 +158,14 @@ TEST_CASE("Triplets") {
 
       asci::generate_triplet_doubles( det, T, overfill, B, t_doubles );
       asci::generate_triplet_singles( det, T, overfill, B, t_singles );
-      new_hist[label] += t_doubles.size() + t_singles.size() * (n_singles + 1);
+      new_hist[label] += t_doubles.size() +                  // AAAA
+                         t_singles.size() * (n_singles + 1); // AA + AABB
+      if( (det & T).count() == 3 and ((det ^ T) >> k).count() == 0 ) {
+        new_hist[label] += n_singles + n_doubles + 1; // No Excitation + BBBB + BB
+      }
     }
   }
 
-  for( auto det : wfn_a_uniq ) {
-    const size_t nocc = det.count();
-    const size_t nvir = norb - nocc;
-    const size_t n_singles = nocc * nvir;
-    const size_t n_doubles = 
-      (n_singles * (n_singles - nocc - nvir + 1))/4;
-
-    const auto label = top_set_ordinal<3, num_bits/2>(det);
-    new_hist[label] += n_singles + n_doubles;
-  }
-  
   std::cout << std::boolalpha << (hist == new_hist) << std::endl;
 }
 
