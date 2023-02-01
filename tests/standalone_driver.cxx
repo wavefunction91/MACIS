@@ -280,9 +280,9 @@ int main(int argc, char** argv) {
       std::tie(E0, dets, C_local) = asci::asci_grow( asci_settings, 
         mcscf_settings, E0, std::move(dets), std::move(C_local), ham_gen, 
         n_active, MPI_COMM_WORLD );
-      std::tie(E0, dets, C_local) = asci::asci_refine( asci_settings, 
-        mcscf_settings, E0, std::move(dets), std::move(C_local), ham_gen, 
-        n_active, MPI_COMM_WORLD );
+      //std::tie(E0, dets, C_local) = asci::asci_refine( asci_settings, 
+      //  mcscf_settings, E0, std::move(dets), std::move(C_local), ham_gen, 
+      //  n_active, MPI_COMM_WORLD );
       #endif
       E0 += E_inactive + E_core;
         

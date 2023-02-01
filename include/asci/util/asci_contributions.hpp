@@ -224,6 +224,7 @@ void generate_pairs( const IndContainer& inds, std::vector<wfn_t<N>>& w ) {
 
 
 
+#if 0
 /**
  *  @param[in]  det       Input root determinant
  *  @param[in]  T         Triplet constraint mask
@@ -325,5 +326,8 @@ void generate_triplet_singles( wfn_t<N> det,
     for( auto a : vir ) t_singles.emplace_back(temp).flip(a);
   }
 }
+#endif
 
 }
+
+#include <asci/util/asci_triplet_constraints.hpp>

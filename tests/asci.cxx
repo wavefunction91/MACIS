@@ -85,8 +85,8 @@ TEST_CASE("Triplets") {
   }
 
   // Print beta counts
-  for( size_t i = 0; i < nuniq_alpha; ++i ) 
-    std::cout << wfn_a_uniq[i].to_ulong() << " " << nbetas[i] << std::endl;
+  //for( size_t i = 0; i < nuniq_alpha; ++i ) 
+  //  std::cout << wfn_a_uniq[i].to_ulong() << " " << nbetas[i] << std::endl;
 
 
   // Compute Histograms
@@ -132,23 +132,27 @@ TEST_CASE("Triplets") {
   //}
 
   std::vector<std::tuple<unsigned, unsigned, unsigned>> triplets; 
-  for(int i = 0; i < 32; ++i)
-  for(int j = 0; j < i;  ++j)
-  for(int k = 0; k < j;  ++k) {
+  for(int i = 0; i < norb; ++i)
+  for(int j = 0; j < i;    ++j)
+  for(int k = 0; k < j;    ++k) {
     triplets.emplace_back(i,j,k);
   }
 
   std::vector<size_t> new_hist(hist.size(), 0);
   for( auto [i,j,k] : triplets ) {
     const auto label = i*32*32 + j*32 + k;
+#if 0
     // Create masks
     asci::wfn_t<num_bits> T(0); 
     T.flip(i).flip(j).flip(k); 
 
     auto overfill = asci::full_mask<num_bits>(norb);
     asci::wfn_t<num_bits> B(1); B <<= k; B = B.to_ullong() - 1;
+#else
+    auto [T, overfill, B] = 
+      asci::make_triplet_masks<num_bits>(norb,i,j,k);
+#endif
 
-    std::vector<asci::wfn_t<num_bits>> t_doubles, t_singles;
     for( auto det : wfn_a_uniq ) {
       const size_t nocc = det.count();
       const size_t nvir = norb - nocc;
@@ -156,16 +160,10 @@ TEST_CASE("Triplets") {
       const size_t n_doubles = 
         (n_singles * (n_singles - nocc - nvir + 1))/4;
 
-      asci::generate_triplet_doubles( det, T, overfill, B, t_doubles );
-      asci::generate_triplet_singles( det, T, overfill, B, t_singles );
-      new_hist[label] += t_doubles.size() +                  // AAAA
-                         t_singles.size() * (n_singles + 1); // AA + AABB
-      if( (det & T).count() == 3 and ((det ^ T) >> k).count() == 0 ) {
-        new_hist[label] += n_singles + n_doubles + 1; // No Excitation + BBBB + BB
-      }
+      new_hist[label] += asci::triplet_histogram( det, n_singles, n_doubles, T, overfill, B );
     }
   }
 
-  std::cout << std::boolalpha << (hist == new_hist) << std::endl;
+  REQUIRE(hist == new_hist);
 }
 
