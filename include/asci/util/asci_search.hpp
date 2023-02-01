@@ -44,6 +44,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
   asci_contrib_container<wfn_t<N>> asci_pairs;
   std::vector<uint32_t> occ_alpha, vir_alpha;
   std::vector<uint32_t> occ_beta, vir_beta;
+  asci_pairs.reserve(asci_settings.pair_size_max);
   for( size_t i = 0; i < ncdets; ++i ) {
 
     // Alias state data
@@ -191,6 +192,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
     }
   }
 
+  asci_pairs.reserve(asci_settings.pair_size_max);
   // Loop over triplets
   for(int t_i = 0; t_i < norb; ++t_i)
   for(int t_j = 0; t_j < t_i;  ++t_j)
