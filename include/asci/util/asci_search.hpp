@@ -154,6 +154,7 @@ std::vector< wfn_t<N> > asci_search(
   struct beta_coeff_data_2 {
     wfn_t<N> beta_string;
     std::vector<uint32_t> occ_beta;
+    std::vector<uint32_t> vir_beta;
     double coeff;
     double h_diag;
   };
@@ -169,10 +170,12 @@ std::vector< wfn_t<N> > asci_search(
       if( (w & full_mask<N/2,N>()) == wfn_a ) {
         const auto beta_shift = w >> N/2;
         const auto beta = beta_shift << N/2;
-        const auto occ_beta = bits_to_indices(beta_shift);
         const auto h_diag = ham_gen.matrix_element(w,w);
+        std::vector<uint32_t> occ_beta, vir_beta;
+        bitset_to_occ_vir( norb, beta_shift, occ_beta, vir_beta );
         uad[i].bcd.push_back( {beta_shift, C_local[j]} );
-        uad[i].bcd2.push_back( {beta, occ_beta, C_local[j], h_diag} );
+        uad[i].bcd2.push_back( {beta, occ_beta, vir_beta, C_local[j], 
+          h_diag} );
       }
     }
   }
@@ -217,12 +220,12 @@ std::vector< wfn_t<N> > asci_search(
         new_asci_pairs.push_back( {new_state, coeff * mat_el} );
       }
 #else
-      for( auto [beta, occ_beta, coeff, h_diag] : uad[i_alpha].bcd2 ) {
-        //const auto full_state = det | (beta << N/2);
-        //const auto occ_beta = bits_to_indices(beta); 
-        //const auto h_diag = 
-        //  ham_gen.matrix_element(full_state, full_state);
-        generate_triplet_single_contributions_ss(
+      for( const auto& bcd : uad[i_alpha].bcd2 ) {
+        const auto& beta     = bcd.beta_string;
+        const auto& coeff    = bcd.coeff;
+        const auto& h_diag   = bcd.h_diag;
+        const auto& occ_beta = bcd.occ_beta;
+        generate_triplet_singles_contributions_ss(
           coeff, det, T, O, B, beta, occ_alpha,
           occ_beta, T_pq, norb, G_red, norb, V_red, norb,
           h_el_tol, h_diag, E_ASCI, ham_gen, new_asci_pairs );
@@ -230,8 +233,9 @@ std::vector< wfn_t<N> > asci_search(
 #endif
 
       // AAAA excitations
-      for( auto s_aa : t_doubles )
-      for( auto [beta, coeff] : uad[i_alpha].bcd ) {
+#if 0
+      for( auto [beta, coeff] : uad[i_alpha].bcd ) 
+      for( auto s_aa : t_doubles ) {
         auto state     = det  | (beta << N/2);
         auto new_state = s_aa | (beta << N/2);
         auto mat_el = ham_gen.matrix_element(state, new_state);
@@ -241,8 +245,21 @@ std::vector< wfn_t<N> > asci_search(
         mat_el /= E_ASCI - h_diag;
         new_asci_pairs.push_back( {new_state, coeff * mat_el} );
       }
+#else
+      for( const auto& bcd : uad[i_alpha].bcd2 ) {
+        const auto& beta     = bcd.beta_string;
+        const auto& coeff    = bcd.coeff;
+        const auto& h_diag   = bcd.h_diag;
+        const auto& occ_beta = bcd.occ_beta;
+        generate_triplet_doubles_contributions_ss(
+          coeff, det, T, O, B, beta, occ_alpha, occ_beta, 
+          G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
+          new_asci_pairs );
+      }
+#endif
 
       // AABB excitations
+#if 0
       for( auto s_aa : t_singles )
       for( auto [beta, coeff] : uad[i_alpha].bcd ) {
         auto state = det  | (beta << N/2);
@@ -258,6 +275,19 @@ std::vector< wfn_t<N> > asci_search(
           new_asci_pairs.push_back( {new_state, coeff * mat_el} );
         }
       }
+#else
+      for( const auto& bcd : uad[i_alpha].bcd2 ) {
+        const auto& beta     = bcd.beta_string;
+        const auto& coeff    = bcd.coeff;
+        const auto& h_diag   = bcd.h_diag;
+        const auto& occ_beta = bcd.occ_beta;
+        const auto& vir_beta = bcd.vir_beta;
+        generate_triplet_doubles_contributions_os(
+          coeff, det, T, O, B, beta, occ_alpha, occ_beta,
+          vir_beta, V_pqrs, norb, h_el_tol, h_diag,
+          E_ASCI, ham_gen, new_asci_pairs );
+      }
+#endif
 
       if( (det & T).count() == 3 and ((det ^ T) >> t_k).count() == 0 ) {
 

@@ -253,8 +253,8 @@ int main(int argc, char** argv) {
 
       spdlog::null_logger_mt("asci_search");
       asci::ASCISettings asci_settings;
-      asci_settings.ntdets_max = 100000;
-      asci_settings.ncdets_max = 10000;
+      asci_settings.ntdets_max = 10000;
+      asci_settings.ncdets_max = 1000;
       asci_settings.grow_factor = 2;
       std::vector<asci::wfn_t<64>> dets = {
         asci::canonical_hf_determinant<64>(nalpha, nalpha)

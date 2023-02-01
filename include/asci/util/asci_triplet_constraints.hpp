@@ -76,18 +76,17 @@ unsigned count_triplet_singles(Args&&... args) {
  *  @param[out] t_doubles 
  */
 template <size_t N>
-void generate_triplet_doubles( wfn_t<N> det, 
-  wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B,
-  std::vector<wfn_t<N>>& t_doubles
+auto generate_triplet_double_excitations( wfn_t<N> det, 
+  wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B
 ) {
+  // Occ/Vir pairs to generate excitations
+  std::vector<wfn_t<N>> O,V; 
 
-  if( (det & T) == 0 ) return;
+  if( (det & T) == 0 ) return std::make_tuple(O,V);
 
   auto o = det ^ T;
   auto v = (~det) & O_mask & B;
 
-  // Occ/Vir pairs to generate excitations
-  std::vector<wfn_t<N>> O,V; 
 
   // Generate Virtual Pairs
   if( (o & T).count() >= 2 ) {
@@ -111,7 +110,7 @@ void generate_triplet_doubles( wfn_t<N> det,
 
   // Generate Occupied Pairs
   const auto o_and_not_b = o & ~B;
-  if( o_and_not_b.count() > 2 ) return;
+  if( o_and_not_b.count() > 2 ) return std::make_tuple(O,V);
 
   switch(o_and_not_b.count()) {
     case 1 :
@@ -124,6 +123,17 @@ void generate_triplet_doubles( wfn_t<N> det,
       generate_pairs( bits_to_indices(o), O );
       break;
   }
+
+  return std::make_tuple(O,V);
+}
+
+template <size_t N>
+void generate_triplet_doubles( wfn_t<N> det, 
+  wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B,
+  std::vector<wfn_t<N>>& t_doubles
+) {
+
+  auto [O,V] = generate_triplet_double_excitations(det,T,O_mask,B);
 
   t_doubles.clear();
   for(auto ij : O) {
@@ -210,7 +220,7 @@ size_t triplet_histogram( wfn_t<N> det, size_t n_os_singles, size_t n_os_doubles
 
 
 template <size_t N>
-void generate_triplet_single_contributions_ss(
+void generate_triplet_singles_contributions_ss(
   double coeff,
   wfn_t<N> det, wfn_t<N> T, wfn_t<N> O, wfn_t<N> B,
   wfn_t<N> os_det, 
@@ -271,6 +281,135 @@ void generate_triplet_single_contributions_ss(
 }
 
 
+
+template <size_t N>
+void generate_triplet_doubles_contributions_ss(
+  double coeff,
+  wfn_t<N> det, wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B,
+  wfn_t<N> os_det, 
+  const std::vector<uint32_t>&        occ_same,
+  const std::vector<uint32_t>&        occ_othr,
+  const double*                       G,
+  const size_t                        LDG,
+  double                              h_el_tol,
+  double                              root_diag,
+  double                              E0,
+  HamiltonianGenerator<N>&            ham_gen,
+  asci_contrib_container<wfn_t<N>>& asci_contributions) {
+
+  auto [O,V] = generate_triplet_double_excitations(det, T, O_mask, B);
+  const auto no_pairs = O.size();
+  const auto nv_pairs = V.size();
+  if( !no_pairs or !nv_pairs ) return;
+
+  const size_t LDG2 = LDG * LDG;
+  for(int _ij = 0; _ij < no_pairs; ++_ij) {
+    const auto ij = O[_ij];
+    const auto i  = ffs(ij) - 1;
+    const auto j  = fls(ij);
+    const auto G_ij = G + (j + i*LDG2)*LDG;
+    const auto ex_ij = det ^ ij;
+  for(int _ab = 0; _ab < nv_pairs; ++_ab) {
+    const auto ab = V[_ab];
+    const auto a  = ffs(ab) - 1;
+    const auto b  = fls(ab);
+    
+    const auto G_aibj = G_ij[b + a*LDG2];
+    //printf(" %d %d %d %d %.6e\n", i,j,a,b, G_aibj);
+
+    // Early Exit
+    if( std::abs(G_aibj) < h_el_tol ) continue;
+
+    // Calculate Excited Determinant (spin)
+    const auto full_ex_spin = ij | ab;
+    const auto ex_det_spin  = ex_ij | ab;
+    
+
+    // Compute Sign in a Canonical Way
+    auto sign = doubles_sign( det, ex_det_spin, full_ex_spin );
+    
+    // Calculate Full Excited Determinant
+    const auto full_ex = ex_det_spin | os_det;
+
+    // Update Sign of Matrix Element
+    auto h_el = sign * G_aibj;
+
+    // Evaluate fast diagonal matrix element
+    auto h_diag =
+      ham_gen.fast_diag_ss_double( occ_same, occ_othr, i, j, a, b, root_diag);
+    h_el /= (E0 - h_diag);
+
+    asci_contributions.push_back( {full_ex, coeff * h_el} );
+
+  }
+  }
+}
+
+
+
+
+template <size_t N>
+void generate_triplet_doubles_contributions_os(
+  double coeff,
+  wfn_t<N> det, wfn_t<N> T, wfn_t<N> O, wfn_t<N> B,
+  wfn_t<N> os_det, 
+  const std::vector<uint32_t>&        occ_same,
+  const std::vector<uint32_t>&        occ_othr,
+  const std::vector<uint32_t>&        vir_othr,
+  const double*                       V,
+  const size_t                        LDV,
+  double                              h_el_tol,
+  double                              root_diag,
+  double                              E0,
+  HamiltonianGenerator<N>&            ham_gen,
+  asci_contrib_container<wfn_t<N>>& asci_contributions) {
+
+  
+  // Generate Single Excitations that Satisfy the Constraint
+  auto [o,v] = generate_triplet_single_excitations(det, T, O, B);
+  const auto no = o.count();
+  const auto nv = v.count();
+  if(!no or !nv) return;
+
+  const size_t LDV2 = LDV * LDV;
+  for(int ii = 0; ii < no; ++ii) {
+    const auto i = fls(o);
+    o.flip(i);
+    auto v_cpy = v;
+  for(int aa = 0; aa < nv; ++aa) {
+    const auto a = fls(v_cpy);
+    v_cpy.flip(a);
+
+    const auto* V_ai = V + a + i*LDV;
+    double sign_same = single_excitation_sign( det, a, i );
+
+    for( auto j : occ_othr )
+    for( auto b : vir_othr ) {
+      const auto jb = b + j*LDV;
+      const auto V_aibj = V_ai[jb*LDV2];
+
+      // Early Exist
+      if( std::abs(V_aibj) < h_el_tol ) continue;
+
+      double sign_othr = single_excitation_sign( os_det >> (N/2),  b, j );
+      double sign = sign_same * sign_othr;
+
+      // Compute Excited Determinant
+      auto ex_det = det | os_det; ex_det.flip(i).flip(a).flip(j+N/2).flip(b+N/2);
+
+      // Finalize Matrix Element
+      auto h_el = sign * V_aibj;
+
+      auto h_diag = 
+        ham_gen.fast_diag_os_double( occ_same, occ_othr, i, j, a, b, root_diag );
+      h_el /= ( E0 - h_diag );
+
+      asci_contributions.push_back( {ex_det, coeff*h_el} );
+    } // BJ
+
+  } // A
+  } // I
+}
 
 #endif
 }
