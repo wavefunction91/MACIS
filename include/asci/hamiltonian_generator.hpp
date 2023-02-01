@@ -115,10 +115,27 @@ public:
     const std::vector<uint32_t>& ss_occ,
     const std::vector<uint32_t>& os_occ ) const;
 
+  std::vector<double> single_orbital_ens(
+    size_t norb, 
+    const std::vector<uint32_t>& ss_occ,
+    const std::vector<uint32_t>& os_occ ) const;
+
   double fast_diag_single( 
     const std::vector<uint32_t>& ss_occ, 
     const std::vector<uint32_t>& os_occ, 
     uint32_t orb_hol, uint32_t orb_par, 
+    double orig_det_Hii ) const;
+
+  double fast_diag_single( 
+    double hol_en, double par_en,
+    uint32_t orb_hol, uint32_t orb_par, 
+    double orig_det_Hii ) const;
+
+  double fast_diag_ss_double( 
+    double en_hol1, double en_hol2,
+    double en_par1, double en_par2, 
+    uint32_t orb_hol1, uint32_t orb_hol2,
+    uint32_t orb_par1, uint32_t orb_par2, 
     double orig_det_Hii ) const;
 
   double fast_diag_ss_double( 
@@ -126,6 +143,13 @@ public:
     const std::vector<uint32_t>& os_occ, 
     uint32_t orb_hol1, uint32_t orb_hol2,
     uint32_t orb_par1, uint32_t orb_par2, 
+    double orig_det_Hii ) const;
+
+  double fast_diag_os_double( 
+    double en_holu, double en_hold,
+    double en_paru, double en_pard, 
+    uint32_t orb_holu, uint32_t orb_hold,
+    uint32_t orb_paru, uint32_t orb_pard, 
     double orig_det_Hii ) const;
 
   double fast_diag_os_double( 

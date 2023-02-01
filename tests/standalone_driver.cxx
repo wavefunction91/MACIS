@@ -251,7 +251,7 @@ int main(int argc, char** argv) {
       E0 += E_inactive + E_core;
     } else {
 
-      spdlog::null_logger_mt("asci_search");
+      //spdlog::null_logger_mt("asci_search");
       asci::ASCISettings asci_settings;
       asci_settings.ntdets_max = 10000;
       asci_settings.ncdets_max = 1000;

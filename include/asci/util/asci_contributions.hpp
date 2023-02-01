@@ -22,6 +22,7 @@ void append_singles_asci_contributions(
   const std::vector<uint32_t>&        occ_same,
   const std::vector<uint32_t>&        vir_same,
   const std::vector<uint32_t>&        occ_othr,
+  const double*                       eps_same,
   const double*                       T_pq,
   const size_t                        LDT,
   const double*                       G_kpq,
@@ -60,7 +61,8 @@ void append_singles_asci_contributions(
 
     // Calculate fast diagonal matrix element
     auto h_diag = 
-      ham_gen.fast_diag_single( occ_same, occ_othr, i, a, root_diag );
+      //ham_gen.fast_diag_single( occ_same, occ_othr, i, a, root_diag );
+      ham_gen.fast_diag_single( eps_same[i], eps_same[a], i, a, root_diag );
     h_el /= (E0 - h_diag);
 
     // Append to return values
@@ -81,6 +83,7 @@ void append_ss_doubles_asci_contributions(
   const std::vector<uint32_t>&        ss_occ,
   const std::vector<uint32_t>&        vir,
   const std::vector<uint32_t>&        os_occ,
+  const double*                       eps_same,
   const double*                       G,
   size_t                              LDG,
   double                              h_el_tol,
@@ -130,7 +133,9 @@ void append_ss_doubles_asci_contributions(
 
       // Evaluate fast diagonal matrix element
       auto h_diag = 
-        ham_gen.fast_diag_ss_double( ss_occ, os_occ, i, j, a, b, root_diag );
+        //ham_gen.fast_diag_ss_double( ss_occ, os_occ, i, j, a, b, root_diag );
+        ham_gen.fast_diag_ss_double( eps_same[i], eps_same[j], eps_same[a],
+          eps_same[b], i, j, a, b, root_diag );
       h_el /= (E0 - h_diag);
 
       // Append {det, c*h_el}
@@ -157,6 +162,8 @@ void append_os_doubles_asci_contributions(
   const std::vector<uint32_t>&        occ_beta,
   const std::vector<uint32_t>&        vir_alpha,
   const std::vector<uint32_t>&        vir_beta,
+  const double*                       eps_alpha,
+  const double*                       eps_beta,
   const double*                       V,
   size_t                              LDV,
   double                              h_el_tol,
@@ -192,7 +199,9 @@ void append_os_doubles_asci_contributions(
 
       // Evaluate fast diagonal element
       auto h_diag = 
-        ham_gen.fast_diag_os_double( occ_alpha, occ_beta, i, j, a, b, root_diag );
+        //ham_gen.fast_diag_os_double( occ_alpha, occ_beta, i, j, a, b, root_diag );
+        ham_gen.fast_diag_os_double( eps_alpha[i], eps_beta[j], eps_alpha[a],
+          eps_beta[b], i, j, a, b, root_diag );
       h_el /= ( E0 - h_diag );
 
       asci_contributions.push_back( {ex_det, coeff*h_el} );

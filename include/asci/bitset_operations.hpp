@@ -88,8 +88,19 @@ uint32_t fls( std::bitset<N> bits ) {
 template <size_t N>
 void bits_to_indices( std::bitset<N> bits, std::vector<uint32_t>& indices ) {
   indices.clear();
+#if 0
   for( auto i = 0ul; i < N; ++i )
   if( bits[i] ) indices.emplace_back(i);
+#else
+  auto c = bits.count();
+  indices.resize(c);
+  if( ! c ) return;
+  for(int i = 0; i < c; ++i) {
+    const auto ind = ffs(bits) - 1;
+    bits.flip(ind);
+    indices[i] = ind;
+  }
+#endif
 }
 
 template <size_t N>

@@ -56,6 +56,10 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     bitset_to_occ_vir( norb, state_alpha, occ_alpha, vir_alpha ); 
     bitset_to_occ_vir( norb, state_beta,  occ_beta,  vir_beta  ); 
 
+    // Precompute orbital energies
+    auto eps_alpha = ham_gen.single_orbital_ens( norb, occ_alpha, occ_beta );
+    auto eps_beta  = ham_gen.single_orbital_ens( norb, occ_beta, occ_alpha );
+
     // Compute base diagonal matrix element
     double h_diag = ham_gen.matrix_element(state, state);
 
@@ -63,28 +67,29 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
 
     // Singles - AA
     append_singles_asci_contributions<(N/2),0>( coeff, state, state_alpha,
-      occ_alpha, vir_alpha, occ_beta, T_pq, norb, G_red, norb, V_red, norb, 
-      h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
+      occ_alpha, vir_alpha, occ_beta, eps_alpha.data(), T_pq, norb, G_red, 
+      norb, V_red, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
 
     // Singles - BB
     append_singles_asci_contributions<(N/2),(N/2)>( coeff, state, state_beta, 
-      occ_beta, vir_beta, occ_alpha, T_pq, norb, G_red, norb, V_red, norb, 
-      h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
+      occ_beta, vir_beta, occ_alpha, eps_beta.data(), T_pq, norb, G_red, 
+      norb, V_red, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
 
     if(not asci_settings.just_singles) {
       // Doubles - AAAA
       append_ss_doubles_asci_contributions<N/2,0>( coeff, state, state_alpha, 
-        occ_alpha, vir_alpha, occ_beta, G_pqrs, norb, h_el_tol, h_diag, 
-        E_ASCI, ham_gen, asci_pairs);
+        occ_alpha, vir_alpha, occ_beta, eps_alpha.data(), G_pqrs, norb, 
+        h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
 
       // Doubles - BBBB
       append_ss_doubles_asci_contributions<N/2,N/2>( coeff, state, 
-        state_beta, occ_beta, vir_beta, occ_alpha, G_pqrs, norb, h_el_tol, 
-        h_diag, E_ASCI, ham_gen, asci_pairs);
+        state_beta, occ_beta, vir_beta, occ_alpha, eps_beta.data(),
+        G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
 
       // Doubles - AABB
       append_os_doubles_asci_contributions( coeff, state, state_alpha, 
-        state_beta, occ_alpha, occ_beta, vir_alpha, vir_beta, V_pqrs, norb, 
+        state_beta, occ_alpha, occ_beta, vir_alpha, vir_beta, 
+        eps_alpha.data(), eps_beta.data(), V_pqrs, norb, 
         h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
     }
 
@@ -153,6 +158,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
     wfn_t<N> beta_string;
     std::vector<uint32_t> occ_beta;
     std::vector<uint32_t> vir_beta;
+    std::vector<double>   orb_ens_alpha;
+    std::vector<double>   orb_ens_beta;
     double coeff;
     double h_diag;
   };
@@ -164,6 +171,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
   std::vector<unique_alpha_data> uad(nuniq_alpha);
   for(auto i = 0; i < nuniq_alpha; ++i) {
     const auto wfn_a = uniq_alpha_wfn[i];
+    std::vector<uint32_t> occ_alpha, vir_alpha;
+    bitset_to_occ_vir( norb, wfn_a, occ_alpha, vir_alpha );
     for(auto j = 0; j < ncdets; ++j) { 
        const auto w = *(cdets_begin + j);
       if( (w & full_mask<N/2,N>()) == wfn_a ) {
@@ -172,8 +181,12 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto h_diag = ham_gen.matrix_element(w,w);
         std::vector<uint32_t> occ_beta, vir_beta;
         bitset_to_occ_vir( norb, beta_shift, occ_beta, vir_beta );
-        uad[i].bcd.push_back( {beta, occ_beta, vir_beta, C[j], 
-          h_diag} );
+        auto orb_ens_alpha = 
+          ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
+        auto orb_ens_beta = 
+          ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
+        uad[i].bcd.push_back( {beta, occ_beta, vir_beta, orb_ens_alpha,
+          orb_ens_beta, C[j], h_diag} );
       }
     }
   }
@@ -200,9 +213,10 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto& coeff    = bcd.coeff;
         const auto& h_diag   = bcd.h_diag;
         const auto& occ_beta = bcd.occ_beta;
+        const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
         generate_triplet_singles_contributions_ss(
-          coeff, det, T, O, B, beta, occ_alpha,
-          occ_beta, T_pq, norb, G_red, norb, V_red, norb,
+          coeff, det, T, O, B, beta, occ_alpha, occ_beta, 
+          orb_ens_alpha.data(), T_pq, norb, G_red, norb, V_red, norb,
           h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
       }
 
@@ -212,10 +226,11 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto& coeff    = bcd.coeff;
         const auto& h_diag   = bcd.h_diag;
         const auto& occ_beta = bcd.occ_beta;
+        const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
         generate_triplet_doubles_contributions_ss(
           coeff, det, T, O, B, beta, occ_alpha, occ_beta, 
-          G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
-          asci_pairs );
+          orb_ens_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, 
+          ham_gen, asci_pairs );
       }
 
       // AABB excitations
@@ -225,32 +240,37 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto& h_diag   = bcd.h_diag;
         const auto& occ_beta = bcd.occ_beta;
         const auto& vir_beta = bcd.vir_beta;
+        const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
+        const auto& orb_ens_beta  = bcd.orb_ens_beta;
         generate_triplet_doubles_contributions_os(
           coeff, det, T, O, B, beta, occ_alpha, occ_beta,
-          vir_beta, V_pqrs, norb, h_el_tol, h_diag,
-          E_ASCI, ham_gen, asci_pairs );
+          vir_beta, orb_ens_alpha.data(), orb_ens_beta.data(),
+          V_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
       }
 
       if( (det & T).count() == 3 and ((det ^ T) >> t_k).count() == 0 ) {
         for( const auto& bcd : uad[i_alpha].bcd ) {
+
           const auto& beta     = bcd.beta_string;
           const auto& coeff    = bcd.coeff;
           const auto& h_diag   = bcd.h_diag;
           const auto& occ_beta = bcd.occ_beta;
           const auto& vir_beta = bcd.vir_beta;
+          const auto& eps_beta  = bcd.orb_ens_beta;
 
           const auto state = det | beta;
           const auto state_beta = truncate_bitset<N/2>(beta >> N/2);
           // BB Excitations
           append_singles_asci_contributions<(N/2),(N/2)>( coeff, state,
-            state_beta, occ_beta, vir_beta, occ_alpha, T_pq, norb,
-            G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI, ham_gen, 
-            asci_pairs ); 
+            state_beta, occ_beta, vir_beta, occ_alpha, eps_beta.data(), 
+            T_pq, norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI, 
+            ham_gen, asci_pairs ); 
 
           // BBBB Excitations
           append_ss_doubles_asci_contributions<N/2,N/2>( coeff, state,
-            state_beta, occ_beta, vir_beta, occ_alpha, G_pqrs, norb,
-            h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
+            state_beta, occ_beta, vir_beta, occ_alpha, eps_beta.data(),
+            G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
+
         } // Beta Loop
       } // Triplet Check
     } // Unique Alpha Loop
@@ -297,21 +317,19 @@ std::vector< wfn_t<N> > asci_search(
   
   // Expand Search Space
   auto pairs_st = clock_type::now();
+#if 0
   auto asci_pairs = asci_contributions_standard( asci_settings, 
     cdets_begin, cdets_end, E_ASCI, C_local, norb, T_pq, G_red,
     V_red, G_pqrs, V_pqrs, ham_gen );
-
-
-#if 1
-  auto tmp_tp = clock_type::now();
-  std::cout << "OLD = " << duration_type(tmp_tp - pairs_st).count() << std::endl;
-
-  auto new_asci_pairs = asci_contributions_triplet( asci_settings, 
+#else
+  auto asci_pairs = asci_contributions_triplet( asci_settings, 
     cdets_begin, cdets_end, E_ASCI, C_local, norb, T_pq, G_red,
     V_red, G_pqrs, V_pqrs, ham_gen );
+#endif
+  auto pairs_en = clock_type::now();
 
-  std::cout << "NEW = " << duration_type(clock_type::now() - tmp_tp).count() << std::endl;
 
+#if 0
   sort_and_accumulate_asci_pairs(new_asci_pairs);
   sort_and_accumulate_asci_pairs(asci_pairs);
 
@@ -329,9 +347,7 @@ std::vector< wfn_t<N> > asci_search(
   }
 
   //throw std::runtime_error("DIE DIE DIE");
-
 #endif
-  auto pairs_en = clock_type::now();
 
   logger->info("  * ASCI Kept {} Pairs", asci_pairs.size());
 
