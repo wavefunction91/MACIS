@@ -130,7 +130,10 @@ std::vector< wfn_t<N> > asci_search(
     } // Pruning 
   } // Loop over search determinants
 
+
 #if 1
+  auto tmp_tp = clock_type::now();
+  std::cout << "OLD = " << duration_type(tmp_tp - pairs_st).count() << std::endl;
 
   // Get unique alpha strings
   std::vector<wfn_t<N>> uniq_alpha_wfn(cdets_begin, cdets_end);
@@ -180,10 +183,10 @@ std::vector< wfn_t<N> > asci_search(
     }
   }
 
-  size_t nacc = 0;
-  for( auto &x : uad ) nacc += x.bcd.size();
+  //size_t nacc = 0;
+  //for( auto &x : uad ) nacc += x.bcd.size();
 
-  std::cout << "NTOT = " << ncdets << " NU = " << nuniq_alpha << " NACC = " << nacc << std::endl;
+  //std::cout << "NTOT = " << ncdets << " NU = " << nuniq_alpha << " NACC = " << nacc << std::endl;
 
   // Loop over triplets
   std::vector<asci_contrib<wfn_t<N>>> new_asci_pairs;
@@ -201,9 +204,9 @@ std::vector< wfn_t<N> > asci_search(
 
       // Generate valid alpha excitation strings subject to T
       const auto& det = uniq_alpha_wfn[i_alpha];
-      std::vector<wfn_t<N>> t_doubles, t_singles;
-      asci::generate_triplet_doubles( det, T, O, B, t_doubles );
-      asci::generate_triplet_singles( det, T, O, B, t_singles );
+      //std::vector<wfn_t<N>> t_doubles, t_singles;
+      //asci::generate_triplet_doubles( det, T, O, B, t_doubles );
+      //asci::generate_triplet_singles( det, T, O, B, t_singles );
       const auto occ_alpha = bits_to_indices(det);
 
       // AA excitations
@@ -291,6 +294,7 @@ std::vector< wfn_t<N> > asci_search(
 
       if( (det & T).count() == 3 and ((det ^ T) >> t_k).count() == 0 ) {
 
+#if 0
         for( auto [beta, coeff] : uad[i_alpha].bcd ) {
           auto state = det  | (beta << N/2);
           std::vector<wfn_t<N>> beta_singles, beta_doubles;
@@ -318,10 +322,32 @@ std::vector< wfn_t<N> > asci_search(
             new_asci_pairs.push_back( {new_state, coeff * mat_el} );
           }
         }
+#else
+      for( const auto& bcd : uad[i_alpha].bcd2 ) {
+        const auto& beta     = bcd.beta_string;
+        const auto& coeff    = bcd.coeff;
+        const auto& h_diag   = bcd.h_diag;
+        const auto& occ_beta = bcd.occ_beta;
+        const auto& vir_beta = bcd.vir_beta;
+
+        const auto state = det | beta;
+        const auto state_beta = truncate_bitset<N/2>(beta >> N/2);
+        append_singles_asci_contributions<(N/2),(N/2)>( coeff, state,
+          state_beta, occ_beta, vir_beta, occ_alpha, T_pq, norb,
+          G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI, ham_gen, 
+          new_asci_pairs ); 
+
+        append_ss_doubles_asci_contributions<N/2,N/2>( coeff, state,
+          state_beta, occ_beta, vir_beta, occ_alpha, G_pqrs, norb,
+          h_el_tol, h_diag, E_ASCI, ham_gen, new_asci_pairs );
+        
+      }
+#endif
       }
     }
 
   }
+  std::cout << "NEW = " << duration_type(clock_type::now() - tmp_tp).count() << std::endl;
 
   sort_and_accumulate_asci_pairs(new_asci_pairs);
   sort_and_accumulate_asci_pairs(asci_pairs);
