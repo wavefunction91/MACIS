@@ -8,6 +8,7 @@
 #include <asci/util/fock_matrices.hpp>
 #include <asci/util/moller_plesset.hpp>
 #include <asci/util/transform.hpp>
+#include <asci/util/memory.hpp>
 
 #include <iostream>
 #include <iomanip>
@@ -57,6 +58,7 @@ template <typename T>
 T vec_sum(const std::vector<T>& x) {
   return std::accumulate(x.begin(), x.end(), T(0));
 }
+
 
 
 int main(int argc, char** argv) {
@@ -174,6 +176,8 @@ int main(int argc, char** argv) {
     console->debug("ECORE = {:.12f}", E_core); 
     console->debug("TSUM  = {:.12f}", vec_sum(T));
     console->debug("VSUM  = {:.12f}", vec_sum(V));
+    console->info("TMEM   = {:.2e} GiB", asci::to_gib(T));
+    console->info("VMEM   = {:.2e} GiB", asci::to_gib(V));
   }
 
   // Setup printing

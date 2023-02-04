@@ -3,6 +3,7 @@
 #include <asci/sd_operations.hpp>
 #include <asci/util/asci_contributions.hpp>
 #include <asci/util/asci_sort.hpp>
+#include <asci/util/memory.hpp>
 
 #include <chrono>
 #include <spdlog/spdlog.h>
@@ -15,7 +16,7 @@ struct ASCISettings {
   size_t ncdets_max        = 100;
   double h_el_tol          = 1e-8;
   double rv_prune_tol      = 1e-8;
-  size_t pair_size_max     = 2e9;
+  size_t pair_size_max     = 5e8;
   bool   just_singles      = false;
   size_t grow_factor       = 8;
   size_t max_refine_iter   = 6;
@@ -163,6 +164,28 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
     std::vector<double>   orb_ens_beta;
     double coeff;
     double h_diag;
+
+    beta_coeff_data( double c, size_t norb, const std::vector<uint32_t>& occ_alpha, 
+      wfn_t<N> w, const HamiltonianGenerator<N>& ham_gen ) {
+
+      coeff = c;
+
+      // Compute Beta string 
+      const auto beta_shift = w >> N/2;
+      beta_string = beta_shift << N/2; // Reduce the number of times things shift in inner loop
+    
+      // Compute diagonal matrix element
+      h_diag = ham_gen.matrix_element(w,w);
+
+      // Compute occ/vir for beta string
+      bitset_to_occ_vir(norb, beta_shift, occ_beta, vir_beta);
+
+      // Precompute orbital energies
+      orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
+      orb_ens_beta  = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
+      
+    }
+
   };
 
   struct unique_alpha_data {
@@ -177,17 +200,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
     for(auto j = 0; j < ncdets; ++j) { 
        const auto w = *(cdets_begin + j);
       if( (w & full_mask<N/2,N>()) == wfn_a ) {
-        const auto beta_shift = w >> N/2;
-        const auto beta = beta_shift << N/2;
-        const auto h_diag = ham_gen.matrix_element(w,w);
-        std::vector<uint32_t> occ_beta, vir_beta;
-        bitset_to_occ_vir( norb, beta_shift, occ_beta, vir_beta );
-        auto orb_ens_alpha = 
-          ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
-        auto orb_ens_beta = 
-          ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
-        uad[i].bcd.push_back( {beta, occ_beta, vir_beta, orb_ens_alpha,
-          orb_ens_beta, C[j], h_diag} );
+        uad[i].bcd.emplace_back( C[j], norb, occ_alpha, w, ham_gen );
       }
     }
   }
@@ -275,6 +288,27 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
 
         } // Beta Loop
       } // Triplet Check
+
+      // Prune Down Contributions
+      if( asci_pairs.size() > asci_settings.pair_size_max ) {
+
+        // Remove small contributions
+        auto it = std::partition( asci_pairs.begin(), asci_pairs.end(),
+          [=](const auto& x){ 
+            return std::abs(x.rv) > asci_settings.rv_prune_tol;
+          });
+        asci_pairs.erase(it, asci_pairs.end());
+        logger->info("  * Pruning at TRIPLET = {} {} {}, NSZ = {}", 
+          t_i, t_j, t_k,  asci_pairs.size() );
+
+        // Extra Pruning if not sufficient
+        if( asci_pairs.size() > asci_settings.pair_size_max ) {
+          logger->info("    * Removing Duplicates");
+          sort_and_accumulate_asci_pairs( asci_pairs );
+          logger->info("    * NSZ = {}", asci_pairs.size());
+        }
+
+      } // Pruning 
     } // Unique Alpha Loop
   } // Triplet Loop
 
@@ -351,7 +385,10 @@ std::vector< wfn_t<N> > asci_search(
   //throw std::runtime_error("DIE DIE DIE");
 #endif
 
+
+
   logger->info("  * ASCI Kept {} Pairs", asci_pairs.size());
+  logger->info("  * Pairs Mem = {:.2e} GiB", to_gib(asci_pairs));
 
 #if 0
   std::cout << "ASCI PAIRS" << std::endl;
@@ -409,6 +446,8 @@ std::vector< wfn_t<N> > asci_search(
   std::vector<std::bitset<N>> new_dets( asci_pairs.size() );
   std::transform( asci_pairs.begin(), asci_pairs.end(), new_dets.begin(),
     [](auto x){ return x.state; } );
+
+  logger->info("  * New Dets Mem = {:.2e} GiB", to_gib(new_dets));
 
 #if 0
   std::sort(new_dets.begin(), new_dets.end(),

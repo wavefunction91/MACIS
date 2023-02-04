@@ -113,6 +113,7 @@ double selected_ci_diag(
   logger->info("  {}   = {:6}, {}     = {:.5e} ms",
     "NNZ", total_nnz, "H_DUR", duration_type(H_en-H_st).count()
   );
+  logger->info("  {} = {:.2e} GiB", "HMEM_LOC", H.mem_footprint()/1073741824.);
 
   // Solve EVP
   auto E = selected_ci_diag(H, davidson_max_m, 
