@@ -83,27 +83,30 @@ struct my_ranking_pair {
 namespace asci {
 
 template <> 
-mpi_datatype mpi_dtype<my_ranking_pair>() {
-
-  my_ranking_pair dummy;
-
-  int lengths[2] = {1,1};
-  MPI_Aint displacements[2];
-  MPI_Aint base_address;
-  MPI_Get_address(&dummy,       &base_address);
-  MPI_Get_address(&dummy.id,    displacements + 0);
-  MPI_Get_address(&dummy.score, displacements + 1);
-  displacements[0] = MPI_Aint_diff(displacements[0], base_address);
-  displacements[1] = MPI_Aint_diff(displacements[1], base_address);
-
-  MPI_Datatype types[2] = {MPI_INT, MPI_DOUBLE};
-  MPI_Datatype custom_type;
-  MPI_Type_create_struct( 2, lengths, displacements, types, &custom_type );
-  MPI_Type_commit( &custom_type );
-
-  return make_managed_mpi_datatype( custom_type );
-
-}
+struct mpi_traits<my_ranking_pair> {
+  using type = my_ranking_pair;
+  inline static mpi_datatype datatype() {
+  
+    type dummy;
+  
+    int lengths[2] = {1,1};
+    MPI_Aint displacements[2];
+    MPI_Aint base_address;
+    MPI_Get_address(&dummy,       &base_address);
+    MPI_Get_address(&dummy.id,    displacements + 0);
+    MPI_Get_address(&dummy.score, displacements + 1);
+    displacements[0] = MPI_Aint_diff(displacements[0], base_address);
+    displacements[1] = MPI_Aint_diff(displacements[1], base_address);
+  
+    MPI_Datatype types[2] = {MPI_INT, MPI_DOUBLE};
+    MPI_Datatype custom_type;
+    MPI_Type_create_struct( 2, lengths, displacements, types, &custom_type );
+    MPI_Type_commit( &custom_type );
+  
+    return make_managed_mpi_datatype( custom_type );
+  
+  }
+};
 
 }
 

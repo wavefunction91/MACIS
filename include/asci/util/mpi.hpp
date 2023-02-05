@@ -60,20 +60,41 @@ inline mpi_datatype make_mpi_datatype(Args&&... args) {
   );
 }
 
+#if 0
 template <typename T> mpi_datatype mpi_dtype();
 #define REGISTER_MPI_TYPE(T, TYPE) \
 template <> inline mpi_datatype mpi_dtype<T>(){ \
   return make_mpi_datatype(TYPE); \
 }
 
+REGISTER_MPI_TYPE(char,   MPI_CHAR  );
 REGISTER_MPI_TYPE(int,    MPI_INT   );
 REGISTER_MPI_TYPE(double, MPI_DOUBLE);
 
 #undef REGISTER_MPI_TYPE
+#else
+
+template <typename T>
+struct mpi_traits;
+
+#define REGISTER_MPI_TYPE(T, TYPE) \
+template <> \
+struct mpi_traits<T> { \
+  using type = T; \
+  inline static mpi_datatype datatype() { return make_mpi_datatype(TYPE); }\
+};
+
+
+REGISTER_MPI_TYPE(char,   MPI_CHAR  );
+REGISTER_MPI_TYPE(int,    MPI_INT   );
+REGISTER_MPI_TYPE(double, MPI_DOUBLE);
+
+#undef REGISTER_MPI_TYPE
+#endif
 
 template <typename T> 
 mpi_datatype make_contiguous_mpi_datatype(int n) {
-  auto dtype = mpi_dtype<T>();
+  auto dtype = mpi_traits<T>::datatype();
   MPI_Datatype contig_dtype;
   MPI_Type_contiguous( n, dtype, &contig_dtype );
   MPI_Type_commit( &contig_dtype );

@@ -5,12 +5,59 @@
 #include <asci/util/asci_sort.hpp>
 #include <asci/util/memory.hpp>
 #include <asci/util/mpi.hpp>
+#include <asci/util/topk_parallel.hpp>
 
 #include <chrono>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace asci {
+
+// Generate MPI types
+template <size_t N>
+struct mpi_traits<std::bitset<N>> {
+  using type = std::bitset<N>;
+  inline static mpi_datatype datatype() { 
+    return make_contiguous_mpi_datatype<char>(sizeof(type));
+  }
+};
+
+template <typename WfnT>
+struct mpi_traits<asci_contrib<WfnT>> {
+  using type = asci_contrib<WfnT>;
+  inline static mpi_datatype datatype() {
+  
+    type dummy;
+  
+    int lengths[2] = {1,1};
+    MPI_Aint displacements[2];
+    MPI_Aint base_address;
+    MPI_Get_address(&dummy,       &base_address);
+    MPI_Get_address(&dummy.state, displacements + 0);
+    MPI_Get_address(&dummy.rv,    displacements + 1);
+    displacements[0] = MPI_Aint_diff(displacements[0], base_address);
+    displacements[1] = MPI_Aint_diff(displacements[1], base_address);
+  
+    auto wfn_dtype = mpi_traits<WfnT>::datatype();
+    MPI_Datatype types[2] = {wfn_dtype, MPI_DOUBLE};
+    MPI_Datatype custom_type;
+    MPI_Type_create_struct( 2, lengths, displacements, types, &custom_type );
+    MPI_Type_commit( &custom_type );
+  
+    return make_managed_mpi_datatype( custom_type );
+    
+  }
+};
+
+template <typename WfnT>
+struct asci_contrib_topk_comparator {
+  using type = asci_contrib<WfnT>;
+  constexpr bool operator()(const type& a, const type& b) const {
+    return std::abs(a.rv) > std::abs(b.rv);
+  }
+};
+
+
 
 struct ASCISettings {
   size_t ntdets_max        = 1e5;
@@ -515,9 +562,11 @@ std::vector< wfn_t<N> > asci_search(
     std::nth_element( asci_pairs.begin(), 
       asci_pairs.begin() + top_k_elements,
       asci_pairs.end(), 
-      [](auto x, auto y){ 
-        return std::abs(x.rv) > std::abs(y.rv);
-      });
+      //[](auto x, auto y){ 
+      //  return std::abs(x.rv) > std::abs(y.rv);
+      //}
+      asci_contrib_topk_comparator<wfn_t<N>>{}
+    );
     asci_pairs.erase( asci_pairs.begin() + top_k_elements, 
       asci_pairs.end() );
   }
