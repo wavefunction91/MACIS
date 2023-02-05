@@ -1,16 +1,21 @@
 #pragma once
 #include <asci/util/asci_iter.hpp>
+#include <asci/util/mpi.hpp>
 
 namespace asci {
 
 template <size_t N, typename index_t = int32_t>
 auto asci_grow( ASCISettings asci_settings, MCSCFSettings mcscf_settings,
-  double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X_local,
+  double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X,
   HamiltonianGenerator<N>& ham_gen, size_t norb, MPI_Comm comm ) {
+
+  auto world_rank = comm_rank(comm);
 
   //spdlog::null_logger_mt("asci_search");
   auto logger = spdlog::get("asci_grow");
-  if(!logger) logger = spdlog::stdout_color_mt("asci_grow");
+  if(!logger) logger = world_rank ? 
+    spdlog::null_logger_mt ("asci_grow") :
+    spdlog::stdout_color_mt("asci_grow");
 
   logger->info("[ASCI Grow Settings]:");
   logger->info("  NTDETS_MAX = {:6}, NCDETS_MAX = {:6}, GROW_FACTOR = {}",
@@ -31,8 +36,8 @@ auto asci_grow( ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       asci_settings.ntdets_max
     );
     double E;
-    std::tie(E, wfn, X_local) = asci_iter<N,index_t>( asci_settings,
-      mcscf_settings, ndets_new, E0, std::move(wfn), std::move(X_local),
+    std::tie(E, wfn, X) = asci_iter<N,index_t>( asci_settings,
+      mcscf_settings, ndets_new, E0, std::move(wfn), std::move(X),
       ham_gen, norb, comm );
     if( ndets_new != wfn.size() )
       throw std::runtime_error("Wavefunction didn't grow enough...");
@@ -41,7 +46,7 @@ auto asci_grow( ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     E0 = E;
   }
 
-  return std::make_tuple(E0, wfn, X_local);
+  return std::make_tuple(E0, wfn, X);
 
 }
 

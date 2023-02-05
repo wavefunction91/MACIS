@@ -5,26 +5,26 @@ namespace asci {
 
 template <typename WfnT>
 void reorder_ci_on_coeff( std::vector<WfnT>& dets, 
-  std::vector<double>& C_local, MPI_Comm /* comm: will need for dist*/ ) {
+  std::vector<double>& C) {
 
-  size_t nlocal = C_local.size();
+  size_t nlocal = C.size();
   size_t ndets  = dets.size();
   std::vector<uint64_t> idx( nlocal );
   std::iota( idx.begin(), idx.end(), 0 );
   std::sort( idx.begin(), idx.end(), [&](auto i, auto j) {
-    return std::abs(C_local[i]) > std::abs(C_local[j]);
+    return std::abs(C[i]) > std::abs(C[j]);
   });
 
   std::vector<double> reorder_C( nlocal );
   std::vector<WfnT> reorder_dets( ndets );
   assert( nlocal == ndets );
   for( auto i = 0ul; i < ndets; ++i ) {
-    reorder_C[i]    = C_local[idx[i]];
+    reorder_C[i]    = C[idx[i]];
     reorder_dets[i] = dets[idx[i]];
   }
 
-  C_local = std::move(reorder_C);
-  dets    = std::move(reorder_dets);
+  C    = std::move(reorder_C);
+  dets = std::move(reorder_dets);
 
 }
 

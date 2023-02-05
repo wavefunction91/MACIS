@@ -4,6 +4,7 @@
 #include <asci/util/asci_contributions.hpp>
 #include <asci/util/asci_sort.hpp>
 #include <asci/util/memory.hpp>
+#include <asci/util/mpi.hpp>
 
 #include <chrono>
 #include <spdlog/spdlog.h>
@@ -132,7 +133,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
   const double*              V_red,
   const double*              G_pqrs,
   const double*              V_pqrs,
-  HamiltonianGenerator<N>&   ham_gen
+  HamiltonianGenerator<N>&   ham_gen,
+  MPI_Comm                   comm
 ) {
 
   auto logger = spdlog::get("asci_search");
@@ -165,14 +167,16 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
     double coeff;
     double h_diag;
 
-    beta_coeff_data( double c, size_t norb, const std::vector<uint32_t>& occ_alpha, 
-      wfn_t<N> w, const HamiltonianGenerator<N>& ham_gen ) {
+    beta_coeff_data( double c, size_t norb, 
+      const std::vector<uint32_t>& occ_alpha, wfn_t<N> w, 
+      const HamiltonianGenerator<N>& ham_gen ) {
 
       coeff = c;
 
       // Compute Beta string 
       const auto beta_shift = w >> N/2;
-      beta_string = beta_shift << N/2; // Reduce the number of times things shift in inner loop
+      // Reduce the number of times things shift in inner loop
+      beta_string = beta_shift << N/2; 
     
       // Compute diagonal matrix element
       h_diag = ham_gen.matrix_element(w,w);
@@ -205,11 +209,57 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
     }
   }
 
-  asci_pairs.reserve(asci_settings.pair_size_max);
-  // Loop over triplets
+  auto world_rank = comm_rank(comm);
+  auto world_size = comm_size(comm);
+
+  std::vector<size_t> world_workloads(world_size, 0);
+
+  const auto n_occ_alpha = uniq_alpha_wfn[0].count();
+  const auto n_vir_alpha = norb - n_occ_alpha;
+  const auto n_sing_alpha = n_occ_alpha * n_vir_alpha;
+  const auto n_doub_alpha = 
+    (n_sing_alpha * ( n_sing_alpha - norb + 1 )) / 4;
+
+  // Generate triplets
+  std::vector< std::tuple<int,int,int> > triplets; 
+  triplets.reserve(norb*norb*norb);
   for(int t_i = 0; t_i < norb; ++t_i)
   for(int t_j = 0; t_j < t_i;  ++t_j)
   for(int t_k = 0; t_k < t_j;  ++t_k) {
+
+    if(world_size > 1) {
+      auto [T,O,B] = 
+        make_triplet_masks<N>(norb,t_i,t_j,t_k);
+      size_t nw = 0;
+      for( const auto& alpha : uniq_alpha_wfn ) {
+         nw += 
+           triplet_histogram(alpha, n_sing_alpha, n_doub_alpha, T, O, B );
+      }
+
+      auto min_rank_it = 
+        std::min_element(world_workloads.begin(), world_workloads.end());
+      int min_rank = std::distance(world_workloads.begin(), min_rank_it);
+
+      *min_rank_it += nw;
+      if( world_rank == min_rank and nw) 
+        triplets.emplace_back(t_i,t_j,t_k);
+
+    } else {
+      triplets.emplace_back(t_i,t_j,t_k);
+    }
+  }
+
+  
+  size_t max_size = std::min(asci_settings.pair_size_max,
+    ncdets * 
+      ( 2*n_sing_alpha + // AA + BB 
+        2*n_doub_alpha + // AAAA + BBBB
+        n_sing_alpha*n_sing_alpha // AABB
+      )
+  );
+  asci_pairs.reserve(max_size);
+  // Loop over triplets
+  for( auto [t_i, t_j, t_k] : triplets ) {
 
     auto [T,O,B] = 
       make_triplet_masks<N>(norb,t_i,t_j,t_k);
@@ -310,7 +360,11 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
 
       } // Pruning 
     } // Unique Alpha Loop
+
   } // Triplet Loop
+
+  std::cout << "PAIRS SIZE = " << asci_pairs.size() << std::endl;
+  if(world_size > 1) throw std::runtime_error("DIE DIE DIE");
 
   return asci_pairs;
 }
@@ -322,7 +376,7 @@ std::vector< wfn_t<N> > asci_search(
   wavefunction_iterator_t<N> cdets_begin, 
   wavefunction_iterator_t<N> cdets_end,
   const double               E_ASCI, 
-  const std::vector<double>& C_local,
+  const std::vector<double>& C,
   size_t                     norb,
   const double*              T_pq,
   const double*              G_red,
@@ -336,8 +390,14 @@ std::vector< wfn_t<N> > asci_search(
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
 
+  // MPI Info
+  auto world_rank = comm_rank(comm);
+  auto world_size = comm_size(comm);
+
   auto logger = spdlog::get("asci_search");
-  if(!logger) logger = spdlog::stdout_color_mt("asci_search");
+  if(!logger) logger = world_rank ? 
+    spdlog::null_logger_mt ("asci_search") :
+    spdlog::stdout_color_mt("asci_search");
   
 
   // Print to logger
@@ -351,40 +411,18 @@ std::vector< wfn_t<N> > asci_search(
     asci_settings.pair_size_max, asci_settings.just_singles);
 
   
-  // Expand Search Space
+  // Expand Search Space with Connected ASCI Contributions 
   auto pairs_st = clock_type::now();
-#if 0
-  auto asci_pairs = asci_contributions_standard( asci_settings, 
-    cdets_begin, cdets_end, E_ASCI, C_local, norb, T_pq, G_red,
-    V_red, G_pqrs, V_pqrs, ham_gen );
-#else
-  auto asci_pairs = asci_contributions_triplet( asci_settings, 
-    cdets_begin, cdets_end, E_ASCI, C_local, norb, T_pq, G_red,
-    V_red, G_pqrs, V_pqrs, ham_gen );
-#endif
+  asci_contrib_container<wfn_t<N>> asci_pairs;
+  //if(world_size == 1)
+  //  asci_pairs = asci_contributions_standard( asci_settings, 
+  //    cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
+  //    V_red, G_pqrs, V_pqrs, ham_gen );
+  //else
+    asci_pairs = asci_contributions_triplet( asci_settings, 
+      cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
+      V_red, G_pqrs, V_pqrs, ham_gen, comm );
   auto pairs_en = clock_type::now();
-
-
-#if 0
-  sort_and_accumulate_asci_pairs(new_asci_pairs);
-  sort_and_accumulate_asci_pairs(asci_pairs);
-
-  std::cout << std::scientific;
-  if( asci_pairs.size() != new_asci_pairs.size() )
-    throw std::runtime_error("Different Sizes");
-  for( int i = 0; i < asci_pairs.size(); ++i ) {
-    auto [ref_d, ref_c] = asci_pairs[i];
-    auto [new_d, new_c] = new_asci_pairs[i];
-    if( ref_d != new_d ) throw std::runtime_error("Different Det");
-    if( std::abs(ref_c - new_c) > 1e-12 ) {
-      std::cout << ref_c - new_c << std::endl;
-      throw std::runtime_error("Different Contrib");
-    }
-  }
-
-  //throw std::runtime_error("DIE DIE DIE");
-#endif
-
 
 
   logger->info("  * ASCI Kept {} Pairs", asci_pairs.size());
@@ -408,44 +446,100 @@ std::vector< wfn_t<N> > asci_search(
     duration_type(pairs_en - pairs_st).count(),
     duration_type(bit_sort_en - bit_sort_st).count()
   );
+
+//#define REMOVE_CDETS
+
+#ifndef REMOVE_CDETS
+  if(world_size > 1) throw std::runtime_error("MPI + !REMOVE_CDETS wont work robustly");
  
   // Finalize scores
-  std::transform(asci_pairs.begin(),asci_pairs.end(),asci_pairs.begin(),
-    [](auto x) {x.rv =  -std::abs(x.rv); return x;});
+  for( auto& x : asci_pairs ) x.rv = -std::abs(x.rv);
 
   // Insert all dets with their coefficients as seeds
   for( size_t i = 0; i < ncdets; ++i ) {
     auto state = *(cdets_begin + i);
-    asci_pairs.push_back({state, std::abs(C_local[i])});
+    asci_pairs.push_back({state, std::abs(C[i])});
   }
 
   // Check duplicates (which correspond to the initial truncation),
   // and keep only the duplicate with positive coefficient. 
   keep_only_largest_copy_asci_pairs(asci_pairs);
+ 
 
-  // Sort pairs by ASCI score
+  // CDETS are included in list, so search over full NDETS_MAX
+  const size_t top_k_elements = ndets_max;
+
+#else
+
+  // Finalize the scores
+  for( auto& p : asci_pairs ) p.rv = std::abs(p.rv);
+
+  // Remove wfns in CDETS from the ranking sort
+  for( size_t i = 0; i < ncdets; ++i ) {
+    auto state = *(cdets_begin + i);
+
+    asci_contrib<wfn_t<N>> state_c{ state,  -1 };
+    auto comparator = [](const auto& a, const auto& b) { 
+        return bitset_less(a.state, b.state);
+    };
+
+    // Do binary search for state in local pairs array
+    // XXX This assumes that sort_and_accumulate_asci_pairs uses
+    //     the same comparator
+    auto it = std::lower_bound( asci_pairs.begin(), asci_pairs.end(),
+      state_c, comparator );
+
+    // If found = replace
+    // All contribs are positive, inserting a negative makes
+    // the next search easier
+    if( it != asci_pairs.end() and !comparator(state_c, *it) ) {
+      *it = state_c;
+    } 
+  }
+
+  // Perform implicit removal of CDETS
+  { // Scope temp iterator
+  auto it = std::partition(asci_pairs.begin(), asci_pairs.end(),
+    [](const auto& p) { return p.rv > 0.0; } );
+  asci_pairs.erase(it, asci_pairs.end());
+  }
+
+  // Only do top-K on (ndets_max - ncdets) b/c CDETS will be added later
+  const size_t top_k_elements = ndets_max - ncdets;
+
+#endif
+
+  // Do Top-K to get the largest determinant contributions
   auto asci_sort_st = clock_type::now();
-  std::nth_element( asci_pairs.begin(), 
-    asci_pairs.begin() + ndets_max,
-    asci_pairs.end(), 
-    [](auto x, auto y){ 
-      return std::abs(x.rv) > std::abs(y.rv);
-    });
+  if( asci_pairs.size() > top_k_elements ) {
+    std::nth_element( asci_pairs.begin(), 
+      asci_pairs.begin() + top_k_elements,
+      asci_pairs.end(), 
+      [](auto x, auto y){ 
+        return std::abs(x.rv) > std::abs(y.rv);
+      });
+    asci_pairs.erase( asci_pairs.begin() + top_k_elements, 
+      asci_pairs.end() );
+  }
   auto asci_sort_en = clock_type::now();
   logger->info("  * ASCI_SORT_DUR = {:.2e} s", 
     duration_type(asci_sort_en - asci_sort_st).count()
   );
 
   // Shrink to max search space
-  if( asci_pairs.size() > ndets_max )
-    asci_pairs.erase( asci_pairs.begin() + ndets_max, 
-      asci_pairs.end() );
   asci_pairs.shrink_to_fit();
+
 
   // Extract new search determinants
   std::vector<std::bitset<N>> new_dets( asci_pairs.size() );
   std::transform( asci_pairs.begin(), asci_pairs.end(), new_dets.begin(),
     [](auto x){ return x.state; } );
+
+#ifdef REMOVE_CDETS
+  // Insert the CDETS back in
+  new_dets.insert(new_dets.end(), cdets_begin, cdets_end);
+  new_dets.shrink_to_fit();
+#endif
 
   logger->info("  * New Dets Mem = {:.2e} GiB", to_gib(new_dets));
 

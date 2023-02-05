@@ -9,6 +9,7 @@
 #include <asci/util/moller_plesset.hpp>
 #include <asci/util/transform.hpp>
 #include <asci/util/memory.hpp>
+#include <asci/util/mpi.hpp>
 
 #include <iostream>
 #include <iomanip>
@@ -71,12 +72,16 @@ int main(int argc, char** argv) {
 
   MPI_Init(&argc, &argv);
 
-  int world_size, world_rank;
-  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+  //int world_size, world_rank;
+  //MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+  //MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+  auto world_rank = asci::comm_rank(MPI_COMM_WORLD);
+  auto world_size = asci::comm_size(MPI_COMM_WORLD);
   {
   // Create Logger
-  auto console = spdlog::stdout_color_mt("standalone_driver");
+  auto console = world_rank ? 
+    spdlog::null_logger_mt ("standalone_driver") : 
+    spdlog::stdout_color_mt("standalone_driver");
 
   // Read Input Options
   std::vector< std::string > opts( argc );
@@ -100,6 +105,7 @@ int main(int argc, char** argv) {
 
   if( norb > nwfn_bits/2 ) throw std::runtime_error("Not Enough Bits");
 
+  // XXX: Consider reading this into shared memory to avoid replication
   std::vector<double> T(norb2), V(norb4);
   auto E_core = asci::read_fcidump_core(fcidump_fname);
   asci::read_fcidump_1body(fcidump_fname, T.data(), norb);
@@ -188,10 +194,10 @@ int main(int argc, char** argv) {
   OPT_KEYWORD("PRINT.MCSCF",    print_mcscf,    bool );
   OPT_KEYWORD("PRINT.DIIS",     print_diis,     bool );
 
-  if(not print_davidson) spdlog::null_logger_mt("davidson");
-  if(not print_ci)       spdlog::null_logger_mt("ci_solver");
-  if(not print_mcscf)    spdlog::null_logger_mt("mcscf");
-  if(not print_diis)     spdlog::null_logger_mt("diis");
+  if(world_rank or not print_davidson) spdlog::null_logger_mt("davidson");
+  if(world_rank or not print_ci)       spdlog::null_logger_mt("ci_solver");
+  if(world_rank or not print_mcscf)    spdlog::null_logger_mt("mcscf");
+  if(world_rank or not print_diis)     spdlog::null_logger_mt("diis");
 
   // MP2 Guess Orbitals
   if(mp2_guess) {
@@ -246,8 +252,9 @@ int main(int argc, char** argv) {
   if( job == Job::CI ) {
 
     using generator_t = asci::DoubleLoopHamiltonianGenerator<64>;
-    std::vector<double> C_local;
     if( ci_exp == CIExpansion::CAS ) {
+      std::vector<double> C_local;
+      // TODO: VERIFY MPI + CAS
       E0 = 
       asci::CASRDMFunctor<generator_t>::rdms(mcscf_settings, NumOrbital(n_active), 
         nalpha, nbeta, T_active.data(), V_active.data(), active_ordm.data(), 
@@ -255,7 +262,8 @@ int main(int argc, char** argv) {
       E0 += E_inactive + E_core;
     } else {
 
-      //spdlog::null_logger_mt("asci_search");
+      std::vector<double> C; // Full wfn coefficients
+      if(world_rank) spdlog::null_logger_mt("asci_search");
       asci::ASCISettings asci_settings;
       asci_settings.ntdets_max = 10000;
       asci_settings.ncdets_max = 1000;
@@ -271,21 +279,21 @@ int main(int argc, char** argv) {
       );
 
       E0 = ham_gen.matrix_element(dets[0], dets[0]);
-      C_local = {1.0};
+      C = {1.0};
       #if 0
       dets = asci::asci_search(asci_settings, 100, dets.begin(), dets.end(), EHF,
-        C_local, n_active, T_active.data(), ham_gen.G_red(), ham_gen.V_red(),
+        C, n_active, T_active.data(), ham_gen.G_red(), ham_gen.V_red(),
         ham_gen.G(), V_active.data(), ham_gen, MPI_COMM_WORLD);
       #elif 0
-      std::tie(E0, dets, C_local) = asci::asci_iter( asci_settings, mcscf_settings,
-        100, E0, std::move(dets), std::move(C_local), ham_gen, n_active, 
+      std::tie(E0, dets, C) = asci::asci_iter( asci_settings, mcscf_settings,
+        100, E0, std::move(dets), std::move(C), ham_gen, n_active, 
         MPI_COMM_WORLD );
       #else
-      std::tie(E0, dets, C_local) = asci::asci_grow( asci_settings, 
-        mcscf_settings, E0, std::move(dets), std::move(C_local), ham_gen, 
+      std::tie(E0, dets, C) = asci::asci_grow( asci_settings, 
+        mcscf_settings, E0, std::move(dets), std::move(C), ham_gen, 
         n_active, MPI_COMM_WORLD );
-      //std::tie(E0, dets, C_local) = asci::asci_refine( asci_settings, 
-      //  mcscf_settings, E0, std::move(dets), std::move(C_local), ham_gen, 
+      //std::tie(E0, dets, C) = asci::asci_refine( asci_settings, 
+      //  mcscf_settings, E0, std::move(dets), std::move(C), ham_gen, 
       //  n_active, MPI_COMM_WORLD );
       #endif
       E0 += E_inactive + E_core;
