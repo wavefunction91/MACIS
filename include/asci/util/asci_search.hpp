@@ -411,7 +411,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
 
   } // Triplet Loop
 
-  std::cout << "PAIRS SIZE = " << asci_pairs.size() << std::endl;
+  //std::cout << "PAIRS SIZE = " << asci_pairs.size() << std::endl;
   //if(world_size > 1) throw std::runtime_error("DIE DIE DIE");
 
   return asci_pairs;
@@ -472,9 +472,13 @@ std::vector< wfn_t<N> > asci_search(
       V_red, G_pqrs, V_pqrs, ham_gen, comm );
   auto pairs_en = clock_type::now();
 
-
-  logger->info("  * ASCI Kept {} Pairs", asci_pairs.size());
+  {
+  size_t npairs  = asci_pairs.size();
+  if(world_size > 1)
+    MPI_Allreduce(MPI_IN_PLACE, &npairs, 1, MPI_UINT64_T, MPI_SUM, comm );
+  logger->info("  * ASCI Kept {} Pairs", npairs);
   logger->info("  * Pairs Mem = {:.2e} GiB", to_gib(asci_pairs));
+  }
 
 #if 0
   std::cout << "ASCI PAIRS" << std::endl;
@@ -488,12 +492,17 @@ std::vector< wfn_t<N> > asci_search(
   sort_and_accumulate_asci_pairs( asci_pairs );
   auto bit_sort_en = clock_type::now();
 
+  {
+  size_t npairs  = asci_pairs.size();
+  if(world_size > 1)
+    MPI_Allreduce(MPI_IN_PLACE, &npairs, 1, MPI_UINT64_T, MPI_SUM, comm );
   logger->info("  * ASCI will search over {} unique determinants",
-    asci_pairs.size() );
+    npairs );
   logger->info("  * PAIR_DUR = {:.2e} s, SORT_ACC_DUR = {:.2e} s",
     duration_type(pairs_en - pairs_st).count(),
     duration_type(bit_sort_en - bit_sort_st).count()
   );
+  }
 
 #define REMOVE_CDETS
 
@@ -605,6 +614,11 @@ std::vector< wfn_t<N> > asci_search(
   if(world_size > 1) {
     std::sort(new_dets.begin(), new_dets.end(),
     [](auto x, auto y){ return bitset_less(x,y); });
+
+    // Not guranteed to get the SAME list of eqivalent scored
+    // wfns... Sync to be sure
+    auto dtype = mpi_traits<wfn_t<N>>::datatype();
+    MPI_Bcast( new_dets.data(), new_dets.size(), dtype, 0, comm );
   }
 
 #if 0
@@ -617,14 +631,14 @@ std::vector< wfn_t<N> > asci_search(
   }
   }
   MPI_Barrier(comm);
-  throw std::runtime_error("DIE DIE DIE");
 #else
-  {
-  std::ofstream wfn_file("wfn." + std::to_string(world_rank) + ".txt");
-  for( auto s : new_dets ) {
-    wfn_file << to_canonical_string(s) << std::endl;
-  }
-  }
+  //{
+  //std::ofstream wfn_file("wfn." + std::to_string(world_rank) + ".txt");
+  //for( auto s : new_dets ) {
+  //  wfn_file << to_canonical_string(s) << std::endl;
+  //}
+  //}
+  //throw std::runtime_error("DIE DIE DIE");
 #endif
 
   return new_dets;
