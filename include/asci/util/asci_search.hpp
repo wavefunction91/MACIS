@@ -8,6 +8,7 @@
 #include <asci/util/topk_parallel.hpp>
 
 #include <chrono>
+#include <fstream>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
@@ -411,7 +412,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
   } // Triplet Loop
 
   std::cout << "PAIRS SIZE = " << asci_pairs.size() << std::endl;
-  if(world_size > 1) throw std::runtime_error("DIE DIE DIE");
+  //if(world_size > 1) throw std::runtime_error("DIE DIE DIE");
 
   return asci_pairs;
 }
@@ -494,7 +495,7 @@ std::vector< wfn_t<N> > asci_search(
     duration_type(bit_sort_en - bit_sort_st).count()
   );
 
-//#define REMOVE_CDETS
+#define REMOVE_CDETS
 
 #ifndef REMOVE_CDETS
   if(world_size > 1) throw std::runtime_error("MPI + !REMOVE_CDETS wont work robustly");
@@ -558,7 +559,8 @@ std::vector< wfn_t<N> > asci_search(
 
   // Do Top-K to get the largest determinant contributions
   auto asci_sort_st = clock_type::now();
-  if( asci_pairs.size() > top_k_elements ) {
+  if( world_size > 1 or asci_pairs.size() > top_k_elements ) {
+#if 0
     std::nth_element( asci_pairs.begin(), 
       asci_pairs.begin() + top_k_elements,
       asci_pairs.end(), 
@@ -569,6 +571,13 @@ std::vector< wfn_t<N> > asci_search(
     );
     asci_pairs.erase( asci_pairs.begin() + top_k_elements, 
       asci_pairs.end() );
+#else
+    std::vector<asci_contrib<wfn_t<N>>> topk(top_k_elements);
+    topk_allreduce<512>( asci_pairs.data(), asci_pairs.data() + asci_pairs.size(),
+      top_k_elements, topk.data(), asci_contrib_topk_comparator<wfn_t<N>>{},
+      comm );
+    asci_pairs = std::move(topk);
+#endif
   }
   auto asci_sort_en = clock_type::now();
   logger->info("  * ASCI_SORT_DUR = {:.2e} s", 
@@ -592,12 +601,29 @@ std::vector< wfn_t<N> > asci_search(
 
   logger->info("  * New Dets Mem = {:.2e} GiB", to_gib(new_dets));
 
+  // Ensure consistent ordering
+  if(world_size > 1) {
+    std::sort(new_dets.begin(), new_dets.end(),
+    [](auto x, auto y){ return bitset_less(x,y); });
+  }
+
 #if 0
+  if(!world_rank) {
   std::sort(new_dets.begin(), new_dets.end(),
   [](auto x, auto y){ return bitset_less(x,y); });
   std::cout << "NEW DETS " << new_dets.size() << std::endl;
   for( auto s : new_dets ) {
     std::cout << to_canonical_string(s) << std::endl;
+  }
+  }
+  MPI_Barrier(comm);
+  throw std::runtime_error("DIE DIE DIE");
+#else
+  {
+  std::ofstream wfn_file("wfn." + std::to_string(world_rank) + ".txt");
+  for( auto s : new_dets ) {
+    wfn_file << to_canonical_string(s) << std::endl;
+  }
   }
 #endif
 

@@ -29,6 +29,7 @@ double selected_ci_diag(
 
   // Resize eigenvector size
   C_local.resize( H.local_row_extent(), 0 );
+  //printf("RANK %d C_local size %d\n", world_rank, int(C_local.size()));
 
   // Extract Diagonal
   auto D_local = extract_diagonal_elements( H.diagonal_tile() );

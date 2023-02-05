@@ -28,8 +28,29 @@ auto asci_iter( ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     mcscf_settings.ci_matel_tol, mcscf_settings.ci_max_subspace, 
     mcscf_settings.ci_res_tol, X_local, comm);
 
-  // TODO Broadcast X_local to X
-  X = std::move(X_local);
+  auto world_size = comm_size(comm);
+  auto world_rank = comm_rank(comm);
+  if( world_size > 1 ) {
+    // Broadcast X_local to X
+    const size_t wfn_size = wfn.size();
+    const size_t local_count = wfn_size / world_size;
+    X.resize(wfn.size());
+    
+    MPI_Allgather( X_local.data(), local_count, MPI_DOUBLE, 
+      X.data(), local_count, MPI_DOUBLE, comm );
+    if( wfn_size % world_size ) {
+      const size_t nrem = wfn_size % world_size;
+      auto* X_rem = X.data() + world_size * local_count;
+      if( world_rank == world_size - 1 ) {
+        const auto* X_loc_rem = X_local.data() + local_count;
+        std::copy_n( X_loc_rem, nrem, X_rem );
+      }
+      MPI_Bcast( X_rem, nrem, MPI_DOUBLE, world_size-1, comm );
+    }
+  } else {
+    // Avoid copy
+    X = std::move(X_local);
+  }
 
   return std::make_tuple(E, wfn, X);
 
