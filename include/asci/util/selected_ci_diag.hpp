@@ -3,6 +3,7 @@
 #include <asci/hamiltonian_generator.hpp>
 #include <asci/csr_hamiltonian.hpp>
 #include <asci/davidson.hpp>
+#include <asci/util/mpi.hpp>
 #include <chrono>
 
 
@@ -108,9 +109,7 @@ double selected_ci_diag(
   MPI_Barrier(comm); auto H_en = clock_type::now();
 
   // Get total NNZ
-  size_t local_nnz = H.nnz();
-  size_t total_nnz;
-  MPI_Allreduce( &local_nnz, &total_nnz, 1, MPI_UINT64_T, MPI_SUM, comm );
+  size_t total_nnz = allreduce( (size_t)H.nnz(), MPI_SUM, comm );
   logger->info("  {}   = {:6}, {}     = {:.5e} ms",
     "NNZ", total_nnz, "H_DUR", duration_type(H_en-H_st).count()
   );

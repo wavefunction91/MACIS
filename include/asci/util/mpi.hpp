@@ -1,6 +1,7 @@
 #pragma once
 #include <mpi.h>
 #include <memory>
+#include <iostream>
 
 namespace asci {
 
@@ -60,19 +61,6 @@ inline mpi_datatype make_mpi_datatype(Args&&... args) {
   );
 }
 
-#if 0
-template <typename T> mpi_datatype mpi_dtype();
-#define REGISTER_MPI_TYPE(T, TYPE) \
-template <> inline mpi_datatype mpi_dtype<T>(){ \
-  return make_mpi_datatype(TYPE); \
-}
-
-REGISTER_MPI_TYPE(char,   MPI_CHAR  );
-REGISTER_MPI_TYPE(int,    MPI_INT   );
-REGISTER_MPI_TYPE(double, MPI_DOUBLE);
-
-#undef REGISTER_MPI_TYPE
-#else
 
 template <typename T>
 struct mpi_traits;
@@ -85,12 +73,13 @@ struct mpi_traits<T> { \
 };
 
 
-REGISTER_MPI_TYPE(char,   MPI_CHAR  );
-REGISTER_MPI_TYPE(int,    MPI_INT   );
-REGISTER_MPI_TYPE(double, MPI_DOUBLE);
+REGISTER_MPI_TYPE(char,   MPI_CHAR    );
+REGISTER_MPI_TYPE(int,    MPI_INT     );
+REGISTER_MPI_TYPE(double, MPI_DOUBLE  );
+REGISTER_MPI_TYPE(float,  MPI_FLOAT   );
+REGISTER_MPI_TYPE(size_t, MPI_UINT64_T);
 
 #undef REGISTER_MPI_TYPE
-#endif
 
 template <typename T> 
 mpi_datatype make_contiguous_mpi_datatype(int n) {
@@ -100,5 +89,74 @@ mpi_datatype make_contiguous_mpi_datatype(int n) {
   MPI_Type_commit( &contig_dtype );
   return make_managed_mpi_datatype( contig_dtype );
 }
+
+
+template <typename T>
+void allreduce( const T* send, T* recv, size_t count, MPI_Op op, 
+  MPI_Comm comm ) {
+
+  auto dtype = mpi_traits<T>::datatype();
+
+  size_t intmax = std::numeric_limits<int>::max();
+  size_t nchunk = count / intmax;
+  for(int i = 0; i < nchunk; ++i) {
+    MPI_Allreduce( send + i*intmax, recv + i*intmax, intmax, 
+      dtype, op, comm );
+  }
+
+  int nrem = count % intmax;
+  if(nrem) {
+    MPI_Allreduce( send + nchunk*intmax, recv + nchunk*intmax, nrem,
+      dtype, op, comm);
+  }
+
+}
+
+template <typename T>
+void allreduce( T* recv, size_t count, MPI_Op op, MPI_Comm comm ) {
+
+  auto dtype = mpi_traits<T>::datatype();
+
+  size_t intmax = std::numeric_limits<int>::max();
+  size_t nchunk = count / intmax;
+  for(int i = 0; i < nchunk; ++i) {
+    MPI_Allreduce( MPI_IN_PLACE, recv + i*intmax, intmax, 
+      dtype, op, comm );
+  }
+
+  int nrem = count % intmax;
+  if(nrem) {
+    MPI_Allreduce( MPI_IN_PLACE, recv + nchunk*intmax, nrem,
+      dtype, op, comm);
+  }
+
+}
+
+template <typename T>
+T allreduce( const T& d, MPI_Op op, MPI_Comm comm ) {
+  T r;
+  allreduce( &d, &r, 1, op, comm );
+  return r;
+}
+
+template <typename T>
+void bcast( T* buffer, size_t count, int root, MPI_Comm comm ) {
+
+  auto dtype = mpi_traits<T>::datatype();
+
+  size_t intmax = std::numeric_limits<int>::max();
+  size_t nchunk = count / intmax;
+  for(int i = 0; i < nchunk; ++i) {
+    MPI_Bcast( buffer + i*intmax, intmax, dtype, root, comm );
+  }
+
+  int nrem = count % intmax;
+  if(nrem) {
+    MPI_Bcast( buffer + nchunk*intmax, nrem, dtype, root, comm );
+  }
+
+}
+
+
 
 }

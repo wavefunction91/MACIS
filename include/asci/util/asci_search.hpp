@@ -473,9 +473,7 @@ std::vector< wfn_t<N> > asci_search(
   auto pairs_en = clock_type::now();
 
   {
-  size_t npairs  = asci_pairs.size();
-  if(world_size > 1)
-    MPI_Allreduce(MPI_IN_PLACE, &npairs, 1, MPI_UINT64_T, MPI_SUM, comm );
+  size_t npairs  = allreduce( asci_pairs.size(), MPI_SUM, comm );;
   logger->info("  * ASCI Kept {} Pairs", npairs);
   logger->info("  * Pairs Mem = {:.2e} GiB", to_gib(asci_pairs));
   }
@@ -493,9 +491,7 @@ std::vector< wfn_t<N> > asci_search(
   auto bit_sort_en = clock_type::now();
 
   {
-  size_t npairs  = asci_pairs.size();
-  if(world_size > 1)
-    MPI_Allreduce(MPI_IN_PLACE, &npairs, 1, MPI_UINT64_T, MPI_SUM, comm );
+  size_t npairs  = allreduce( asci_pairs.size(), MPI_SUM, comm );;
   logger->info("  * ASCI will search over {} unique determinants",
     npairs );
   logger->info("  * PAIR_DUR = {:.2e} s, SORT_ACC_DUR = {:.2e} s",
@@ -582,9 +578,13 @@ std::vector< wfn_t<N> > asci_search(
       asci_pairs.end() );
 #else
     std::vector<asci_contrib<wfn_t<N>>> topk(top_k_elements);
-    topk_allreduce<512>( asci_pairs.data(), asci_pairs.data() + asci_pairs.size(),
-      top_k_elements, topk.data(), asci_contrib_topk_comparator<wfn_t<N>>{},
-      comm );
+    topk_allreduce<512>( 
+      asci_pairs.data(), 
+      asci_pairs.data() + asci_pairs.size(),
+      top_k_elements, topk.data(), 
+      asci_contrib_topk_comparator<wfn_t<N>>{},
+      comm 
+    );
     asci_pairs = std::move(topk);
 #endif
   }
@@ -613,12 +613,11 @@ std::vector< wfn_t<N> > asci_search(
   // Ensure consistent ordering
   if(world_size > 1) {
     std::sort(new_dets.begin(), new_dets.end(),
-    [](auto x, auto y){ return bitset_less(x,y); });
+      bitset_less_comparator<N>{});
 
     // Not guranteed to get the SAME list of eqivalent scored
     // wfns... Sync to be sure
-    auto dtype = mpi_traits<wfn_t<N>>::datatype();
-    MPI_Bcast( new_dets.data(), new_dets.size(), dtype, 0, comm );
+    bcast( new_dets.data(), new_dets.size(), 0, comm );
   }
 
 #if 0

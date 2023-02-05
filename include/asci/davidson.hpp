@@ -10,6 +10,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/null_sink.h>
+#include <asci/util/mpi.hpp>
 
 
 namespace asci {
@@ -217,7 +218,7 @@ inline void p_gram_schmidt( int64_t N_local, int64_t K, const double* V_old, int
     K, 1, N_local, 1., V_old, LDV, V_new, N_local, 0., inner.data(), K );
 
   // Reduce inner product
-  MPI_Allreduce( MPI_IN_PLACE, inner.data(), K, MPI_DOUBLE, MPI_SUM, comm );
+  allreduce( inner.data(), K, MPI_SUM, comm );
 
   // Project locally
   blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
@@ -226,14 +227,14 @@ inline void p_gram_schmidt( int64_t N_local, int64_t K, const double* V_old, int
   // Repeat
   blas::gemm( blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
     K, 1, N_local, 1., V_old, LDV, V_new, N_local, 0., inner.data(), K );
-  MPI_Allreduce( MPI_IN_PLACE, inner.data(), K, MPI_DOUBLE, MPI_SUM, comm );
+  allreduce( inner.data(), K, MPI_SUM, comm );
   blas::gemm( blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
     N_local, 1, K, -1., V_old, LDV, inner.data(), K, 1., V_new, N_local );
 
 
   // Normalize
   double dot = blas::dot( N_local, V_new, 1, V_new, 1 );
-  MPI_Allreduce( MPI_IN_PLACE, &dot, 1, MPI_DOUBLE, MPI_SUM, comm );
+  dot = allreduce(dot, MPI_SUM, comm);
   double nrm = std::sqrt(dot);
   blas::scal(N_local, 1./nrm, V_new, 1);
 
@@ -251,7 +252,7 @@ inline void p_rayleigh_ritz( int64_t N_local, int64_t K, const double* X, int64_
 
   // Reduce result
   if( LDC != K ) throw std::runtime_error("DIE DIE DIE RR");
-  MPI_Allreduce( MPI_IN_PLACE, C, K*K, MPI_DOUBLE, MPI_SUM, comm );
+  allreduce( C, K*K, MPI_SUM, comm );
 
   // Do local diagonalization on rank-0
   if( !world_rank ) {
@@ -336,7 +337,7 @@ auto p_davidson( int64_t N_local, int64_t max_m, const Functor& op,
 
     // Compute residual norm
     auto res_dot = blas::dot( N_local, R_local, 1, R_local, 1 );
-    MPI_Allreduce(MPI_IN_PLACE, &res_dot, 1, MPI_DOUBLE, MPI_SUM, comm );
+    res_dot = allreduce(res_dot, MPI_SUM, comm);
     auto res_nrm = std::sqrt(res_dot);
 
     logger->info("iter = {:4}, LAM(0) = {:20.12e}, RNORM = {:20.12e}",
