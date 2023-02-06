@@ -10,6 +10,7 @@
 #include <asci/util/transform.hpp>
 #include <asci/util/memory.hpp>
 #include <asci/util/mpi.hpp>
+#include <asci/read_wavefunction.hpp>
 
 #include <iostream>
 #include <iomanip>
@@ -72,9 +73,6 @@ int main(int argc, char** argv) {
 
   MPI_Init(&argc, &argv);
 
-  //int world_size, world_rank;
-  //MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-  //MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
   auto world_rank = asci::comm_rank(MPI_COMM_WORLD);
   auto world_size = asci::comm_size(MPI_COMM_WORLD);
   {
@@ -164,6 +162,15 @@ int main(int argc, char** argv) {
   OPT_KEYWORD("MCSCF.CI_RES_TOL",     mcscf_settings.ci_res_tol,         double);
   OPT_KEYWORD("MCSCF.CI_MAX_SUB",     mcscf_settings.ci_max_subspace,    size_t);
   OPT_KEYWORD("MCSCF.CI_MATEL_TOL",   mcscf_settings.ci_matel_tol,       double);
+
+  // ASCI Settings
+  asci::ASCISettings asci_settings;
+  std::string asci_wfn_fname, asci_wfn_out_fname;
+  OPT_KEYWORD("ASCI.NTDETS_MAX",   asci_settings.ntdets_max,  size_t      );
+  OPT_KEYWORD("ASCI.NCDETS_MAX",   asci_settings.ncdets_max,  size_t      );
+  OPT_KEYWORD("ASCI.GROW_FACTOR",  asci_settings.grow_factor, int         );
+  OPT_KEYWORD("ASCI.WFN_FILE",     asci_wfn_fname,            std::string );
+  OPT_KEYWORD("ASCI.WFN_OUT_FILE", asci_wfn_out_fname,        std::string );
 
   bool mp2_guess = false;
   OPT_KEYWORD("MCSCF.MP2_GUESS", mp2_guess, bool );
@@ -262,15 +269,7 @@ int main(int argc, char** argv) {
       E0 += E_inactive + E_core;
     } else {
 
-      std::vector<double> C; // Full wfn coefficients
       if(world_rank) spdlog::null_logger_mt("asci_search");
-      asci::ASCISettings asci_settings;
-      asci_settings.ntdets_max = 10000;
-      asci_settings.ncdets_max = 1000;
-      asci_settings.grow_factor = 2;
-      std::vector<asci::wfn_t<64>> dets = {
-        asci::canonical_hf_determinant<64>(nalpha, nalpha)
-      };
 
       generator_t ham_gen( 
         asci::matrix_span<double>(T_active.data(),n_active,n_active),
@@ -278,8 +277,32 @@ int main(int argc, char** argv) {
           n_active)
       );
 
-      E0 = ham_gen.matrix_element(dets[0], dets[0]);
-      C = {1.0};
+      std::vector<asci::wfn_t<64>> dets;
+      std::vector<double> C;
+      if( asci_wfn_fname.size() ) {
+        // Read wave function from standard file
+        console->info("Reading Guess Wavefunction From {}", asci_wfn_fname );
+        asci::read_wavefunction( asci_wfn_fname, dets, C );
+#if 0
+        E0 = ham_gen.matrix_element(dets[0], dets[0]);
+#else
+        E0 = 0;
+        for( auto ii  = 0; ii < dets.size(); ++ii ) {
+          double tmp = 0.0;
+          for( auto jj  = 0; jj < dets.size(); ++jj ) {
+            tmp += ham_gen.matrix_element( dets[ii], dets[jj] ) * C[jj];
+          }
+          E0 += C[ii] * tmp;
+        }
+#endif
+      } else {
+        // HF Guess
+        console->info("Generating HF Guess for ASCI");
+        dets = { asci::canonical_hf_determinant<64>(nalpha, nalpha) };
+        E0 = ham_gen.matrix_element(dets[0], dets[0]);
+        C = {1.0};
+      }
+
       #if 0
       dets = asci::asci_search(asci_settings, 100, dets.begin(), dets.end(), EHF,
         C, n_active, T_active.data(), ham_gen.G_red(), ham_gen.V_red(),
@@ -298,6 +321,12 @@ int main(int argc, char** argv) {
       #endif
       E0 += E_inactive + E_core;
         
+      if( asci_wfn_out_fname.size() and !world_rank ) {
+        console->info("Writing ASCI Wavefunction to {}", asci_wfn_out_fname);
+        asci::write_wavefunction( asci_wfn_out_fname, norb, dets, C );
+      }
+
+
     }
 
 
