@@ -749,6 +749,9 @@ double selected_ci_diag(
   if( nstates == 1 )
   {
     E = p_davidson( davidson_max_m, H, davidson_res_tol, C_local.data() );
+    size_t dimH = std::distance(dets_begin,dets_end);
+    std::vector<double> tmp = C_local;
+    ham_gen.SymmSingleState( C_local.data(), tmp.data(), dets_begin, dets_end, dimH );
   }
   else
   {

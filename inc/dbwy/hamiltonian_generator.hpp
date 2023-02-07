@@ -195,6 +195,19 @@ public:
       *(sym_vec + i) = *( deg_vecs + i );
   }
 
+  virtual void SymmSingleState( double*           sym_vec,
+                                const double*     in_vec,
+			        full_det_iterator dets_begin,
+			        full_det_iterator dets_end,
+			        const size_t      dim
+			      ) const
+  {
+    // Default behaviour, when there is no symmetry implemented
+    // Just copy the vector, no symmetrization occurring.
+    for( int i = 0; i < dim; i++ )
+      *(sym_vec + i) = *( in_vec + i );
+  }
+
   virtual void SymmTruncation( std::vector<full_det_t>& dets ) const
   {
     return;
