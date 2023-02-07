@@ -69,7 +69,7 @@ int main(int argc, char** argv) {
   spdlog::cfg::load_env_levels();
   spdlog::set_pattern("[%n] %v");
 
-  constexpr size_t nwfn_bits = 64;
+  constexpr size_t nwfn_bits = 128;
 
   MPI_Init(&argc, &argv);
 
@@ -100,8 +100,6 @@ int main(int argc, char** argv) {
   size_t norb2 = norb  * norb;
   size_t norb3 = norb2 * norb;
   size_t norb4 = norb2 * norb2;
-
-  if( norb > nwfn_bits/2 ) throw std::runtime_error("Not Enough Bits");
 
   // XXX: Consider reading this into shared memory to avoid replication
   std::vector<double> T(norb2), V(norb4);
@@ -148,6 +146,8 @@ int main(int argc, char** argv) {
   OPT_KEYWORD("CI.RDMFILE",     rdm_fname,     std::string);
   OPT_KEYWORD("CI.FCIDUMP_OUT", fci_out_fname, std::string);
   
+
+  if( n_active > nwfn_bits/2 ) throw std::runtime_error("Not Enough Bits");
 
   // MCSCF Settings
   asci::MCSCFSettings mcscf_settings;
@@ -258,7 +258,7 @@ int main(int argc, char** argv) {
   // CI
   if( job == Job::CI ) {
 
-    using generator_t = asci::DoubleLoopHamiltonianGenerator<64>;
+    using generator_t = asci::DoubleLoopHamiltonianGenerator<nwfn_bits>;
     if( ci_exp == CIExpansion::CAS ) {
       std::vector<double> C_local;
       // TODO: VERIFY MPI + CAS
@@ -277,7 +277,7 @@ int main(int argc, char** argv) {
           n_active)
       );
 
-      std::vector<asci::wfn_t<64>> dets;
+      std::vector<asci::wfn_t<nwfn_bits>> dets;
       std::vector<double> C;
       if( asci_wfn_fname.size() ) {
         // Read wave function from standard file
@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
       } else {
         // HF Guess
         console->info("Generating HF Guess for ASCI");
-        dets = { asci::canonical_hf_determinant<64>(nalpha, nalpha) };
+        dets = { asci::canonical_hf_determinant<nwfn_bits>(nalpha, nalpha) };
         E0 = ham_gen.matrix_element(dets[0], dets[0]);
         C = {1.0};
       }
@@ -323,7 +323,7 @@ int main(int argc, char** argv) {
         
       if( asci_wfn_out_fname.size() and !world_rank ) {
         console->info("Writing ASCI Wavefunction to {}", asci_wfn_out_fname);
-        asci::write_wavefunction( asci_wfn_out_fname, norb, dets, C );
+        asci::write_wavefunction( asci_wfn_out_fname, n_active, dets, C );
       }
 
 

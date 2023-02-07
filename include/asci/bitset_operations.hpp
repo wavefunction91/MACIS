@@ -77,7 +77,7 @@ uint32_t fls( std::bitset<N> bits ) {
   else if constexpr (N <= 64) return fls( bits.to_ullong() );
   else {
     uint32_t ind = 0;
-    for( ind = N-1; ind >= N; ind-- )
+    for( ind = N-1; ind >= 0; ind-- )
     if( bits[ind] ) return ind;
     return ind;
   }

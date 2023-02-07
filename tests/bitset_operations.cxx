@@ -87,6 +87,13 @@ TEST_CASE("Bitset Operations") {
 
   }
 
+  SECTION("FLS") {
+    bs<64> a(0x0A0A); REQUIRE( asci::fls(a) == 12 - 1 );
+    bs<32> b(0x0A0A); REQUIRE( asci::fls(b) == 12 - 1 );
+    bs<128> c(0xDEADBEEF); REQUIRE( asci::fls(c) == 31 );
+    bs<256> d(0xDEADBEEF); REQUIRE( asci::fls(d) == 31 );
+  }
+
   SECTION("Indices") {
 
     bs<128> one(1);
