@@ -62,6 +62,7 @@ struct asci_contrib_topk_comparator {
 
 struct ASCISettings {
   size_t ntdets_max        = 1e5;
+  size_t ntdets_min        = 100;
   size_t ncdets_max        = 100;
   double h_el_tol          = 1e-8;
   double rv_prune_tol      = 1e-8;
@@ -70,6 +71,9 @@ struct ASCISettings {
   size_t grow_factor       = 8;
   size_t max_refine_iter   = 6;
   double refine_energy_tol = 1e-6;
+
+  bool grow_with_rot    = false;
+  size_t rot_size_start = 1000;
 };
 
 template <size_t N>
@@ -462,11 +466,11 @@ std::vector< wfn_t<N> > asci_search(
   // Expand Search Space with Connected ASCI Contributions 
   auto pairs_st = clock_type::now();
   asci_contrib_container<wfn_t<N>> asci_pairs;
-  //if(world_size == 1)
-  //  asci_pairs = asci_contributions_standard( asci_settings, 
-  //    cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
-  //    V_red, G_pqrs, V_pqrs, ham_gen );
-  //else
+  if(world_size == 1)
+    asci_pairs = asci_contributions_standard( asci_settings, 
+      cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
+      V_red, G_pqrs, V_pqrs, ham_gen );
+  else
     asci_pairs = asci_contributions_triplet( asci_settings, 
       cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
       V_red, G_pqrs, V_pqrs, ham_gen, comm );
@@ -578,13 +582,19 @@ std::vector< wfn_t<N> > asci_search(
       asci_pairs.end() );
 #else
     std::vector<asci_contrib<wfn_t<N>>> topk(top_k_elements);
-    topk_allreduce<512>( 
-      asci_pairs.data(), 
-      asci_pairs.data() + asci_pairs.size(),
-      top_k_elements, topk.data(), 
-      asci_contrib_topk_comparator<wfn_t<N>>{},
-      comm 
-    );
+    if( world_size > 1 ) {
+      topk_allreduce<512>( 
+        asci_pairs.data(), 
+        asci_pairs.data() + asci_pairs.size(),
+        top_k_elements, topk.data(), 
+        asci_contrib_topk_comparator<wfn_t<N>>{},
+        comm 
+      );
+    } else {
+      std::nth_element(asci_pairs.begin(), asci_pairs.begin() + top_k_elements,
+        asci_pairs.end(), asci_contrib_topk_comparator<wfn_t<N>>{} );
+      std::copy(asci_pairs.begin(), asci_pairs.begin() + top_k_elements, topk.begin()); 
+    }
     asci_pairs = std::move(topk);
 #endif
   }

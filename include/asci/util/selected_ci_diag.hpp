@@ -4,6 +4,7 @@
 #include <asci/csr_hamiltonian.hpp>
 #include <asci/davidson.hpp>
 #include <asci/util/mpi.hpp>
+#include <sparsexx/matrix_types/dense_conversions.hpp>
 #include <chrono>
 
 
@@ -53,8 +54,19 @@ double selected_ci_diag(
   // Solve EVP
   MPI_Barrier(comm); auto dav_st = clock_type::now();
 
+#if 1
   auto [niter, E] = p_davidson( H.local_row_extent(), davidson_max_m, op, 
     D_local.data(), davidson_res_tol, C_local.data(), H.comm() );
+#else
+  std::vector<double> H_dense(H.m() * H.m());
+  std::vector<double> W(H.m());
+  sparsexx::convert_to_dense( H.diagonal_tile(), H_dense.data(), H.m() );
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, H.m(),
+    H_dense.data(), H.m(), W.data());
+  auto E = W[0];
+  std::copy_n(H_dense.data(), C_local.size(), C_local.data());
+  size_t niter = 0;
+#endif
 
   MPI_Barrier(comm); auto dav_en = clock_type::now();
 
@@ -114,6 +126,7 @@ double selected_ci_diag(
     "NNZ", total_nnz, "H_DUR", duration_type(H_en-H_st).count()
   );
   logger->info("  {} = {:.2e} GiB", "HMEM_LOC", H.mem_footprint()/1073741824.);
+  logger->info("  {} = {:.2f}%", "H_SPARSE", total_nnz/double(H.n() * H.n()));
 
   // Solve EVP
   auto E = selected_ci_diag(H, davidson_max_m, 

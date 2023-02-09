@@ -166,11 +166,19 @@ int main(int argc, char** argv) {
   // ASCI Settings
   asci::ASCISettings asci_settings;
   std::string asci_wfn_fname, asci_wfn_out_fname;
-  OPT_KEYWORD("ASCI.NTDETS_MAX",   asci_settings.ntdets_max,  size_t      );
-  OPT_KEYWORD("ASCI.NCDETS_MAX",   asci_settings.ncdets_max,  size_t      );
-  OPT_KEYWORD("ASCI.GROW_FACTOR",  asci_settings.grow_factor, int         );
-  OPT_KEYWORD("ASCI.WFN_FILE",     asci_wfn_fname,            std::string );
-  OPT_KEYWORD("ASCI.WFN_OUT_FILE", asci_wfn_out_fname,        std::string );
+  OPT_KEYWORD("ASCI.NTDETS_MAX",   asci_settings.ntdets_max,    size_t      );
+  OPT_KEYWORD("ASCI.NTDETS_MIN",   asci_settings.ntdets_min,    size_t      );
+  OPT_KEYWORD("ASCI.NCDETS_MAX",   asci_settings.ncdets_max,    size_t      );
+  OPT_KEYWORD("ASCI.HAM_EL_TOL",   asci_settings.h_el_tol,      double      );
+  OPT_KEYWORD("ASCI.RV_PRUNE_TOL", asci_settings.rv_prune_tol,  double      );
+  OPT_KEYWORD("ASCI.PAIR_MAX_LIM", asci_settings.pair_size_max, size_t      );
+  OPT_KEYWORD("ASCI.GROW_FACTOR",  asci_settings.grow_factor,   int         );
+  OPT_KEYWORD("ASCI.MAX_REFINE_ITER", asci_settings.max_refine_iter,   size_t );
+  OPT_KEYWORD("ASCI.REFINE_ETOL",     asci_settings.refine_energy_tol, double );
+  OPT_KEYWORD("ASCI.GROW_WITH_ROT",   asci_settings.grow_with_rot,     bool   );
+  OPT_KEYWORD("ASCI.ROT_SIZE_START",  asci_settings.rot_size_start,    size_t );
+  OPT_KEYWORD("ASCI.WFN_FILE",     asci_wfn_fname,              std::string );
+  OPT_KEYWORD("ASCI.WFN_OUT_FILE", asci_wfn_out_fname,          std::string );
 
   bool mp2_guess = false;
   OPT_KEYWORD("MCSCF.MP2_GUESS", mp2_guess, bool );
@@ -186,12 +194,13 @@ int main(int argc, char** argv) {
 
     console->debug("READ {} 1-body integrals and {} 2-body integrals", 
       T.size(), V.size());
-    console->debug("ECORE = {:.12f}", E_core); 
+    console->info("ECORE = {:.12f}", E_core); 
     console->debug("TSUM  = {:.12f}", vec_sum(T));
     console->debug("VSUM  = {:.12f}", vec_sum(V));
     console->info("TMEM   = {:.2e} GiB", asci::to_gib(T));
     console->info("VMEM   = {:.2e} GiB", asci::to_gib(V));
   }
+
 
   // Setup printing
   bool print_davidson = false, print_ci = false, print_mcscf = true,
@@ -283,6 +292,7 @@ int main(int argc, char** argv) {
         // Read wave function from standard file
         console->info("Reading Guess Wavefunction From {}", asci_wfn_fname );
         asci::read_wavefunction( asci_wfn_fname, dets, C );
+        //std::cout << dets[0].to_ullong() << std::endl;
 #if 0
         E0 = ham_gen.matrix_element(dets[0], dets[0]);
 #else
@@ -299,9 +309,12 @@ int main(int argc, char** argv) {
         // HF Guess
         console->info("Generating HF Guess for ASCI");
         dets = { asci::canonical_hf_determinant<nwfn_bits>(nalpha, nalpha) };
+        //std::cout << dets[0].to_ullong() << std::endl;
         E0 = ham_gen.matrix_element(dets[0], dets[0]);
         C = {1.0};
       }
+      console->info("ASCI Guess Size = {}", dets.size());
+      console->info("ASCI E0 = {:.10e}", E0 + E_core + E_inactive);
 
       #if 0
       dets = asci::asci_search(asci_settings, 100, dets.begin(), dets.end(), EHF,
@@ -315,9 +328,11 @@ int main(int argc, char** argv) {
       std::tie(E0, dets, C) = asci::asci_grow( asci_settings, 
         mcscf_settings, E0, std::move(dets), std::move(C), ham_gen, 
         n_active, MPI_COMM_WORLD );
-      //std::tie(E0, dets, C) = asci::asci_refine( asci_settings, 
-      //  mcscf_settings, E0, std::move(dets), std::move(C), ham_gen, 
-      //  n_active, MPI_COMM_WORLD );
+      if(asci_settings.max_refine_iter) {
+        std::tie(E0, dets, C) = asci::asci_refine( asci_settings, 
+          mcscf_settings, E0, std::move(dets), std::move(C), ham_gen, 
+          n_active, MPI_COMM_WORLD );
+      }
       #endif
       E0 += E_inactive + E_core;
         
