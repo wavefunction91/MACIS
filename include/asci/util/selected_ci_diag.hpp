@@ -121,12 +121,20 @@ double selected_ci_diag(
   MPI_Barrier(comm); auto H_en = clock_type::now();
 
   // Get total NNZ
-  size_t total_nnz = allreduce( (size_t)H.nnz(), MPI_SUM, comm );
+  size_t local_nnz = H.nnz();
+  size_t total_nnz = allreduce( local_nnz, MPI_SUM, comm );
+  size_t max_nnz   = allreduce( local_nnz, MPI_MAX, comm );
+  size_t min_nnz   = allreduce( local_nnz, MPI_MIN, comm );
   logger->info("  {}   = {:6}, {}     = {:.5e} ms",
     "NNZ", total_nnz, "H_DUR", duration_type(H_en-H_st).count()
   );
   logger->info("  {} = {:.2e} GiB", "HMEM_LOC", H.mem_footprint()/1073741824.);
-  logger->info("  {} = {:.2f}%", "H_SPARSE", total_nnz/double(H.n() * H.n()));
+  logger->info("  {} = {:.2f}%", "H_SPARSE", total_nnz/double(H.n() * H.n()) * 100);
+  auto world_size = comm_size(comm);
+  if( world_size > 1 ) {
+    logger->info("  NNZ_MAX = {}, NNZ_MIN = {}, NNZ_AVG = {}",
+      max_nnz, min_nnz, total_nnz/double(world_size));
+  }
 
   // Solve EVP
   auto E = selected_ci_diag(H, davidson_max_m, 

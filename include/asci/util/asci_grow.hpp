@@ -12,7 +12,7 @@ auto asci_grow( ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
   auto world_rank = comm_rank(comm);
 
-  spdlog::null_logger_mt("asci_search");
+  //spdlog::null_logger_mt("asci_search");
   auto logger = spdlog::get("asci_grow");
   if(!logger) logger = world_rank ? 
     spdlog::null_logger_mt ("asci_grow") :
