@@ -5,7 +5,8 @@
 #include <asci/util/asci_sort.hpp>
 #include <asci/util/memory.hpp>
 #include <asci/util/mpi.hpp>
-#include <asci/util/topk_parallel.hpp>
+//#include <asci/util/topk_parallel.hpp>
+#include <asci/util/dist_quickselect.hpp>
 
 #include <chrono>
 #include <fstream>
@@ -583,13 +584,63 @@ std::vector< wfn_t<N> > asci_search(
 #else
     std::vector<asci_contrib<wfn_t<N>>> topk(top_k_elements);
     if( world_size > 1 ) {
-      topk_allreduce<512>( 
-        asci_pairs.data(), 
-        asci_pairs.data() + asci_pairs.size(),
-        top_k_elements, topk.data(), 
-        asci_contrib_topk_comparator<wfn_t<N>>{},
-        comm 
-      );
+      //topk_allreduce<512>( 
+      //  asci_pairs.data(), 
+      //  asci_pairs.data() + asci_pairs.size(),
+      //  top_k_elements, topk.data(), 
+      //  asci_contrib_topk_comparator<wfn_t<N>>{},
+      //  comm 
+      //);
+
+      // Strip scores
+      std::vector<double> scores(asci_pairs.size());
+      std::transform(asci_pairs.begin(), asci_pairs.end(), scores.begin(),
+        [](const auto& p){ return std::abs(p.rv); });
+
+      // Determine kth-ranked scores
+      auto kth_score = dist_quickselect( scores.begin(), scores.end(), 
+        top_k_elements, comm, std::greater<double>{}, std::equal_to<double>{} );
+
+      // Partition local pairs into less / eq batches
+      auto [g_begin, e_begin, l_begin, _end] = 
+        leg_partition( asci_pairs.begin(), asci_pairs.end(), kth_score,
+          [=](const auto& p, const auto& s){ return std::abs(p.rv) >  s; },
+          [=](const auto& p, const auto& s){ return std::abs(p.rv) == s; } );
+
+      // Determine local counts
+      size_t n_greater = std::distance(g_begin, e_begin);
+      size_t n_equal   = std::distance(e_begin, l_begin);
+      size_t n_less    = std::distance(l_begin, _end   );
+      const int n_geq_local = n_greater + n_equal;
+
+      //printf("[rank %d] KTH SCORE = %.10e\n", world_rank, kth_score);
+      //printf("[rank %d] G = %lu E = %lu L = %lu\n", world_rank, n_greater, n_equal, n_less);
+      
+      // Strip bitsrings
+      std::vector<wfn_t<N>> keep_strings_local( n_geq_local );
+      std::transform( g_begin, l_begin, keep_strings_local.begin(),
+        [](const auto& p){ return p.state; } );
+
+      // Gather global strings
+      std::vector<int> local_sizes, displ;
+      auto n_geq_global = total_gather_and_exclusive_scan( n_geq_local,
+        local_sizes, displ, comm );
+      //if( n_geq_global > top_k_elements ) {
+      //  printf("TOPK %d %d\n", int(top_k_elements), n_geq_global );
+      //  throw std::runtime_error("Houston: We Have a Problem");
+      //}
+
+      std::vector<wfn_t<N>> keep_strings_global(n_geq_global);
+      auto string_dtype = mpi_traits<wfn_t<N>>::datatype();
+      MPI_Allgatherv( keep_strings_local.data(), n_geq_local, string_dtype,
+        keep_strings_global.data(), local_sizes.data(), displ.data(),
+        string_dtype, comm );
+
+      // Make fake strings
+      topk.resize(n_geq_global);
+      std::transform(keep_strings_global.begin(), keep_strings_global.end(),
+        topk.begin(), [](const auto& s) { return asci_contrib<wfn_t<N>>{s, -1.0}; });
+
     } else {
       std::nth_element(asci_pairs.begin(), asci_pairs.begin() + top_k_elements,
         asci_pairs.end(), asci_contrib_topk_comparator<wfn_t<N>>{} );
@@ -642,6 +693,8 @@ std::vector< wfn_t<N> > asci_search(
   MPI_Barrier(comm);
 #else
   //{
+  //std::sort(new_dets.begin(), new_dets.end(),
+  //  bitset_less_comparator<N>{});
   //std::ofstream wfn_file("wfn." + std::to_string(world_rank) + ".txt");
   //for( auto s : new_dets ) {
   //  wfn_file << to_canonical_string(s) << std::endl;

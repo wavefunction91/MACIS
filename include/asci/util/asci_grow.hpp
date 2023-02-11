@@ -40,7 +40,7 @@ auto asci_grow( ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     std::tie(E, wfn, X) = asci_iter<N,index_t>( asci_settings,
       mcscf_settings, ndets_new, E0, std::move(wfn), std::move(X),
       ham_gen, norb, comm );
-    if( ndets_new != wfn.size() )
+    if( ndets_new > wfn.size() )
       throw std::runtime_error("Wavefunction didn't grow enough...");
 
     logger->info(fmt_string, iter++, E, E - E0, wfn.size());

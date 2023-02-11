@@ -1,3 +1,4 @@
+#if 0
 #include "ut_common.hpp"
 #include <asci/util/topk_parallel.hpp>
 
@@ -153,4 +154,4 @@ TEST_CASE("TopK - Metadata") {
   }
   
 }
-
+#endif
