@@ -65,6 +65,9 @@ T vec_sum(const std::vector<T>& x) {
 
 int main(int argc, char** argv) {
 
+  using hrt_t = std::chrono::high_resolution_clock;
+  using dur_t = std::chrono::duration<double, std::milli>;
+
   std::cout << std::scientific << std::setprecision(12);
   spdlog::cfg::load_env_levels();
   spdlog::set_pattern("[%n] %v");
@@ -204,16 +207,18 @@ int main(int argc, char** argv) {
 
   // Setup printing
   bool print_davidson = false, print_ci = false, print_mcscf = true,
-       print_diis = false;
-  OPT_KEYWORD("PRINT.DAVIDSON", print_davidson, bool );
-  OPT_KEYWORD("PRINT.CI",       print_ci,       bool );
-  OPT_KEYWORD("PRINT.MCSCF",    print_mcscf,    bool );
-  OPT_KEYWORD("PRINT.DIIS",     print_diis,     bool );
+       print_diis = false, print_asci_search = false;
+  OPT_KEYWORD("PRINT.DAVIDSON",    print_davidson,    bool );
+  OPT_KEYWORD("PRINT.CI",          print_ci,          bool );
+  OPT_KEYWORD("PRINT.MCSCF",       print_mcscf,       bool );
+  OPT_KEYWORD("PRINT.DIIS",        print_diis,        bool );
+  OPT_KEYWORD("PRINT.ASCI_SEARCH", print_asci_search, bool );
 
-  if(world_rank or not print_davidson) spdlog::null_logger_mt("davidson");
-  if(world_rank or not print_ci)       spdlog::null_logger_mt("ci_solver");
-  if(world_rank or not print_mcscf)    spdlog::null_logger_mt("mcscf");
-  if(world_rank or not print_diis)     spdlog::null_logger_mt("diis");
+  if(world_rank or not print_davidson)    spdlog::null_logger_mt("davidson");
+  if(world_rank or not print_ci)          spdlog::null_logger_mt("ci_solver");
+  if(world_rank or not print_mcscf)       spdlog::null_logger_mt("mcscf");
+  if(world_rank or not print_diis)        spdlog::null_logger_mt("diis");
+  if(world_rank or not print_asci_search) spdlog::null_logger_mt("asci_search");
 
   // MP2 Guess Orbitals
   if(mp2_guess) {
@@ -278,8 +283,6 @@ int main(int argc, char** argv) {
       E0 += E_inactive + E_core;
     } else {
 
-      if(world_rank) spdlog::null_logger_mt("asci_search");
-
       generator_t ham_gen( 
         asci::matrix_span<double>(T_active.data(),n_active,n_active),
         asci::rank4_span<double>(V_active.data(),n_active,n_active,n_active,
@@ -316,15 +319,7 @@ int main(int argc, char** argv) {
       console->info("ASCI Guess Size = {}", dets.size());
       console->info("ASCI E0 = {:.10e}", E0 + E_core + E_inactive);
 
-      #if 0
-      dets = asci::asci_search(asci_settings, 100, dets.begin(), dets.end(), EHF,
-        C, n_active, T_active.data(), ham_gen.G_red(), ham_gen.V_red(),
-        ham_gen.G(), V_active.data(), ham_gen, MPI_COMM_WORLD);
-      #elif 0
-      std::tie(E0, dets, C) = asci::asci_iter( asci_settings, mcscf_settings,
-        100, E0, std::move(dets), std::move(C), ham_gen, n_active, 
-        MPI_COMM_WORLD );
-      #else
+      auto asci_st = hrt_t::now();
       std::tie(E0, dets, C) = asci::asci_grow( asci_settings, 
         mcscf_settings, E0, std::move(dets), std::move(C), ham_gen, 
         n_active, MPI_COMM_WORLD );
@@ -333,8 +328,10 @@ int main(int argc, char** argv) {
           mcscf_settings, E0, std::move(dets), std::move(C), ham_gen, 
           n_active, MPI_COMM_WORLD );
       }
-      #endif
       E0 += E_inactive + E_core;
+      auto asci_en = hrt_t::now();
+      dur_t asci_dur = asci_en - asci_st;
+      console->info("* ASCI_DUR = {:.2e} ms", asci_dur.count() );
         
       if( asci_wfn_out_fname.size() and !world_rank ) {
         console->info("Writing ASCI Wavefunction to {}", asci_wfn_out_fname);

@@ -94,6 +94,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
 ) {
 
   auto logger = spdlog::get("asci_search");
+  
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
 
   asci_contrib_container<wfn_t<N>> asci_pairs;

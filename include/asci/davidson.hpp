@@ -117,6 +117,9 @@ template <typename Functor>
 auto davidson( int64_t N, int64_t max_m, const Functor& op, 
   const double* D, double tol, double* X ) {
 
+  using hrt_t = std::chrono::high_resolution_clock;
+  using dur_t = std::chrono::duration<double, std::milli>;
+
   if(!X) throw std::runtime_error("Davidson: No Guess Provided");
 
   auto logger = spdlog::get("davidson");
@@ -152,13 +155,20 @@ auto davidson( int64_t N, int64_t max_m, const Functor& op,
     const auto k = i + 1; // Current subspace dimension after new vector
 
     // AV(:,i) = A * V(:,i)
+    auto op_st = hrt_t::now();
     op.operator_action(1, 1., V.data() + i*N, N, 0., AV.data() + i*N, N);
+    auto op_en = hrt_t::now();
+    dur_t op_dur = op_en - op_st;
 
     // Rayleigh Ritz
+    auto rr_st = hrt_t::now();
     lobpcgxx::rayleigh_ritz( N, k, V.data(), N, AV.data(), N, LAM.data(),
       C.data(), k);
+    auto rr_en = hrt_t::now();
+    dur_t rr_dur = rr_en - rr_st;
 
     // Compute Residual (A - LAM(0)*I) * V(:,0:i) * C(:,0)
+    auto res_st = hrt_t::now();
     double* R = V.data() + (i+1)*N;
 
     // X = V*C
@@ -175,8 +185,14 @@ auto davidson( int64_t N, int64_t max_m, const Functor& op,
     // Compute residual norm
     auto res_nrm = blas::nrm2( N, R, 1 );
 
+    auto res_en = hrt_t::now();
+    dur_t res_dur = res_en - res_st;
+    
+
     logger->info("iter = {:4}, LAM(0) = {:20.12e}, RNORM = {:20.12e}",
       i, LAM[0], res_nrm);
+    logger->trace("  * OP_DUR = {:.2e} ms, RR_DUR = {:.2e} ms, RES_DUR = {:.2e} ms",
+      op_dur.count(), rr_dur.count(), res_dur.count());
 
     // Check for convergence
     if( res_nrm < tol ) {converged = true; break;}
@@ -270,18 +286,24 @@ template <typename Functor>
 auto p_davidson( int64_t N_local, int64_t max_m, const Functor& op, 
   const double* D_local, double tol, double* X_local, MPI_Comm comm ) {
 
+  using hrt_t = std::chrono::high_resolution_clock;
+  using dur_t = std::chrono::duration<double, std::milli>;
+
   if(N_local and !X_local) 
     throw std::runtime_error("Davidson: No Guess Provided");
-
-  auto logger = spdlog::get("davidson");
-  if(!logger) {
-    logger = spdlog::stdout_color_mt("davidson");
-  }
-
 
   int world_rank, world_size;
   MPI_Comm_rank( comm, &world_rank );
   MPI_Comm_size( comm, &world_size );
+
+  auto logger = spdlog::get("davidson");
+  if(!logger) {
+    logger = world_rank ? 
+      spdlog::null_logger_mt("davidson") :
+      spdlog::stdout_color_mt("davidson");
+  }
+
+
 
   logger->info("[Davidson Eigensolver]:");
   logger->info("  {} = {:6}, {} = {:4}, {} = {:10.5e}",
@@ -312,14 +334,21 @@ auto p_davidson( int64_t N_local, int64_t max_m, const Functor& op,
     const auto k = i + 1; // Current subspace dimension after new vector
 
     // AV(:,i) = A * V(:,i)
+    auto op_st = hrt_t::now();
     op.operator_action(1, 1., V_local.data() + i*N_local, N_local, 
       0., AV_local.data() + i*N_local, N_local);
+    auto op_en = hrt_t::now();
+    dur_t op_dur = op_en - op_st;
 
     // Rayleigh Ritz
+    auto rr_st = hrt_t::now();
     p_rayleigh_ritz( N_local, k, V_local.data(), N_local, AV_local.data(), 
       N_local, LAM.data(), C.data(), k, comm);
+    auto rr_en = hrt_t::now();
+    dur_t rr_dur = rr_en - rr_st;
 
     // Compute Residual (A - LAM(0)*I) * V(:,0:i) * C(:,0)
+    auto res_st = hrt_t::now();
     double* R_local = V_local.data() + (i+1)*N_local;
 
     // X = V*C
@@ -340,8 +369,13 @@ auto p_davidson( int64_t N_local, int64_t max_m, const Functor& op,
     res_dot = allreduce(res_dot, MPI_SUM, comm);
     auto res_nrm = std::sqrt(res_dot);
 
+    auto res_en = hrt_t::now();
+    dur_t res_dur = res_en - res_st;
+
     logger->info("iter = {:4}, LAM(0) = {:20.12e}, RNORM = {:20.12e}",
       i, LAM[0], res_nrm);
+    logger->trace("  * OP_DUR = {:.2e} ms, RR_DUR = {:.2e} ms, RES_DUR = {:.2e} ms",
+      op_dur.count(), rr_dur.count(), res_dur.count());
 
     // Check for convergence
     if( res_nrm < tol ) {converged = true; break;}
