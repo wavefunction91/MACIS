@@ -169,6 +169,7 @@ int main(int argc, char** argv) {
   // ASCI Settings
   asci::ASCISettings asci_settings;
   std::string asci_wfn_fname, asci_wfn_out_fname;
+  double asci_E0 = 0.0; bool compute_asci_E0 = true;
   OPT_KEYWORD("ASCI.NTDETS_MAX",   asci_settings.ntdets_max,    size_t      );
   OPT_KEYWORD("ASCI.NTDETS_MIN",   asci_settings.ntdets_min,    size_t      );
   OPT_KEYWORD("ASCI.NCDETS_MAX",   asci_settings.ncdets_max,    size_t      );
@@ -182,6 +183,10 @@ int main(int argc, char** argv) {
   OPT_KEYWORD("ASCI.ROT_SIZE_START",  asci_settings.rot_size_start,    size_t );
   OPT_KEYWORD("ASCI.WFN_FILE",     asci_wfn_fname,              std::string );
   OPT_KEYWORD("ASCI.WFN_OUT_FILE", asci_wfn_out_fname,          std::string );
+  if(input.containsData("ASCI.E0_WFN")) {
+    asci_E0 = input.getData<double>("ASCI.E0_WFN");
+    compute_asci_E0 = false;
+  }
 
   bool mp2_guess = false;
   OPT_KEYWORD("MCSCF.MP2_GUESS", mp2_guess, bool );
@@ -296,18 +301,20 @@ int main(int argc, char** argv) {
         console->info("Reading Guess Wavefunction From {}", asci_wfn_fname );
         asci::read_wavefunction( asci_wfn_fname, dets, C );
         //std::cout << dets[0].to_ullong() << std::endl;
-#if 0
-        E0 = ham_gen.matrix_element(dets[0], dets[0]);
-#else
-        E0 = 0;
-        for( auto ii  = 0; ii < dets.size(); ++ii ) {
-          double tmp = 0.0;
-          for( auto jj  = 0; jj < dets.size(); ++jj ) {
-            tmp += ham_gen.matrix_element( dets[ii], dets[jj] ) * C[jj];
+        if(compute_asci_E0) {
+          console->info("*  Calculating E0");
+          E0 = 0;
+          for( auto ii  = 0; ii < dets.size(); ++ii ) {
+            double tmp = 0.0;
+            for( auto jj  = 0; jj < dets.size(); ++jj ) {
+              tmp += ham_gen.matrix_element( dets[ii], dets[jj] ) * C[jj];
+            }
+            E0 += C[ii] * tmp;
           }
-          E0 += C[ii] * tmp;
+        } else {
+          console->info("*  Reading E0");
+          E0 = asci_E0 - E_core - E_inactive;
         }
-#endif
       } else {
         // HF Guess
         console->info("Generating HF Guess for ASCI");
