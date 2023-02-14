@@ -464,6 +464,7 @@ std::vector< wfn_t<N> > asci_search(
   logger->info("  MAX_RV_SIZE = {}, JUST_SINGLES = {}", 
     asci_settings.pair_size_max, asci_settings.just_singles);
 
+  auto asci_search_st = clock_type::now();
   
   // Expand Search Space with Connected ASCI Contributions 
   auto pairs_st = clock_type::now();
@@ -704,6 +705,9 @@ std::vector< wfn_t<N> > asci_search(
   //throw std::runtime_error("DIE DIE DIE");
 #endif
 
+  auto asci_search_en = clock_type::now();
+  duration_type asci_search_dur = asci_search_en - asci_search_st;
+  logger->info("  * ASCI_SEARCH DUR = {:.2e} s", asci_search_dur.count() );
   return new_dets;
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 #include <asci/util/asci_contributions.hpp>
+#include <boost/sort/pdqsort/pdqsort.hpp>
 
 namespace asci {
 
@@ -35,7 +36,8 @@ void sort_and_accumulate_asci_pairs( asci_contrib_container<WfnT>& asci_pairs ) 
   };
 
   // Sort by bitstring
-  std::sort( asci_pairs.begin(), asci_pairs.end(), comparator );
+  boost::sort::pdqsort_branchless( asci_pairs.begin(), asci_pairs.end(), 
+    comparator );
 
   // Accumulate the ASCI scores into first instance of unique bitstrings
   auto cur_it = asci_pairs.begin();
@@ -66,7 +68,9 @@ void keep_only_largest_copy_asci_pairs(
   };
 
   // Sort by bitstring
-  std::sort( asci_pairs.begin(), asci_pairs.end(), comparator );
+  //std::sort( asci_pairs.begin(), asci_pairs.end(), comparator );
+  boost::sort::pdqsort_branchless( asci_pairs.begin(), asci_pairs.end(), 
+    comparator );
 
   // Keep the largest ASCI score in the unique instance of each bit string
   auto cur_it = asci_pairs.begin();

@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
   spdlog::cfg::load_env_levels();
   spdlog::set_pattern("[%n] %v");
 
-  constexpr size_t nwfn_bits = 128;
+  constexpr size_t nwfn_bits = 64;
 
   MPI_Init(&argc, &argv);
 
