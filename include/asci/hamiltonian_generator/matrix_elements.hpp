@@ -8,10 +8,10 @@ template <size_t N>
 double HamiltonianGenerator<N>::matrix_element( full_det_t bra, full_det_t ket ) 
   const {
 
-  auto bra_alpha = truncate_bitset<N/2>(bra);
-  auto ket_alpha = truncate_bitset<N/2>(ket);
-  auto bra_beta  = truncate_bitset<N/2>(bra >> (N/2));
-  auto ket_beta  = truncate_bitset<N/2>(ket >> (N/2));
+  auto bra_alpha = bitset_lo_word(bra);
+  auto ket_alpha = bitset_lo_word(ket);
+  auto bra_beta  = bitset_hi_word(bra);
+  auto ket_beta  = bitset_hi_word(ket);
 
   auto ex_alpha = bra_alpha ^ ket_alpha;
   auto ex_beta  = bra_beta  ^ ket_beta;

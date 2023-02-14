@@ -175,6 +175,30 @@ inline std::bitset<N> expand_bitset( std::bitset<M> bits ) {
   }
 }
 
+
+
+template <size_t N>
+inline std::bitset<N/2> bitset_lo_word( std::bitset<N> bits ) {
+  static_assert( N == 128 or N == 64, "Not Supported");
+  if constexpr (N == 128) {
+    return std::bitset<64>(reinterpret_cast<uint64_t*>(&bits)[0]);
+  }
+  if constexpr (N == 64) {
+    return std::bitset<32>(reinterpret_cast<uint32_t*>(&bits)[0]);
+  }
+}
+
+template <size_t N>
+inline std::bitset<N/2> bitset_hi_word( std::bitset<N> bits ) {
+  static_assert( N == 128 or N == 64, "Not Supported");
+  if constexpr (N == 128) {
+    return std::bitset<64>(reinterpret_cast<uint64_t*>(&bits)[1]);
+  }
+  if constexpr (N == 64) {
+    return std::bitset<32>(reinterpret_cast<uint32_t*>(&bits)[1]);
+  }
+}
+
 template <size_t N>
 bool bitset_less( std::bitset<N> x, std::bitset<N> y ) {
   if constexpr (N <= 32)      return fast_to_ulong (x) < fast_to_ulong (y);

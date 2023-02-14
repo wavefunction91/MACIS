@@ -105,8 +105,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
 
     // Alias state data
     auto state       = *(cdets_begin + i);
-    auto state_alpha = truncate_bitset<N/2>(state);
-    auto state_beta  = truncate_bitset<N/2>(state >> (N/2));
+    auto state_alpha = bitset_lo_word(state);
+    auto state_beta  = bitset_hi_word(state);
     auto coeff       = C[i]; 
 
     // Get occupied and virtual indices
@@ -378,7 +378,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
           const auto& eps_beta  = bcd.orb_ens_beta;
 
           const auto state = det | beta;
-          const auto state_beta = truncate_bitset<N/2>(beta >> N/2);
+          const auto state_beta = bitset_hi_word(beta);
           // BB Excitations
           append_singles_asci_contributions<(N/2),(N/2)>( coeff, state,
             state_beta, occ_beta, vir_beta, occ_alpha, eps_beta.data(), 

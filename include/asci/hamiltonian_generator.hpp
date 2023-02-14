@@ -31,10 +31,12 @@ public:
 public:
 
   inline spin_det_t alpha_string( full_det_t str ) {
-    return asci::truncate_bitset<N/2>(str);
+    //return asci::truncate_bitset<N/2>(str);
+    return bitset_lo_word(str);
   }
   inline spin_det_t beta_string( full_det_t str ) {
-    return asci::truncate_bitset<N/2>(str >> (N/2));
+    //return asci::truncate_bitset<N/2>(str >> (N/2));
+    return bitset_hi_word(str);
   }
 
   size_t norb_;

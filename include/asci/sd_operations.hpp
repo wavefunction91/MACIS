@@ -82,9 +82,12 @@ void bitset_to_occ_vir( size_t norb, std::bitset<N> state,
 
   const auto nvir = norb - nocc;
   vir.resize(nvir);
-  auto it = vir.begin();
-  for( size_t i = 0; i < norb; ++i )
-  if( !state[i] ) *(it++) = i;
+  state = ~state;
+  for(int i = 0; i < nvir; ++i) {
+    auto a = ffs(state) - 1;
+    vir[i] = a;
+    state.flip(a);
+  }
 
 }
 
@@ -127,14 +130,15 @@ void append_singles( std::bitset<N> state,
 
   const size_t nocc = occ.size();
   const size_t nvir = vir.size();
-  const std::bitset<N> one = 1ul;
+  //const std::bitset<N> one = 1ul;
 
   singles.clear();
   singles.reserve(nocc*nvir);
 
   for( size_t a = 0; a < nvir; ++a )
   for( size_t i = 0; i < nocc; ++i ) {
-    std::bitset<N> ex = (one << occ[i]) ^ (one << vir[a]);
+    //std::bitset<N> ex = (one << occ[i]) ^ (one << vir[a]);
+    auto ex = std::bitset<N>(0).flip(occ[i]).flip(vir[a]) ;
     singles.emplace_back( state ^ ex );
   }
 
@@ -147,7 +151,7 @@ void append_doubles( std::bitset<N> state,
 
   const size_t nocc = occ.size();
   const size_t nvir = vir.size();
-  const std::bitset<N> one = 1ul;
+  //const std::bitset<N> one = 1ul;
 
   doubles.clear();
   const size_t nv2 = (nvir * (nvir-1)) / 2;
@@ -158,8 +162,9 @@ void append_doubles( std::bitset<N> state,
   for( size_t i = 0; i < nocc; ++i ) 
   for( size_t b = a+1; b < nvir; ++b )
   for( size_t j = i+1; j < nocc; ++j ) {
-    std::bitset<N> ex = (one << occ[i]) ^ (one << occ[j]) ^
-                        (one << vir[a]) ^ (one << vir[b]);
+    //std::bitset<N> ex = (one << occ[i]) ^ (one << occ[j]) ^
+    //                    (one << vir[a]) ^ (one << vir[b]);
+    auto ex = std::bitset<N>(0).flip(occ[i]).flip(vir[a]).flip(occ[j]).flip(vir[b]);
     doubles.emplace_back( state ^ ex );
   }
 
@@ -238,8 +243,8 @@ template <size_t N>
 void generate_singles_spin_as( size_t norb, std::bitset<N> state, 
   std::vector<std::bitset<N>>& singles, const std::vector<uint32_t> as_orbs ) {
 
-  auto state_alpha = truncate_bitset<N/2>(state);
-  auto state_beta  = truncate_bitset<N/2>(state >> (N/2));
+  auto state_alpha = bitset_lo_word(state);
+  auto state_beta  = bitset_hi_word(state);
 
   std::vector<std::bitset<N/2>> singles_alpha, singles_beta;
 
@@ -275,8 +280,8 @@ void generate_singles_doubles_spin_as( size_t norb, std::bitset<N> state,
   std::vector<std::bitset<N>>& singles, std::vector<std::bitset<N>>& doubles,
   const std::vector<uint32_t> &as_orbs ) {
 
-  auto state_alpha = truncate_bitset<N/2>(state);
-  auto state_beta  = truncate_bitset<N/2>(state >> (N/2));
+  auto state_alpha = bitset_lo_word(state);
+  auto state_beta  = bitset_hi_word(state);
 
   std::vector<std::bitset<N/2>> singles_alpha, singles_beta;
   std::vector<std::bitset<N/2>> doubles_alpha, doubles_beta;
@@ -336,8 +341,8 @@ template <size_t N>
 void generate_singles_spin( size_t norb, std::bitset<N> state, 
   std::vector<std::bitset<N>>& singles ) {
 
-  auto state_alpha = truncate_bitset<N/2>(state);
-  auto state_beta  = truncate_bitset<N/2>(state >> (N/2));
+  auto state_alpha = bitset_lo_word(state);
+  auto state_beta  = bitset_hi_word(state);
 
   std::vector<std::bitset<N/2>> singles_alpha, singles_beta;
 
@@ -371,8 +376,8 @@ template <size_t N>
 void generate_singles_doubles_spin( size_t norb, std::bitset<N> state, 
   std::vector<std::bitset<N>>& singles, std::vector<std::bitset<N>>& doubles ) {
 
-  auto state_alpha = truncate_bitset<N/2>(state);
-  auto state_beta  = truncate_bitset<N/2>(state >> (N/2));
+  auto state_alpha = bitset_lo_word(state);
+  auto state_beta  = bitset_hi_word(state);
 
   std::vector<std::bitset<N/2>> singles_alpha, singles_beta;
   std::vector<std::bitset<N/2>> doubles_alpha, doubles_beta;
@@ -588,8 +593,8 @@ inline auto doubles_sign( std::bitset<N> bra, std::bitset<N> ket,
 template <size_t N>
 void generate_residues( std::bitset<N> state, std::vector<std::bitset<N>>& res ) {
 
-  auto state_alpha = truncate_bitset<N/2>(state);
-  auto state_beta  = truncate_bitset<N/2>(state >> (N/2));
+  auto state_alpha = bitset_lo_word(state);
+  auto state_beta  = bitset_hi_word(state);
 
   //auto occ_alpha = bits_to_indices(state_alpha, occ_alpha);
   auto occ_alpha = bits_to_indices(state_alpha);
@@ -636,8 +641,8 @@ void generate_residues( std::bitset<N> state, std::vector<std::bitset<N>>& res )
 template <size_t N>
 std::string to_canonical_string( std::bitset<N> state ) {
   static_assert((N%2)==0, "N Odd");
-  auto state_alpha = truncate_bitset<N/2>(state);
-  auto state_beta  = truncate_bitset<N/2>(state >> (N/2));
+  auto state_alpha = bitset_lo_word(state);
+  auto state_beta  = bitset_hi_word(state);
   std::string str;
   for( size_t i = 0; i < N/2; ++i ) {
     if( state_alpha[i] and state_beta[i] ) str.push_back('2');
