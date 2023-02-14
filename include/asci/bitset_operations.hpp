@@ -1,5 +1,6 @@
 #pragma once
 #include <cassert>
+#include <iostream>
 #include <bit>
 #include <climits>
 #include <asci/types.hpp>
@@ -25,22 +26,43 @@ std::enable_if_t<
 
 
 template <size_t N>
+unsigned long long fast_to_ullong(const std::bitset<N>& bits) {
+  // Low words
+  if constexpr (N == 64 or N == 128)  return *reinterpret_cast<const uint64_t*>(&bits);
+  if constexpr (N == 32)  return *reinterpret_cast<const uint32_t*>(&bits);
+  return bits.to_ullong();
+}
+
+template <size_t N>
+unsigned long fast_to_ulong(const std::bitset<N>& bits) {
+  // Low words
+  if constexpr (N == 32 or N == 64 or N == 128) return *reinterpret_cast<const uint32_t*>(&bits);
+  return bits.to_ulong();
+}
+
+template <size_t N>
 uint128_t to_uint128( std::bitset<N> bits ) {
   static_assert( N <= 128, "N > 128");
   if constexpr (N == 128) {
     auto _x = reinterpret_cast<uint128_t*>(&bits);
     return *_x;
   } else {
-    return bits.to_ullong();
+    return fast_to_ullong(bits);
   }
 }
-
 
 template <size_t N, size_t M = N>
 std::bitset<M> full_mask() {
   static_assert( M >= N, "M < N" );
   std::bitset<M> mask(0ul);
-  return (~mask) >> (M-N);
+  if constexpr (N == M/2) {
+    if constexpr ( N == 64 ) {
+      reinterpret_cast<uint64_t*>(&mask)[0] = UINT64_MAX;
+    } else if constexpr ( N == 32 ) {
+      reinterpret_cast<uint32_t*>(&mask)[0] = UINT32_MAX;
+    } else mask = (~mask) >> (M-N);
+    return mask;
+  } else return (~mask) >> (M-N);
 }
 
 template <size_t N>
@@ -53,13 +75,16 @@ std::bitset<N> full_mask(size_t i) {
 template <size_t N>
 uint32_t ffs( std::bitset<N> bits ) {
 
-  if constexpr (N <= 32)      return ffsl( bits.to_ulong() );
-  else if constexpr (N <= 64) return ffsll( bits.to_ullong() );
-  //else if constexpr (N <= 128) {
-  //  if(bits.any()) {
-  //    return std::countr_zero( to_uint128(bits) ) + 1;
-  //  } else { return 0; }
-  //}
+  if constexpr (N <= 32)      return ffsl ( fast_to_ulong (bits) );
+  else if constexpr (N <= 64) return ffsll( fast_to_ullong(bits) );
+  else if constexpr (N <= 128) {
+    //if(bits.any()) {
+    //  return std::countr_zero( to_uint128(bits) ) + 1;
+    //} else { return 0; }
+    auto as_words = reinterpret_cast<uint64_t*>(&bits);
+    if(as_words[0]) return ffsll(as_words[0]);
+    else            return ffsll(as_words[1]) + 64;
+  }
   else {
     uint32_t ind = 0;
     for( ind = 0; ind < N; ++ind )
@@ -72,9 +97,13 @@ uint32_t ffs( std::bitset<N> bits ) {
 
 template <size_t N>
 uint32_t fls( std::bitset<N> bits ) {
-
-  if constexpr (N <= 32)      return fls( bits.to_ulong() );
-  else if constexpr (N <= 64) return fls( bits.to_ullong() );
+  if constexpr (N <= 32)      return fls( fast_to_ulong (bits) );
+  else if constexpr (N <= 64) return fls( fast_to_ullong(bits) );
+  else if constexpr (N <= 128) {
+    auto as_words = reinterpret_cast<uint64_t*>(&bits);
+    if(as_words[1]) return fls(as_words[1]) + 64;
+    else            return fls(as_words[0]);
+  }
   else {
     uint32_t ind = 0;
     for( ind = N-1; ind >= 0; ind-- )
@@ -148,8 +177,8 @@ inline std::bitset<N> expand_bitset( std::bitset<M> bits ) {
 
 template <size_t N>
 bool bitset_less( std::bitset<N> x, std::bitset<N> y ) {
-  if constexpr (N <= 32) return x.to_ulong() < y.to_ulong();
-  else if constexpr (N <= 64) return x.to_ullong() < y.to_ullong();
+  if constexpr (N <= 32)      return fast_to_ulong (x) < fast_to_ulong (y);
+  else if constexpr (N <= 64) return fast_to_ullong(x) < fast_to_ullong(y);
   else if constexpr (N == 128) {
     auto _x = reinterpret_cast<uint128_t*>(&x);
     auto _y = reinterpret_cast<uint128_t*>(&y);

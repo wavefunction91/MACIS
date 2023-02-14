@@ -5,11 +5,14 @@ namespace asci {
 
 template <size_t N, typename index_t = int32_t>
 auto asci_refine( ASCISettings asci_settings, MCSCFSettings mcscf_settings,
-  double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X_local,
+  double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X,
   HamiltonianGenerator<N>& ham_gen, size_t norb, MPI_Comm comm ) {
 
   auto logger = spdlog::get("asci_refine");
-  if(!logger) logger = spdlog::stdout_color_mt("asci_refine");
+  auto world_rank = comm_rank(comm);
+  if(!logger) logger = world_rank ? 
+    spdlog::null_logger_mt ("asci_refine") :
+    spdlog::stdout_color_mt("asci_refine");
 
   logger->info("[ASCI Refine Settings]:");
   logger->info("  NTDETS = {:6}, NCDETS = {:6}, MAX_REFINE_ITER = {:4}, REFINE_TOL = {:.2e}",
@@ -26,8 +29,8 @@ auto asci_refine( ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   bool converged = false;
   for(size_t iter = 0; iter < asci_settings.max_refine_iter; ++iter) {
     double E;
-    std::tie(E, wfn, X_local) = asci_iter<N,index_t>( asci_settings,
-      mcscf_settings, ndets, E0, std::move(wfn), std::move(X_local),
+    std::tie(E, wfn, X) = asci_iter<N,index_t>( asci_settings,
+      mcscf_settings, ndets, E0, std::move(wfn), std::move(X),
       ham_gen, norb, comm );
     if( wfn.size() != ndets )
       throw std::runtime_error("Wavefunction size can't change in refinement");
@@ -46,7 +49,7 @@ auto asci_refine( ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   else
     throw std::runtime_error("ACSI Refine did not converge");
 
-  return std::make_tuple(E0, wfn, X_local);
+  return std::make_tuple(E0, wfn, X);
 }
 
 }

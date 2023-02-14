@@ -61,7 +61,8 @@ void keep_only_largest_copy_asci_pairs(
   asci_contrib_container<WfnT>& asci_pairs 
 ) {
   auto comparator = [](const auto& x, const auto& y) {
-    return not (x.state == y.state or bitset_less(x.state, y.state));
+    //return not (x.state == y.state or bitset_less(x.state, y.state));
+    return bitset_less(x.state, y.state);
   };
 
   // Sort by bitstring
