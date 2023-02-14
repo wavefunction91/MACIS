@@ -480,8 +480,14 @@ std::vector< wfn_t<N> > asci_search(
   auto pairs_en = clock_type::now();
 
   {
-  size_t npairs  = allreduce( asci_pairs.size(), MPI_SUM, comm );;
+  size_t npairs  = allreduce( asci_pairs.size(), MPI_SUM, comm );
   logger->info("  * ASCI Kept {} Pairs", npairs);
+
+  if(world_size > 1) {
+    size_t npairs_max = allreduce( asci_pairs.size(), MPI_MAX, comm);
+    size_t npairs_min = allreduce( asci_pairs.size(), MPI_MIN, comm);
+    logger->info("    * PAIRS_MIN = {}, PAIRS_MAX = {}, PAIRS_AVG = {}", npairs_min, npairs_max, npairs / double(world_size) );
+  } 
   logger->info("  * Pairs Mem = {:.2e} GiB", to_gib(asci_pairs));
   }
 
@@ -501,10 +507,28 @@ std::vector< wfn_t<N> > asci_search(
   size_t npairs  = allreduce( asci_pairs.size(), MPI_SUM, comm );;
   logger->info("  * ASCI will search over {} unique determinants",
     npairs );
+
+  float pairs_dur = duration_type(pairs_en - pairs_st).count();
+  float bit_sort_dur = duration_type(bit_sort_en - bit_sort_st).count();
   logger->info("  * PAIR_DUR = {:.2e} s, SORT_ACC_DUR = {:.2e} s",
-    duration_type(pairs_en - pairs_st).count(),
-    duration_type(bit_sort_en - bit_sort_st).count()
-  );
+    pairs_dur, bit_sort_dur );
+
+  if(world_size > 1) {
+    float timings[2] = {pairs_dur, bit_sort_dur};
+    float timings_max[2], timings_min[2], timings_avg[2];
+    allreduce( timings, timings_max, 2, MPI_MAX, comm );
+    allreduce( timings, timings_min, 2, MPI_MIN, comm );
+    allreduce( timings, timings_avg, 2, MPI_SUM, comm );
+    timings_avg[0] /= world_size;
+    timings_avg[1] /= world_size;
+
+    logger->info("    * PAIR_DUR_MIN = {:.2e} s, SORT_ACC_DUR_MIN = {:.2e} s",
+      timings_min[0], timings_min[1] );
+    logger->info("    * PAIR_DUR_MAX = {:.2e} s, SORT_ACC_DUR_MAX = {:.2e} s",
+      timings_max[0], timings_max[1] );
+    logger->info("    * PAIR_DUR_AVG = {:.2e} s, SORT_ACC_DUR_AVG = {:.2e} s",
+      timings_avg[0], timings_avg[1] );
+  }
   }
 
 #define REMOVE_CDETS
@@ -551,6 +575,14 @@ std::vector< wfn_t<N> > asci_search(
   auto keep_large_en = clock_type::now();
   duration_type keep_large_dur = keep_large_en - keep_large_st;
   logger->info("  * KEEP_LARGE_DUR = {:.2e} s", keep_large_dur.count() );
+  if(world_size > 1) {
+    float dur = keep_large_dur.count();
+    auto  dmin = allreduce( dur, MPI_MIN, comm );
+    auto  dmax = allreduce( dur, MPI_MAX, comm );
+    auto  davg = allreduce( dur, MPI_SUM, comm ) / world_size;
+    logger->info("    * KEEP_LARGE_DUR_MIN = {:.2e} s, MAX = {:.2e} s, AVG = {:.2e} s",
+      dmin, dmax, davg );
+  }
 
 //#else
 //
@@ -678,6 +710,14 @@ std::vector< wfn_t<N> > asci_search(
   logger->info("  * ASCI_SORT_DUR = {:.2e} s", 
     duration_type(asci_sort_en - asci_sort_st).count()
   );
+  if(world_size > 1) {
+    float dur = duration_type(asci_sort_en - asci_sort_st).count();
+    auto  dmin = allreduce( dur, MPI_MIN, comm );
+    auto  dmax = allreduce( dur, MPI_MAX, comm );
+    auto  davg = allreduce( dur, MPI_SUM, comm ) / world_size;
+    logger->info("    * ASCI_SORT_DUR_MIN = {:.2e} s, MAX = {:.2e} s, AVG = {:.2e} s",
+      dmin, dmax, davg );
+  }
 
   // Shrink to max search space
   asci_pairs.shrink_to_fit();
@@ -697,6 +737,7 @@ std::vector< wfn_t<N> > asci_search(
   logger->info("  * New Dets Mem = {:.2e} GiB", to_gib(new_dets));
 
   // Ensure consistent ordering
+#if 0
   if(world_size > 1) {
     std::sort(new_dets.begin(), new_dets.end(),
       bitset_less_comparator<N>{});
@@ -705,6 +746,7 @@ std::vector< wfn_t<N> > asci_search(
     // wfns... Sync to be sure
     bcast( new_dets.data(), new_dets.size(), 0, comm );
   }
+#endif
 
 #if 0
   if(!world_rank) {

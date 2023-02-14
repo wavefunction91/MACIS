@@ -68,6 +68,7 @@ typename RandomIt::value_type dist_quickselect( RandomIt begin, RandomIt end,
     size_t local_n = std::distance(local_begin, local_end);
     total_n = 
       total_gather_and_exclusive_scan(local_n, local_sizes, local_start, comm);
+    //if(!world_rank) printf("N = %lu\n", total_n);
     if(total_n < world_size) break;
 
     // Select a pivot index
