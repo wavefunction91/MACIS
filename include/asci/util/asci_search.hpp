@@ -75,6 +75,8 @@ struct ASCISettings {
 
   bool grow_with_rot    = false;
   size_t rot_size_start = 1000;
+
+  bool dist_triplet_random = false;
 };
 
 template <size_t N>
@@ -290,18 +292,38 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
            triplet_histogram(alpha, n_sing_alpha, n_doub_alpha, T, O, B );
       }
 
-      auto min_rank_it = 
-        std::min_element(world_workloads.begin(), world_workloads.end());
-      int min_rank = std::distance(world_workloads.begin(), min_rank_it);
+      if( asci_settings.dist_triplet_random ) {
+        if(nw) triplets.emplace_back(t_i,t_j,t_k);
+      } else {
+        auto min_rank_it = 
+          std::min_element(world_workloads.begin(), world_workloads.end());
+        int min_rank = std::distance(world_workloads.begin(), min_rank_it);
 
-      *min_rank_it += nw;
-      if( world_rank == min_rank and nw) 
-        triplets.emplace_back(t_i,t_j,t_k);
-
+        *min_rank_it += nw;
+        if( world_rank == min_rank and nw) triplets.emplace_back(t_i,t_j,t_k);
+      }
     } else {
       triplets.emplace_back(t_i,t_j,t_k);
     }
   }
+
+  if(world_size > 1 and asci_settings.dist_triplet_random) {
+    std::default_random_engine g(155039);
+    std::shuffle(triplets.begin(),triplets.end(),g);
+    std::vector< std::tuple<int,int,int> > local_triplets;
+    local_triplets.reserve(triplets.size() / world_size);
+    for( auto i = 0; i < triplets.size(); ++i) 
+    if( i % world_size == world_rank ) {
+      local_triplets.emplace_back(triplets[i]);
+    }
+    triplets = std::move(local_triplets);
+  }
+
+  //if(!world_rank) {
+  //std::cout << "WORKLOADS ";
+  //for( auto w : world_workloads ) std::cout << w << " ";
+  //std::cout << std::endl;
+  //}
 
   
   size_t max_size = std::min(asci_settings.pair_size_max,
@@ -463,6 +485,9 @@ std::vector< wfn_t<N> > asci_search(
     asci_settings.rv_prune_tol);
   logger->info("  MAX_RV_SIZE = {}, JUST_SINGLES = {}", 
     asci_settings.pair_size_max, asci_settings.just_singles);
+  if(world_size > 1) {
+    logger->info("  DIST_TRIPLET_RANDOM = {}", asci_settings.dist_triplet_random);
+  }
 
   auto asci_search_st = clock_type::now();
   
