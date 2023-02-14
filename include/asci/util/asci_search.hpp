@@ -509,9 +509,10 @@ std::vector< wfn_t<N> > asci_search(
 
 #define REMOVE_CDETS
 
-#ifndef REMOVE_CDETS
-  if(world_size > 1) throw std::runtime_error("MPI + !REMOVE_CDETS wont work robustly");
+//#ifndef REMOVE_CDETS
+  //if(world_size > 1) throw std::runtime_error("MPI + !REMOVE_CDETS wont work robustly");
  
+  auto keep_large_st = clock_type::now();
   // Finalize scores
   for( auto& x : asci_pairs ) x.rv = -std::abs(x.rv);
 
@@ -526,48 +527,70 @@ std::vector< wfn_t<N> > asci_search(
   keep_only_largest_copy_asci_pairs(asci_pairs);
  
 
-  // CDETS are included in list, so search over full NDETS_MAX
-  const size_t top_k_elements = ndets_max;
 
-#else
+#ifdef REMOVE_CDETS
 
-  // Finalize the scores
-  for( auto& p : asci_pairs ) p.rv = std::abs(p.rv);
-
-  // Remove wfns in CDETS from the ranking sort
-  for( size_t i = 0; i < ncdets; ++i ) {
-    auto state = *(cdets_begin + i);
-
-    asci_contrib<wfn_t<N>> state_c{ state,  -1 };
-    auto comparator = [](const auto& a, const auto& b) { 
-        return bitset_less(a.state, b.state);
-    };
-
-    // Do binary search for state in local pairs array
-    // XXX This assumes that sort_and_accumulate_asci_pairs uses
-    //     the same comparator
-    auto it = std::lower_bound( asci_pairs.begin(), asci_pairs.end(),
-      state_c, comparator );
-
-    // If found = replace
-    // All contribs are positive, inserting a negative makes
-    // the next search easier
-    if( it != asci_pairs.end() and !comparator(state_c, *it) ) {
-      *it = state_c;
-    } 
-  }
-
-  // Perform implicit removal of CDETS
-  { // Scope temp iterator
-  auto it = std::partition(asci_pairs.begin(), asci_pairs.end(),
-    [](const auto& p) { return p.rv > 0.0; } );
-  asci_pairs.erase(it, asci_pairs.end());
-  }
+  asci_pairs.erase(
+    std::partition(asci_pairs.begin(), asci_pairs.end(),
+      [](const auto& p) { return p.rv < 0.0; } ),
+    asci_pairs.end()
+  );
 
   // Only do top-K on (ndets_max - ncdets) b/c CDETS will be added later
   const size_t top_k_elements = ndets_max - ncdets;
 
+#else
+
+  if(world_size > 1) throw std::runtime_error("MPI + !REMOVE_CDETS wont work robustly");
+
+  // CDETS are included in list, so search over full NDETS_MAX
+  const size_t top_k_elements = ndets_max;
+
 #endif
+
+  auto keep_large_en = clock_type::now();
+  duration_type keep_large_dur = keep_large_en - keep_large_st;
+  logger->info("  * KEEP_LARGE_DUR = {:.2e} s", keep_large_dur.count() );
+
+//#else
+//
+//  // Finalize the scores
+//  for( auto& p : asci_pairs ) p.rv = std::abs(p.rv);
+//
+//  // Remove wfns in CDETS from the ranking sort
+//  for( size_t i = 0; i < ncdets; ++i ) {
+//    auto state = *(cdets_begin + i);
+//
+//    asci_contrib<wfn_t<N>> state_c{ state,  -1 };
+//    auto comparator = [](const auto& a, const auto& b) { 
+//        return bitset_less(a.state, b.state);
+//    };
+//
+//    // Do binary search for state in local pairs array
+//    // XXX This assumes that sort_and_accumulate_asci_pairs uses
+//    //     the same comparator
+//    auto it = std::lower_bound( asci_pairs.begin(), asci_pairs.end(),
+//      state_c, comparator );
+//
+//    // If found = replace
+//    // All contribs are positive, inserting a negative makes
+//    // the next search easier
+//    if( it != asci_pairs.end() and !comparator(state_c, *it) ) {
+//      *it = state_c;
+//    } 
+//  }
+//
+//  // Perform implicit removal of CDETS
+//  { // Scope temp iterator
+//  auto it = std::partition(asci_pairs.begin(), asci_pairs.end(),
+//    [](const auto& p) { return p.rv > 0.0; } );
+//  asci_pairs.erase(it, asci_pairs.end());
+//  }
+//
+//  // Only do top-K on (ndets_max - ncdets) b/c CDETS will be added later
+//  const size_t top_k_elements = ndets_max - ncdets;
+//
+//#endif
 
   // Do Top-K to get the largest determinant contributions
   auto asci_sort_st = clock_type::now();
