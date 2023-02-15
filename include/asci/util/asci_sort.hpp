@@ -31,6 +31,7 @@ void reorder_ci_on_coeff( std::vector<WfnT>& dets,
 
 template <typename WfnT>
 void sort_and_accumulate_asci_pairs( asci_contrib_container<WfnT>& asci_pairs ) {
+  if(!asci_pairs.size()) return;
   auto comparator = [](const auto& x, const auto& y) {
     return bitset_less(x.state, y.state);
   };
@@ -62,6 +63,7 @@ template <typename WfnT>
 void keep_only_largest_copy_asci_pairs( 
   asci_contrib_container<WfnT>& asci_pairs 
 ) {
+  if(!asci_pairs.size()) return;
   auto comparator = [](const auto& x, const auto& y) {
     //return not (x.state == y.state or bitset_less(x.state, y.state));
     return bitset_less(x.state, y.state);
