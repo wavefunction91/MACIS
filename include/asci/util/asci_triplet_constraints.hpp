@@ -261,7 +261,7 @@ void generate_triplet_singles_contributions_ss(
     for( auto p : occ_othr ) h_el += V_ov[p];
 
     // Early Exit
-    if( std::abs(h_el) < h_el_tol ) continue;
+    if( std::abs(coeff * h_el) < h_el_tol ) continue;
 
     // Calculate Excited Determinant
     auto ex_det = det | os_det; ex_det.flip(i).flip(a);
@@ -322,7 +322,7 @@ void generate_triplet_doubles_contributions_ss(
     //printf(" %d %d %d %d %.6e\n", i,j,a,b, G_aibj);
 
     // Early Exit
-    if( std::abs(G_aibj) < h_el_tol ) continue;
+    if( std::abs(coeff * G_aibj) < h_el_tol ) continue;
 
     // Calculate Excited Determinant (spin)
     const auto full_ex_spin = ij | ab;
@@ -397,9 +397,10 @@ void generate_triplet_doubles_contributions_os(
       const auto V_aibj = V_ai[jb*LDV2];
 
       // Early Exist
-      if( std::abs(V_aibj) < h_el_tol ) continue;
+      if( std::abs(coeff * V_aibj) < h_el_tol ) continue;
 
-      double sign_othr = single_excitation_sign( os_det >> (N/2),  b, j );
+      //double sign_othr = single_excitation_sign( os_det >> (N/2),  b, j );
+      double sign_othr = single_excitation_sign(bitset_hi_word(os_det) ,  b, j );
       double sign = sign_same * sign_othr;
 
       // Compute Excited Determinant
