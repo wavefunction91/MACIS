@@ -31,8 +31,10 @@ find_package(Eigen3 CONFIG REQUIRED)
 target_link_libraries(asci PUBLIC Eigen3::Eigen)
 
 # Boost
-find_package(Boost CONFIG REQUIRED)
-target_link_libraries(asci PUBLIC Boost::boost)
+if(ASCI_ENABLE_BOOST)
+  find_package(Boost CONFIG REQUIRED)
+  target_link_libraries(asci PUBLIC Boost::boost)
+endif()
 
 # Packaged Dependencies
 target_link_libraries(asci PUBLIC lobpcgxx sparsexx)
