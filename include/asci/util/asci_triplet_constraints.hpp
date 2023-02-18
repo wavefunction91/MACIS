@@ -1,6 +1,7 @@
 #pragma once
 #include <asci/types.hpp>
 #include <asci/sd_operations.hpp>
+#include <asci/util/mpi.hpp>
 
 namespace asci {
 #if 1
@@ -421,6 +422,103 @@ void generate_triplet_doubles_contributions_os(
   } // A
   } // I
 }
+
+
+
+template <typename Integral, size_t N>
+auto dist_triplets_all(size_t norb, size_t ns_othr, size_t nd_othr,
+  const std::vector<wfn_t<N>>& unique_alpha) {
+
+  std::vector< std::tuple<Integral,Integral,Integral> > triplets; 
+  triplets.reserve(norb*norb*norb);
+  for(int t_i = 0; t_i < norb; ++t_i)
+  for(int t_j = 0; t_j < t_i;  ++t_j)
+  for(int t_k = 0; t_k < t_j;  ++t_k) {
+    auto [T,O,B] = make_triplet_masks<N>(norb,t_i,t_j,t_k);
+    size_t nw = 0;
+    for( const auto& alpha : unique_alpha ) {
+       nw += 
+         triplet_histogram(alpha, ns_othr, nd_othr, T, O, B );
+    }
+
+    if(nw) triplets.emplace_back(t_i,t_j,t_k);
+  }
+  
+
+  return triplets;
+}
+
+
+template <typename Integral, size_t N>
+auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
+  const std::vector<wfn_t<N>>& unique_alpha, MPI_Comm comm) {
+
+  auto world_rank = comm_rank(comm);
+  auto world_size = comm_size(comm);
+  using triplet = std::tuple<Integral, Integral, Integral>;
+
+  // Generate pairs + heuristic
+  std::vector<std::pair<triplet,size_t>> triplet_sizes; 
+  triplet_sizes.reserve(norb*norb*norb);
+  for(int t_i = 0; t_i < norb; ++t_i)
+  for(int t_j = 0; t_j < t_i;  ++t_j)
+  for(int t_k = 0; t_k < t_j;  ++t_k) {
+    auto [T,O,B] = make_triplet_masks<N>(norb,t_i,t_j,t_k);
+    size_t nw = 0;
+    for( const auto& alpha : unique_alpha ) {
+       nw += 
+         triplet_histogram(alpha, ns_othr, nd_othr, T, O, B );
+    }
+    if(nw) triplet_sizes.emplace_back(triplet{t_i, t_j, t_k}, nw);
+  }
+
+  // Sort to get optimal bucket partitioning
+  std::sort(triplet_sizes.begin(), triplet_sizes.end(),
+    [](const auto& a, const auto& b){ return a.second > b.second;} );
+  
+  // Assign work
+  std::vector<size_t> workloads(world_size, 0);
+  std::vector< triplet > triplets; 
+  triplets.reserve((norb*norb*norb) / world_size);
+
+  for( auto [trip, nw] : triplet_sizes ) {
+
+    // Get rank with least amount of work
+    auto min_rank_it = std::min_element(workloads.begin(), workloads.end());
+    int min_rank = std::distance(workloads.begin(), min_rank_it);
+
+    // Assign triplet
+    *min_rank_it += nw;
+    if(world_rank == min_rank) triplets.emplace_back(trip);
+    
+  }
+  
+
+  return triplets;
+}
+
+template <typename Integral, size_t N>
+auto dist_triplets_random(size_t norb, size_t ns_othr, size_t nd_othr,
+  const std::vector<wfn_t<N>>& unique_alpha, MPI_Comm comm) {
+
+  auto triplets = dist_triplets_all<Integral>(norb,ns_othr, nd_othr, unique_alpha);
+  auto world_rank = comm_rank(comm);
+  auto world_size = comm_size(comm);
+
+  std::default_random_engine g(155039);
+  std::shuffle(triplets.begin(),triplets.end(),g);
+
+  std::vector< std::tuple<Integral,Integral,Integral> > local_triplets;
+  local_triplets.reserve(triplets.size() / world_size);
+  for( auto i = 0; i < triplets.size(); ++i) 
+  if( i % world_size == world_rank ) {
+    local_triplets.emplace_back(triplets[i]);
+  }
+  triplets = std::move(local_triplets);
+
+  return triplets;
+}
+
 
 #endif
 }

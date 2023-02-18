@@ -16,8 +16,8 @@ std::array<unsigned, NRadix> top_set_indices( std::bitset<NBits> word ) {
   return top_set_indices;
 }
 
-template <size_t NRadix, size_t NSet, size_t NBits>
-size_t top_set_ordinal( std::bitset<NBits> word ) {
+template <size_t NRadix, size_t NBits>
+size_t top_set_ordinal( std::bitset<NBits> word, size_t NSet ) {
   auto ind = top_set_indices<NRadix>(word);
   size_t ord = 0; size_t fact = 1;
   for(size_t i = 0; i < NRadix; ++i) {
@@ -90,7 +90,8 @@ TEST_CASE("Triplets") {
 
 
   // Compute Histograms
-  std::vector<size_t> hist(num_bits/2*num_bits/2*num_bits/2, 0);
+  std::vector<size_t> triplet_hist(norb*norb*norb, 0);
+  std::vector<size_t> quad_hist   (norb*norb*norb*norb, 0);
   for( auto i = 0; i < nuniq_alpha; ++i) {
 
     // Constant dimensions
@@ -106,29 +107,42 @@ TEST_CASE("Triplets") {
 
     // Histogram contribution from root determinant
     {
-      const auto label = top_set_ordinal<3, num_bits/2>(wfn_a_uniq[i]);
-      hist[label] += n_singles + n_doubles + 1;
+      const auto label = top_set_ordinal<3>(wfn_a_uniq[i], norb);
+      triplet_hist[label] += n_singles + n_doubles + 1;
+    }
+    {
+      const auto label = top_set_ordinal<4>(wfn_a_uniq[i], norb);
+      quad_hist[label] += n_singles + n_doubles + 1;
     }
 
     // Histogram contribtutions from single excitations
     for(const auto& w : s_a) {
-      const auto label = top_set_ordinal<3, num_bits/2>(w);
-      hist[label] += n_singles + 1;
+      const auto label = top_set_ordinal<3>(w,norb);
+      triplet_hist[label] += n_singles + 1;
+    }
+    for(const auto& w : s_a) {
+      const auto label = top_set_ordinal<4>(w,norb);
+      quad_hist[label] += n_singles + 1;
     }
 
     // Histogram contribtuions from double excitations
     for(const auto& w : d_a) {
-      const auto label = top_set_ordinal<3, num_bits/2>(w);
-      hist[label]++;
+      const auto label = top_set_ordinal<3>(w,norb);
+      triplet_hist[label]++;
+    }
+    for(const auto& w : d_a) {
+      const auto label = top_set_ordinal<4>(w,norb);
+      quad_hist[label]++;
     }
 
   }
 
-  //std::cout << std::accumulate(hist.begin(), hist.end(),0ul) << std::endl;
+  std::cout << std::accumulate(triplet_hist.begin(), triplet_hist.end(),0ul) << std::endl;
+  std::cout << std::accumulate(quad_hist.begin(), quad_hist.end(),0ul) << std::endl;
 
   // Print Histogram
-  //for( auto i = 0; i < hist.size() ; ++ i ) {
-  //  if(hist[i]) std::cout << i << " " << hist[i] << std::endl;
+  //for( auto i = 0; i < triplet_hist.size() ; ++ i ) {
+  //  if(triplet_hist[i]) std::cout << i << " " << triplet_hist[i] << std::endl;
   //}
 
   std::vector<std::tuple<unsigned, unsigned, unsigned>> triplets; 
@@ -138,20 +152,11 @@ TEST_CASE("Triplets") {
     triplets.emplace_back(i,j,k);
   }
 
-  std::vector<size_t> new_hist(hist.size(), 0);
+  std::vector<size_t> new_triplet_hist(triplet_hist.size(), 0);
   for( auto [i,j,k] : triplets ) {
     const auto label = i*32*32 + j*32 + k;
-#if 0
-    // Create masks
-    asci::wfn_t<num_bits> T(0); 
-    T.flip(i).flip(j).flip(k); 
-
-    auto overfill = asci::full_mask<num_bits>(norb);
-    asci::wfn_t<num_bits> B(1); B <<= k; B = B.to_ullong() - 1;
-#else
     auto [T, overfill, B] = 
       asci::make_triplet_masks<num_bits>(norb,i,j,k);
-#endif
 
     for( auto det : wfn_a_uniq ) {
       const size_t nocc = det.count();
@@ -160,10 +165,10 @@ TEST_CASE("Triplets") {
       const size_t n_doubles = 
         (n_singles * (n_singles - nocc - nvir + 1))/4;
 
-      new_hist[label] += asci::triplet_histogram( det, n_singles, n_doubles, T, overfill, B );
+      new_triplet_hist[label] += asci::triplet_histogram( det, n_singles, n_doubles, T, overfill, B );
     }
   }
 
-  REQUIRE(hist == new_hist);
+  REQUIRE(triplet_hist == new_triplet_hist);
 }
 

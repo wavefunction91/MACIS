@@ -268,7 +268,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
 
-  std::vector<size_t> world_workloads(world_size, 0);
 
   const auto n_occ_alpha = uniq_alpha_wfn[0].count();
   const auto n_vir_alpha = norb - n_occ_alpha;
@@ -280,6 +279,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
 
   // Generate triplets
   std::vector< std::tuple<int,int,int> > triplets; 
+#if 0
+  std::vector<size_t> world_workloads(world_size, 0);
   triplets.reserve(norb*norb*norb);
   for(int t_i = 0; t_i < norb; ++t_i)
   for(int t_j = 0; t_j < t_i;  ++t_j)
@@ -320,12 +321,16 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
     }
     triplets = std::move(local_triplets);
   }
+#else
+  if( asci_settings.dist_triplet_random )
+    triplets = dist_triplets_random<int>(norb, n_sing_alpha, n_doub_alpha,
+      uniq_alpha_wfn, comm);
+  else
+    triplets = dist_triplets_histogram<int>(norb, n_sing_alpha, n_doub_alpha,
+      uniq_alpha_wfn, comm);
+  
+#endif
 
-  //if(!world_rank) {
-  //std::cout << "WORKLOADS ";
-  //for( auto w : world_workloads ) std::cout << w << " ";
-  //std::cout << std::endl;
-  //}
 
   //std::vector<size_t> triplet_nontriv_counts(triplets.size());
   
@@ -463,6 +468,89 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
   //printf("[rank %d] MAX TRIP %d %d %d SZ = %lu\n",
   //  world_rank, std::get<0>(max_trip), std::get<1>(max_trip), std::get<2>(max_trip),
   //  max_trip_sz );
+
+#if 0
+  // Break apart largest triplet into quads
+  std::vector<size_t> quad_histogram(norb*norb*norb*norb, 0);
+  std::vector<size_t> quint_histogram(norb*norb*norb*norb*norb, 0);
+  {
+    auto [t_i, t_j, t_k] = max_trip;
+    auto [T,O,B] = 
+      make_triplet_masks<N/2>(norb,t_i,t_j,t_k);
+
+    // Loop over pairs
+    for( auto [state, rv] : asci_pairs ) {
+      // Grab alpha word
+      auto det = bitset_lo_word(state);    
+
+      // If det satisfies T
+      if( (det & T).count() == 3 and ((det ^ T) >> t_k).count() == 0 ) {
+
+        // Compute quad index
+        unsigned q_i, q_j, q_k, q_l;
+        {
+        auto word = det;
+        q_i = asci::fls(word); word.flip(q_i);
+        q_j = asci::fls(word); word.flip(q_j);
+        q_k = asci::fls(word); word.flip(q_k);
+        q_l = asci::fls(word); word.flip(q_l);
+        }
+
+        { 
+        const size_t label = q_l + q_k*norb + q_j*norb*norb + q_i*norb*norb*norb;
+        quad_histogram[label]++;
+        }
+
+        // Compute quint index
+        unsigned f_i, f_j, f_k, f_l, f_m;
+        {
+        auto word = det;
+        f_i = asci::fls(word); word.flip(f_i);
+        f_j = asci::fls(word); word.flip(f_j);
+        f_k = asci::fls(word); word.flip(f_k);
+        f_l = asci::fls(word); word.flip(f_l);
+        f_m = asci::fls(word); word.flip(f_m);
+        }
+
+        { 
+        const size_t label = f_m + (f_l + f_k*norb + f_j*norb*norb + f_i*norb*norb*norb)*norb;
+        quint_histogram[label]++;
+        }
+      }
+    }
+  }
+
+  {
+  std::ofstream quad_file("quad_file."+std::to_string(world_rank)+".txt");
+  quad_file << "MAX TRIP = " << std::get<0>(max_trip) << " "
+                             << std::get<1>(max_trip) << " "
+                             << std::get<2>(max_trip) << " SZ = "
+                             << max_trip_sz << std::endl;
+  for(int i = 0; i < norb; ++i)
+  for(int j = 0; j < i;    ++j)
+  for(int k = 0; k < j;    ++k)
+  for(int l = 0; l < k;    ++l) {
+    const size_t label = l + k*norb + j*norb*norb + i*norb*norb*norb;
+    if(quad_histogram[label]) {
+      quad_file << i << " " << j << " " << k << " " << l << " SZ = " 
+                << quad_histogram[label] << std::endl;
+    }
+  }
+
+  quad_file << std::endl;
+  for(int i = 0; i < norb; ++i)
+  for(int j = 0; j < i;    ++j)
+  for(int k = 0; k < j;    ++k)
+  for(int l = 0; l < k;    ++l) 
+  for(int m = 0; m < l;    ++m) {
+    const size_t label = m + (l + k*norb + j*norb*norb + i*norb*norb*norb)*norb;
+    if(quint_histogram[label]) {
+      quad_file << i << " " << j << " " << k << " " << l << " " << m << " SZ = " 
+                << quint_histogram[label] << std::endl;
+    }
+  }
+  }
+#endif
 
   return asci_pairs;
 }
