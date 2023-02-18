@@ -276,6 +276,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
   const auto n_doub_alpha = 
     (n_sing_alpha * ( n_sing_alpha - norb + 1 )) / 4;
 
+  logger->info(" * NS = {} ND = {}", n_sing_alpha, n_doub_alpha); 
+
   // Generate triplets
   std::vector< std::tuple<int,int,int> > triplets; 
   triplets.reserve(norb*norb*norb);
@@ -325,6 +327,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
   //std::cout << std::endl;
   //}
 
+  //std::vector<size_t> triplet_nontriv_counts(triplets.size());
   
   size_t max_size = std::min(asci_settings.pair_size_max,
     ncdets * 
@@ -335,7 +338,10 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
   );
   asci_pairs.reserve(max_size);
   // Loop over triplets
+  size_t max_trip_sz = 0;
+  std::tuple<int,int,int> max_trip;
   for( auto [t_i, t_j, t_k] : triplets ) {
+    auto size_before = asci_pairs.size();
 
     auto [T,O,B] = 
       make_triplet_masks<N>(norb,t_i,t_j,t_k);
@@ -437,10 +443,26 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
       } // Pruning 
     } // Unique Alpha Loop
 
+    // Local S&A for each triplet
+    {
+    auto uit = sort_and_accumulate_asci_pairs( 
+      asci_pairs.begin() + size_before, asci_pairs.end()
+    );
+    asci_pairs.erase(uit, asci_pairs.end());
+    }
+
+    auto size_after = asci_pairs.size();
+    //triplet_nontriv_counts[itrip++] = size_after - size_before;
+    if( size_after - size_before > max_trip_sz ) {
+      max_trip_sz = size_after - size_before;
+      max_trip = {t_i, t_j, t_k};
+    }
+
   } // Triplet Loop
 
-  //std::cout << "PAIRS SIZE = " << asci_pairs.size() << std::endl;
-  //if(world_size > 1) throw std::runtime_error("DIE DIE DIE");
+  //printf("[rank %d] MAX TRIP %d %d %d SZ = %lu\n",
+  //  world_rank, std::get<0>(max_trip), std::get<1>(max_trip), std::get<2>(max_trip),
+  //  max_trip_sz );
 
   return asci_pairs;
 }
@@ -511,7 +533,7 @@ std::vector< wfn_t<N> > asci_search(
   if(world_size > 1) {
     size_t npairs_max = allreduce( asci_pairs.size(), MPI_MAX, comm);
     size_t npairs_min = allreduce( asci_pairs.size(), MPI_MIN, comm);
-    logger->info("    * PAIRS_MIN = {}, PAIRS_MAX = {}, PAIRS_AVG = {}", npairs_min, npairs_max, npairs / double(world_size) );
+    logger->info("    * PAIRS_MIN = {}, PAIRS_MAX = {}, PAIRS_AVG = {}, RATIO = {} ", npairs_min, npairs_max, npairs / double(world_size), npairs_max / double(npairs_min) );
   } 
   logger->info("  * Pairs Mem = {:.2e} GiB", to_gib(asci_pairs));
   }
@@ -524,8 +546,9 @@ std::vector< wfn_t<N> > asci_search(
 #endif
 
   // Accumulate unique score contributions
+  // MPI + Constraint Search already does S&A
   auto bit_sort_st = clock_type::now();
-  sort_and_accumulate_asci_pairs( asci_pairs );
+  if(world_size == 1) sort_and_accumulate_asci_pairs( asci_pairs );
   auto bit_sort_en = clock_type::now();
 
   {

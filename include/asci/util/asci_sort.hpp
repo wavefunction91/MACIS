@@ -32,9 +32,15 @@ void reorder_ci_on_coeff( std::vector<WfnT>& dets,
 
 }
 
-template <typename WfnT>
-void sort_and_accumulate_asci_pairs( asci_contrib_container<WfnT>& asci_pairs ) {
-  if(!asci_pairs.size()) return;
+template <typename PairIterator>
+PairIterator sort_and_accumulate_asci_pairs( 
+  PairIterator pairs_begin, PairIterator pairs_end
+) {
+
+  const size_t npairs = std::distance(pairs_begin, pairs_end);
+
+  if(!npairs) return pairs_end;
+
   auto comparator = [](const auto& x, const auto& y) {
     return bitset_less(x.state, y.state);
   };
@@ -45,11 +51,11 @@ void sort_and_accumulate_asci_pairs( asci_contrib_container<WfnT>& asci_pairs ) 
   #else
   std::sort
   #endif
-  ( asci_pairs.begin(), asci_pairs.end(), comparator );
+  ( pairs_begin, pairs_end, comparator );
 
   // Accumulate the ASCI scores into first instance of unique bitstrings
-  auto cur_it = asci_pairs.begin();
-  for( auto it = cur_it + 1; it != asci_pairs.end(); ++it ) {
+  auto cur_it = pairs_begin;
+  for( auto it = cur_it + 1; it != pairs_end; ++it ) {
     // If iterate is not the one being tracked, update the iterator
     if( it->state != cur_it->state ) { cur_it = it; }
 
@@ -61,8 +67,13 @@ void sort_and_accumulate_asci_pairs( asci_contrib_container<WfnT>& asci_pairs ) 
   }
 
   // Remote duplicate bitstrings
-  auto uit = std::unique( asci_pairs.begin(), asci_pairs.end(),
+  return std::unique( pairs_begin, pairs_end,
     [](auto x, auto y){ return x.state == y.state; } );
+}
+
+template <typename WfnT>
+void sort_and_accumulate_asci_pairs( asci_contrib_container<WfnT>& asci_pairs ) {
+  auto uit = sort_and_accumulate_asci_pairs( asci_pairs.begin(), asci_pairs.end());
   asci_pairs.erase(uit, asci_pairs.end()); // Erase dead space
 }
 
