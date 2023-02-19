@@ -235,12 +235,10 @@ size_t triplet_histogram( wfn_t<N> det, size_t n_os_singles, size_t n_os_doubles
   return ndet;
 }
 
-
-
-
-
 template <size_t N>
-auto count_quad_singles( wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O, wfn_t<N> B ) {
+auto generate_quad_single_excitations( wfn_t<N> det,
+  wfn_t<N> Q, wfn_t<N> O, wfn_t<N> B ) {
+
   unsigned i,j,k,l;
   {
   auto Q_cpy = Q;
@@ -254,20 +252,117 @@ auto count_quad_singles( wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O, wfn_t<N> B ) {
   
   // Get triplet singles
   auto [o,v] = generate_triplet_single_excitations(det, T, O, B_trip);
-  if( !o.count() or !v.count() ) return 0ul;
+  if( !o.count() or !v.count() ) return std::make_pair(o,v);
+
+  // Generate quad singles
   const auto occ = bits_to_indices(o);
   const auto vir = bits_to_indices(v);
 
-  size_t n_quad_singles = 0;
+  wfn_t<N> o_quad(0), v_quad(0);
   for(auto i : occ) 
   for(auto a : vir) {
     wfn_t<N> temp = det; temp.flip(i).flip(a);
-    if(satisfies_quad(temp, Q, l)) n_quad_singles++;
+    if(satisfies_quad(temp, Q, l)) {
+      o_quad.flip(i); v_quad.flip(a);
+    }
   }
 
-  return n_quad_singles;
+  return std::make_pair(o_quad,v_quad);
 }
 
+template <size_t N>
+void generate_quad_singles( wfn_t<N> det, 
+  wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B,
+  std::vector<wfn_t<N>>& t_singles
+) {
+
+  auto [o,v] = generate_quad_single_excitations( det, T, O_mask, B );
+  const auto oc = o.count();
+  const auto vc = v.count();
+  if( !oc or !vc ) return;
+
+  t_singles.clear();
+  t_singles.reserve(oc*vc);
+  const auto occ = bits_to_indices(o);
+  const auto vir = bits_to_indices(v);
+  for( auto i : occ ) {
+    auto temp = det; temp.flip(i);
+    for( auto a : vir ) t_singles.emplace_back(temp).flip(a);
+  }
+  
+}
+
+template <typename... Args>
+unsigned count_quad_singles(Args&&... args) {
+  auto [o,v] = generate_quad_single_excitations( std::forward<Args>(args)... );
+  return o.count() * v.count();
+}
+
+
+
+template <size_t N>
+auto generate_quad_double_excitations( wfn_t<N> det, 
+  wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B
+) {
+
+  unsigned i,j,k,l;
+  {
+  auto Q_cpy = Q;
+  i = fls(Q_cpy); Q_cpy.flip(i);
+  j = fls(Q_cpy); Q_cpy.flip(j);
+  k = fls(Q_cpy); Q_cpy.flip(k);
+  l = fls(Q_cpy); Q_cpy.flip(l);
+  }
+  
+  auto [T,_dummy,B_trip] = make_triplet_masks<N>(1,i,j,k);
+  
+  // Get triplet doubles
+  auto [O,V] = generate_triplet_double_excitations(det, T, O_mask, B_trip);
+  if( !O.size() or !V.size() ) return std::make_pair(O,V);
+
+  std::vector<wfn_t<N>> O_quad, V_quad;
+  for(auto ij : O) 
+  for(auto ab : V) {
+    wfn_t<N> temp = (det ^ ij) | ab;
+    if(satisfies_quad(temp, Q, l)) {
+      O_quad.emplace_back(ij);
+      V_quad.emplace_back(ab);
+    };
+  }
+
+  return std::make_pair(O_quad, V_quad);
+}
+
+template <size_t N>
+void generate_quad_doubles( wfn_t<N> det, 
+  wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B,
+  std::vector<wfn_t<N>>& t_doubles
+) {
+
+  auto [O,V] = generate_quad_double_excitations(det,Q,O_mask,B);
+
+  t_doubles.clear();
+  for(auto ij : O) {
+    const auto temp = det ^ ij;
+    for( auto ab : V ) {
+      t_doubles.emplace_back(temp | ab);
+    }
+  }
+}
+
+template <size_t N>
+unsigned count_quad_doubles( wfn_t<N> det, 
+  wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B
+) {
+
+  auto [O,V] = generate_quad_double_excitations(det,Q,O_mask,B);
+  return O.size() * V.size();
+}
+
+
+
+
+#if 0
 template <size_t N>
 auto count_quad_doubles( wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B ) {
   unsigned i,j,k,l;
@@ -294,6 +389,7 @@ auto count_quad_doubles( wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B )
 
   return n_quad_doubles;
 }
+#endif
 
 
 template <size_t N, typename... Args>
