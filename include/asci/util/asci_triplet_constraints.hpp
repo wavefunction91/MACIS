@@ -2,6 +2,7 @@
 #include <asci/types.hpp>
 #include <asci/sd_operations.hpp>
 #include <asci/util/mpi.hpp>
+#include <variant>
 
 namespace asci {
 #if 1
@@ -966,13 +967,14 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
   auto world_size = comm_size(comm);
   using triplet = std::tuple<Integral, Integral, Integral>;
   using quad    = std::tuple<Integral, Integral, Integral, Integral>;
+  using constraint = std::variant<triplet, quad>;
 
   // Global workloads
   std::vector<size_t> workloads(world_size, 0);
 
   // Generate triplets + heuristic
-  std::vector<std::pair<triplet,size_t>> triplet_sizes; 
-  triplet_sizes.reserve(norb*norb*norb);
+  std::vector<std::pair<constraint ,size_t>> constraint_sizes; 
+  constraint_sizes.reserve(norb*norb*norb);
   size_t total_work = 0;
   for(int t_i = 0; t_i < norb; ++t_i)
   for(int t_j = 0; t_j < t_i;  ++t_j)
@@ -983,38 +985,63 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
        nw += 
          triplet_histogram(alpha, ns_othr, nd_othr, T, O, B );
     }
-    if(nw) triplet_sizes.emplace_back(triplet{t_i, t_j, t_k}, nw);
+    if(nw) constraint_sizes.emplace_back(triplet{t_i, t_j, t_k}, nw);
     total_work += nw;
   }
 
 
+
+  // Select triplets larger than average to be broken apart
   size_t local_average = (0.8*total_work) / world_size;
-
-  // Get triplets larger than average
-  std::vector<std::pair<triplet,size_t>> tps_to_quad;
+  std::vector<std::pair<constraint,size_t>> tps_to_quad;
   {
-  auto it = std::partition(triplet_sizes.begin(), triplet_sizes.end(),
+  auto it = std::partition(constraint_sizes.begin(), constraint_sizes.end(),
     [=](const auto& a) { return a.second <= local_average; });
-  //printf("[rank %d] NLARGE = %lu\n", world_rank, 
-  //  std::distance(it, triplet_sizes.end()));
 
-  tps_to_quad = std::vector<std::pair<triplet,size_t>>(it, triplet_sizes.end());
-  triplet_sizes.erase(it, triplet_sizes.end());
+  // Remove triplets from full list
+  tps_to_quad = std::vector<std::pair<constraint,size_t>>(it, constraint_sizes.end());
+  constraint_sizes.erase(it, constraint_sizes.end());
   for( auto [t,s] : tps_to_quad ) total_work -= s;
   }
 
-  //printf("[rank %2d] TSZ = %lu QSZ = %lu\n", world_rank, triplet_sizes.size(), tps_to_quad.size());
+
+
+  // Break apart triplets
+  for( auto [c, nw_trip] : tps_to_quad ) {
+    const auto trip = std::get<triplet>(c);
+
+    // Unpack triplets
+    auto [q_i, q_j, q_k] = trip;
+    
+    // Loop over possible quads
+    for(auto q_l = 0; q_l < q_k; ++q_l) {
+      // Generate quad masks / counts
+      auto [Q,O,B] = make_quad_masks<N>(norb, q_i,q_j,q_k,q_l);
+      size_t nw = 0;
+
+      
+      for( const auto& alpha : unique_alpha ) {
+         nw += 
+           quad_histogram(alpha, ns_othr, nd_othr, Q, O, B );
+      }
+      if(nw) constraint_sizes.emplace_back(quad{q_i, q_j, q_k, q_l}, nw);
+      total_work += nw;
+    }
+
+  }
+
 
 
   // Sort to get optimal bucket partitioning
-  std::sort(triplet_sizes.begin(), triplet_sizes.end(),
+  std::sort(constraint_sizes.begin(), constraint_sizes.end(),
     [](const auto& a, const auto& b){ return a.second > b.second;} );
   
-  // Assign triplet work
+  // Assign work
   std::vector< triplet > triplets; 
-  triplets.reserve((norb*norb*norb) / world_size);
+  std::vector< quad > quads; 
+  triplets.reserve(constraint_sizes.size() / world_size);
 
-  for( auto [trip, nw] : triplet_sizes ) {
+  for( auto [c, nw] : constraint_sizes ) {
 
     // Get rank with least amount of work
     auto min_rank_it = std::min_element(workloads.begin(), workloads.end());
@@ -1022,18 +1049,15 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 
     // Assign triplet
     *min_rank_it += nw;
-    if(world_rank == min_rank) triplets.emplace_back(trip);
+    if(world_rank == min_rank) {
+      if(const auto* p = std::get_if<triplet>(&c)) triplets.emplace_back(*p);
+      else quads.emplace_back(std::get<quad>(c));
+    }
     
   }
 
 
-
-  //printf("[rank %2d] BEFORE LOCAL WORK = %lu TOTAL WORK = %lu\n", world_rank, 
-  //workloads[world_rank], total_work);
-
-
-
-
+#if 0
   // Generate quads + heuristic
   std::vector<std::pair<quad,size_t>> quad_sizes; 
   quad_sizes.reserve(tps_to_quad.size() * norb);
@@ -1043,53 +1067,21 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 
     // Unpack triplets
     auto [q_i, q_j, q_k] = trip;
-    //if(world_rank == 0) printf("LARGE TRIP %d %d %d NW %lu\n",q_i,q_j,q_k, nw_trip);
-
-    #if 0
-    std::vector<wfn_t<N>> trip_singles, trip_doubles;
-    {
-      auto [T,O,B] = make_triplet_masks<N>(norb, q_i,q_j,q_k);
-      
-      std::vector<wfn_t<N>> ls, ld;
-      for( const auto& alpha : unique_alpha ) {
-        generate_triplet_singles(alpha, T,O,B, ls);
-        generate_triplet_doubles(alpha, T,O,B, ld);
-        trip_singles.insert(trip_singles.end(), ls.begin(), ls.end());
-        trip_doubles.insert(trip_doubles.end(), ld.begin(), ld.end());
-      }
-    }
-    #endif
-
     
-    size_t loc_sum = 0;
     // Loop over possible quads
-    //std::vector<wfn_t<N>> quad_singles, quad_doubles;
     for(auto q_l = 0; q_l < q_k; ++q_l) {
       // Generate quad masks / counts
       auto [Q,O,B] = make_quad_masks<N>(norb, q_i,q_j,q_k,q_l);
       size_t nw = 0;
 
       
-      //std::vector<wfn_t<N>> ls, ld;
       for( const auto& alpha : unique_alpha ) {
-        //generate_quad_singles(alpha, Q,O,B, ls);
-        //generate_quad_doubles(alpha, Q,O,B, ld);
-        //quad_singles.insert(quad_singles.end(), ls.begin(), ls.end());
-        //quad_doubles.insert(quad_doubles.end(), ld.begin(), ld.end());
-
          nw += 
            quad_histogram(alpha, ns_othr, nd_othr, Q, O, B );
       }
-      //if(world_rank == 0) printf("  QUAD %d %d %d %d NW %lu\n",q_i,q_j,q_k, q_l, nw);
       if(nw) quad_sizes.emplace_back(quad{q_i, q_j, q_k, q_l}, nw);
       total_work += nw;
-      loc_sum += nw;
     }
-    //if( world_rank == 0 ) {
-    //  std::cout << "  * TS = " << trip_singles.size() << " QS = " << quad_singles.size() << std::endl;
-    //  std::cout << "  * TD = " << trip_doubles.size() << " QD = " << quad_doubles.size() << std::endl;
-    //}
-    //printf("[rank %2d] NW_REF = %lu NW = %lu\n", world_rank, nw_trip, loc_sum);
 
   }
 
@@ -1113,6 +1105,7 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
     if(world_rank == min_rank) quads.emplace_back(quad);
     
   }
+#endif
 
   if(world_rank == 0)
   printf("[rank %2d] AFTER LOCAL WORK = %lu TOTAL WORK = %lu\n", world_rank, 
