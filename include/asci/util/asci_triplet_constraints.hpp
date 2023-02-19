@@ -17,6 +17,25 @@ auto make_triplet_masks(size_t norb,
   return std::make_tuple(T,overfill,B);
 }
 
+
+template <size_t N>
+auto make_quad_masks(size_t norb,
+  unsigned i, unsigned j, unsigned k, unsigned l) {
+
+  wfn_t<N> Q(0); Q.flip(i).flip(j).flip(k).flip(l);
+  auto overfill = full_mask<N>(norb);
+  wfn_t<N> B(1); B <<= l; B = B.to_ullong() - 1;
+
+  return std::make_tuple(Q,overfill,B);
+}
+
+
+template <size_t N>
+bool satisfies_quad( wfn_t<N> det, wfn_t<N> Q, unsigned Q_min ) {
+  return (det & Q).count() == 4 and ((det ^ Q) >> Q_min).count() == 0;
+}
+
+
 template <size_t N>
 auto generate_triplet_single_excitations( wfn_t<N> det,
   wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B ) {
@@ -210,6 +229,85 @@ size_t triplet_histogram( wfn_t<N> det, size_t n_os_singles, size_t n_os_doubles
   ndet += ns * n_os_singles; // AABB
   auto T_min = ffs(T) - 1;
   if( (det & T).count() == 3 and ((det ^ T) >> T_min).count() == 0 ) {
+    ndet += n_os_singles + n_os_doubles + 1; // BB + BBBB + No Excitations
+  }
+
+  return ndet;
+}
+
+
+
+
+
+template <size_t N>
+auto count_quad_singles( wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O, wfn_t<N> B ) {
+  unsigned i,j,k,l;
+  {
+  auto Q_cpy = Q;
+  i = fls(Q_cpy); Q_cpy.flip(i);
+  j = fls(Q_cpy); Q_cpy.flip(j);
+  k = fls(Q_cpy); Q_cpy.flip(k);
+  l = fls(Q_cpy); Q_cpy.flip(l);
+  }
+  
+  auto [T,_dummy,B_trip] = make_triplet_masks<N>(1,i,j,k);
+  
+  // Get triplet singles
+  auto [o,v] = generate_triplet_single_excitations(det, T, O, B_trip);
+  if( !o.count() or !v.count() ) return 0ul;
+  const auto occ = bits_to_indices(o);
+  const auto vir = bits_to_indices(v);
+
+  size_t n_quad_singles = 0;
+  for(auto i : occ) 
+  for(auto a : vir) {
+    wfn_t<N> temp = det; temp.flip(i).flip(a);
+    if(satisfies_quad(temp, Q, l)) n_quad_singles++;
+  }
+
+  return n_quad_singles;
+}
+
+template <size_t N>
+auto count_quad_doubles( wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B ) {
+  unsigned i,j,k,l;
+  {
+  auto Q_cpy = Q;
+  i = fls(Q_cpy); Q_cpy.flip(i);
+  j = fls(Q_cpy); Q_cpy.flip(j);
+  k = fls(Q_cpy); Q_cpy.flip(k);
+  l = fls(Q_cpy); Q_cpy.flip(l);
+  }
+  
+  auto [T,_dummy,B_trip] = make_triplet_masks<N>(1,i,j,k);
+  
+  // Get triplet doubles
+  auto [O,V] = generate_triplet_double_excitations(det, T, O_mask, B_trip);
+  if( !O.size() or !V.size() ) return 0ul;
+
+  size_t n_quad_doubles = 0;
+  for(auto ij : O) 
+  for(auto ab : V) {
+    wfn_t<N> temp = (det ^ ij) | ab;
+    if(satisfies_quad(temp, Q, l)) n_quad_doubles++;
+  }
+
+  return n_quad_doubles;
+}
+
+
+template <size_t N, typename... Args>
+size_t quad_histogram( wfn_t<N> det, size_t n_os_singles, size_t n_os_doubles, 
+  wfn_t<N> Q, wfn_t<N> O, wfn_t<N> B ) {
+
+  auto ns = count_quad_singles( det, Q, O, B );
+  auto nd = count_quad_doubles( det, Q, O, B );
+
+  size_t ndet = 0;
+  ndet += ns;                // AA
+  ndet += nd;                // AAAA
+  ndet += ns * n_os_singles; // AABB
+  if( satisfies_quad(det, Q, ffs(Q)-1) ) {
     ndet += n_os_singles + n_os_doubles + 1; // BB + BBBB + No Excitations
   }
 
@@ -457,7 +555,7 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
   auto world_size = comm_size(comm);
   using triplet = std::tuple<Integral, Integral, Integral>;
 
-  // Generate pairs + heuristic
+  // Generate triplets + heuristic
   std::vector<std::pair<triplet,size_t>> triplet_sizes; 
   triplet_sizes.reserve(norb*norb*norb);
   for(int t_i = 0; t_i < norb; ++t_i)
@@ -492,7 +590,136 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
     if(world_rank == min_rank) triplets.emplace_back(trip);
     
   }
+
+  return triplets;
+}
+
+
+
+
+
+
+
+
+template <typename Integral, size_t N>
+auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
+  const std::vector<wfn_t<N>>& unique_alpha, MPI_Comm comm) {
+
+  auto world_rank = comm_rank(comm);
+  auto world_size = comm_size(comm);
+  using triplet = std::tuple<Integral, Integral, Integral>;
+  using quad    = std::tuple<Integral, Integral, Integral, Integral>;
+
+  // Global workloads
+  std::vector<size_t> workloads(world_size, 0);
+
+  // Generate triplets + heuristic
+  std::vector<std::pair<triplet,size_t>> triplet_sizes; 
+  triplet_sizes.reserve(norb*norb*norb);
+  size_t total_work = 0;
+  for(int t_i = 0; t_i < norb; ++t_i)
+  for(int t_j = 0; t_j < t_i;  ++t_j)
+  for(int t_k = 0; t_k < t_j;  ++t_k) {
+    auto [T,O,B] = make_triplet_masks<N>(norb,t_i,t_j,t_k);
+    size_t nw = 0;
+    for( const auto& alpha : unique_alpha ) {
+       nw += 
+         triplet_histogram(alpha, ns_othr, nd_othr, T, O, B );
+    }
+    if(nw) triplet_sizes.emplace_back(triplet{t_i, t_j, t_k}, nw);
+    total_work += nw;
+  }
+
+
+  size_t local_average = (0.8*total_work) / world_size;
+
+  // Get triplets larger than average
+  std::vector<std::pair<triplet,size_t>> tps_to_quad;
+  {
+  auto it = std::partition(triplet_sizes.begin(), triplet_sizes.end(),
+    [=](const auto& a) { return a.second <= local_average; });
+  printf("[rank %d] NLARGE = %lu\n", world_rank, 
+    std::distance(it, triplet_sizes.end()));
+
+  //tps_to_quad = std::vector<std::pair<triplet,size_t>>(it, triplet_sizes.end());
+  //triplet_sizes.erase(it, triplet_sizes.end());
+  }
+
+
+  // Sort to get optimal bucket partitioning
+  std::sort(triplet_sizes.begin(), triplet_sizes.end(),
+    [](const auto& a, const auto& b){ return a.second > b.second;} );
   
+  // Assign triplet work
+  std::vector< triplet > triplets; 
+  triplets.reserve((norb*norb*norb) / world_size);
+
+  for( auto [trip, nw] : triplet_sizes ) {
+
+    // Get rank with least amount of work
+    auto min_rank_it = std::min_element(workloads.begin(), workloads.end());
+    int min_rank = std::distance(workloads.begin(), min_rank_it);
+
+    // Assign triplet
+    *min_rank_it += nw;
+    if(world_rank == min_rank) triplets.emplace_back(trip);
+    
+  }
+
+
+
+
+
+
+
+  // Generate quads + heuristic
+  std::vector<std::pair<quad,size_t>> quad_sizes; 
+  quad_sizes.reserve(tps_to_quad.size() * norb);
+
+  // Loop over triplets to break up
+  total_work = 0;
+  for( auto [trip, nw_trip] : tps_to_quad ) {
+
+    // Unpack triplets
+    auto [q_i, q_j, q_k] = trip;
+    
+    // Loop over possible quads
+    for(auto q_l = 0; q_l < q_k; ++q_l) {
+      // Generate quad masks / counts
+      auto [Q,O,B] = make_quad_masks<N>(norb, q_i,q_j,q_k,q_l);
+      size_t nw = 0;
+      for( const auto& alpha : unique_alpha ) {
+         nw += 
+           quad_histogram(alpha, ns_othr, nd_othr, Q, O, B );
+      }
+      if(nw) quad_sizes.emplace_back(quad{q_i, q_j, q_k, q_l}, nw);
+      total_work += nw;
+    }
+
+  }
+
+
+  // Sort to get optimal bucket partitioning
+  std::sort(quad_sizes.begin(), quad_sizes.end(),
+    [](const auto& a, const auto& b){ return a.second > b.second;} );
+
+  // Assign quad work
+  std::vector< quad > quads; 
+  quads.reserve(quad_sizes.size() / world_size);
+
+  for( auto [trip, nw] : quad_sizes ) {
+
+    // Get rank with least amount of work
+    auto min_rank_it = std::min_element(workloads.begin(), workloads.end());
+    int min_rank = std::distance(workloads.begin(), min_rank_it);
+
+    // Assign quad
+    *min_rank_it += nw;
+    if(world_rank == min_rank) quads.emplace_back(trip);
+    
+  }
+
+
 
   return triplets;
 }

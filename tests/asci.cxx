@@ -137,8 +137,11 @@ TEST_CASE("Triplets") {
 
   }
 
-  std::cout << std::accumulate(triplet_hist.begin(), triplet_hist.end(),0ul) << std::endl;
-  std::cout << std::accumulate(quad_hist.begin(), quad_hist.end(),0ul) << std::endl;
+  REQUIRE(
+    std::accumulate(triplet_hist.begin(), triplet_hist.end(),0ul) ==
+    std::accumulate(quad_hist.begin(), quad_hist.end(),0ul)
+  );
+
 
   // Print Histogram
   //for( auto i = 0; i < triplet_hist.size() ; ++ i ) {
@@ -165,10 +168,44 @@ TEST_CASE("Triplets") {
       const size_t n_doubles = 
         (n_singles * (n_singles - nocc - nvir + 1))/4;
 
-      new_triplet_hist[label] += asci::triplet_histogram( det, n_singles, n_doubles, T, overfill, B );
+      new_triplet_hist[label] += 
+        asci::triplet_histogram( det, n_singles, n_doubles, T, overfill, B );
     }
   }
 
   REQUIRE(triplet_hist == new_triplet_hist);
+
+
+
+
+
+  std::vector<size_t> new_quad_hist(quad_hist.size(), 0);
+  std::vector<std::tuple<unsigned, unsigned, unsigned, unsigned>> quads; 
+  for(int i = 0; i < norb; ++i)
+  for(int j = 0; j < i;    ++j)
+  for(int k = 0; k < j;    ++k) 
+  for(int l = 0; l < k;    ++l) {
+    quads.emplace_back(i,j,k,l);
+  }
+
+     
+  for( auto [i,j,k,l] : quads ) {
+    const size_t label = i*32ul*32ul*32ul + j*32ul*32ul + k*32ul + l;
+    auto [Q, overfill, B] = 
+      asci::make_quad_masks<num_bits>(norb,i,j,k,l);
+
+    for( auto det : wfn_a_uniq ) {
+      const size_t nocc = det.count();
+      const size_t nvir = norb - nocc;
+      const size_t n_singles = nocc * nvir;
+      const size_t n_doubles = 
+        (n_singles * (n_singles - nocc - nvir + 1))/4;
+
+      new_quad_hist[label] += 
+        asci::quad_histogram( det, n_singles, n_doubles, Q, overfill, B );
+    }
+  }
+
+  REQUIRE(quad_hist == new_quad_hist);
 }
 

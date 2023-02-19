@@ -279,57 +279,21 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
 
   // Generate triplets
   std::vector< std::tuple<int,int,int> > triplets; 
+  std::vector< std::tuple<int,int,int,int> > quads; 
+
 #if 0
-  std::vector<size_t> world_workloads(world_size, 0);
-  triplets.reserve(norb*norb*norb);
-  for(int t_i = 0; t_i < norb; ++t_i)
-  for(int t_j = 0; t_j < t_i;  ++t_j)
-  for(int t_k = 0; t_k < t_j;  ++t_k) {
-
-    if(world_size > 1) {
-      auto [T,O,B] = 
-        make_triplet_masks<N>(norb,t_i,t_j,t_k);
-      size_t nw = 0;
-      for( const auto& alpha : uniq_alpha_wfn ) {
-         nw += 
-           triplet_histogram(alpha, n_sing_alpha, n_doub_alpha, T, O, B );
-      }
-
-      if( asci_settings.dist_triplet_random ) {
-        if(nw) triplets.emplace_back(t_i,t_j,t_k);
-      } else {
-        auto min_rank_it = 
-          std::min_element(world_workloads.begin(), world_workloads.end());
-        int min_rank = std::distance(world_workloads.begin(), min_rank_it);
-
-        *min_rank_it += nw;
-        if( world_rank == min_rank and nw) triplets.emplace_back(t_i,t_j,t_k);
-      }
-    } else {
-      triplets.emplace_back(t_i,t_j,t_k);
-    }
-  }
-
-  if(world_size > 1 and asci_settings.dist_triplet_random) {
-    std::default_random_engine g(155039);
-    std::shuffle(triplets.begin(),triplets.end(),g);
-    std::vector< std::tuple<int,int,int> > local_triplets;
-    local_triplets.reserve(triplets.size() / world_size);
-    for( auto i = 0; i < triplets.size(); ++i) 
-    if( i % world_size == world_rank ) {
-      local_triplets.emplace_back(triplets[i]);
-    }
-    triplets = std::move(local_triplets);
-  }
-#else
   if( asci_settings.dist_triplet_random )
     triplets = dist_triplets_random<int>(norb, n_sing_alpha, n_doub_alpha,
       uniq_alpha_wfn, comm);
   else
     triplets = dist_triplets_histogram<int>(norb, n_sing_alpha, n_doub_alpha,
       uniq_alpha_wfn, comm);
-  
+#else
+    triplets = dist_34_histogram<int>(norb, n_sing_alpha, n_doub_alpha,
+      uniq_alpha_wfn, comm);
+    if(quads.size()) throw std::runtime_error("DIE DIE DIE");
 #endif
+  
 
 
   //std::vector<size_t> triplet_nontriv_counts(triplets.size());
