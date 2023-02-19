@@ -263,7 +263,8 @@ auto generate_quad_single_excitations( wfn_t<N> det,
   for(auto a : vir) {
     wfn_t<N> temp = det; temp.flip(i).flip(a);
     if(satisfies_quad(temp, Q, l)) {
-      o_quad.flip(i); v_quad.flip(a);
+      o_quad |= (wfn_t<N>(1) << i);
+      v_quad |= (wfn_t<N>(1) << a);
     }
   }
 
@@ -328,6 +329,18 @@ auto generate_quad_double_excitations( wfn_t<N> det,
       O_quad.emplace_back(ij);
       V_quad.emplace_back(ab);
     };
+  }
+
+  // Remove duplicates - this is insane 
+  std::sort(O_quad.begin(), O_quad.end(), bitset_less_comparator<N>{});
+  std::sort(V_quad.begin(), V_quad.end(), bitset_less_comparator<N>{});
+  {
+    auto it = std::unique(O_quad.begin(), O_quad.end());
+    O_quad.erase(it, O_quad.end());
+  }
+  {
+    auto it = std::unique(V_quad.begin(), V_quad.end());
+    V_quad.erase(it, V_quad.end());
   }
 
   return std::make_pair(O_quad, V_quad);
@@ -619,6 +632,254 @@ void generate_triplet_doubles_contributions_os(
 
 
 
+
+
+
+
+
+
+
+
+
+
+template <size_t N>
+void generate_quad_singles_contributions_ss(
+  double coeff,
+  wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O, wfn_t<N> B,
+  wfn_t<N> os_det, 
+  const std::vector<uint32_t>&        occ_same,
+  const std::vector<uint32_t>&        occ_othr,
+  const double*                       eps,
+  const double*                       T_pq,
+  const size_t                        LDT,
+  const double*                       G_kpq,
+  const size_t                        LDG,
+  const double*                       V_kpq,
+  const size_t                        LDV,
+  double                              h_el_tol,
+  double                              root_diag,
+  double                              E0,
+  HamiltonianGenerator<N>&            ham_gen,
+  asci_contrib_container<wfn_t<N>>& asci_contributions) {
+
+  auto [o,v] = generate_quad_single_excitations(det, Q, O, B);
+  const auto no = o.count();
+  const auto nv = v.count();
+  if(!no or !nv) return;
+
+  const size_t LDG2 = LDG * LDG;
+  const size_t LDV2 = LDV * LDV;
+  for(int ii = 0; ii < no; ++ii) {
+    const auto i = fls(o);
+    o.flip(i);
+    auto v_cpy = v;
+  for(int aa = 0; aa < nv; ++aa) {
+    const auto a = fls(v_cpy);
+    v_cpy.flip(a);
+
+    double h_el = T_pq[a + i*LDT];
+    const double* G_ov = G_kpq + a*LDG + i*LDG2;
+    const double* V_ov = V_kpq + a*LDV + i*LDV2;
+    for( auto p : occ_same ) h_el += G_ov[p];
+    for( auto p : occ_othr ) h_el += V_ov[p];
+
+    // Early Exit
+    if( std::abs(coeff * h_el) < h_el_tol ) continue;
+
+    // Calculate Excited Determinant
+    auto ex_det = det | os_det; ex_det.flip(i).flip(a);
+
+    // Compute Sign in a Canonical Way
+    auto sign = single_excitation_sign(det, a, i);
+    h_el *= sign;
+
+    // Compute Fast Diagonal Matrix Element
+    auto h_diag =
+      //ham_gen.fast_diag_single(occ_same, occ_othr, i, a, root_diag);
+      ham_gen.fast_diag_single(eps[i], eps[a], i, a, 
+        root_diag);
+    h_el /= (E0 - h_diag);
+
+    asci_contributions.push_back( {ex_det, coeff * h_el} );
+  }
+  }
+
+}
+
+
+
+template <size_t N>
+void generate_quad_doubles_contributions_ss(
+  double coeff,
+  wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B,
+  wfn_t<N> os_det, 
+  const std::vector<uint32_t>&        occ_same,
+  const std::vector<uint32_t>&        occ_othr,
+  const double*                       eps,
+  const double*                       G,
+  const size_t                        LDG,
+  double                              h_el_tol,
+  double                              root_diag,
+  double                              E0,
+  HamiltonianGenerator<N>&            ham_gen,
+  asci_contrib_container<wfn_t<N>>& asci_contributions) {
+
+  auto [O,V] = generate_quad_double_excitations(det, Q, O_mask, B);
+  const auto no_pairs = O.size();
+  const auto nv_pairs = V.size();
+  if( !no_pairs or !nv_pairs ) return;
+
+  const size_t LDG2 = LDG * LDG;
+  for(int _ij = 0; _ij < no_pairs; ++_ij) {
+    const auto ij = O[_ij];
+    const auto i  = ffs(ij) - 1;
+    const auto j  = fls(ij);
+    const auto G_ij = G + (j + i*LDG2)*LDG;
+    const auto ex_ij = det ^ ij;
+  for(int _ab = 0; _ab < nv_pairs; ++_ab) {
+    const auto ab = V[_ab];
+    const auto a  = ffs(ab) - 1;
+    const auto b  = fls(ab);
+    
+    const auto G_aibj = G_ij[b + a*LDG2];
+    //printf(" %d %d %d %d %.6e\n", i,j,a,b, G_aibj);
+
+    // Early Exit
+    if( std::abs(coeff * G_aibj) < h_el_tol ) continue;
+
+    // Calculate Excited Determinant (spin)
+    const auto full_ex_spin = ij | ab;
+    const auto ex_det_spin  = ex_ij | ab;
+    
+
+    // Compute Sign in a Canonical Way
+    auto sign = doubles_sign( det, ex_det_spin, full_ex_spin );
+    
+    // Calculate Full Excited Determinant
+    const auto full_ex = ex_det_spin | os_det;
+
+    // Update Sign of Matrix Element
+    auto h_el = sign * G_aibj;
+
+    // Evaluate fast diagonal matrix element
+    auto h_diag =
+      //ham_gen.fast_diag_ss_double( occ_same, occ_othr, i, j, a, b, root_diag);
+      ham_gen.fast_diag_ss_double( eps[i], eps[j],
+        eps[a], eps[b], i, j, a, b, root_diag);
+    h_el /= (E0 - h_diag);
+
+    asci_contributions.push_back( {full_ex, coeff * h_el} );
+
+  }
+  }
+}
+
+
+
+
+template <size_t N>
+void generate_quad_doubles_contributions_os(
+  double coeff,
+  wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O, wfn_t<N> B,
+  wfn_t<N> os_det, 
+  const std::vector<uint32_t>&        occ_same,
+  const std::vector<uint32_t>&        occ_othr,
+  const std::vector<uint32_t>&        vir_othr,
+  const double*                       eps_same,
+  const double*                       eps_othr,
+  const double*                       V,
+  const size_t                        LDV,
+  double                              h_el_tol,
+  double                              root_diag,
+  double                              E0,
+  HamiltonianGenerator<N>&            ham_gen,
+  asci_contrib_container<wfn_t<N>>& asci_contributions) {
+
+  
+  // Generate Single Excitations that Satisfy the Constraint
+  auto [o,v] = generate_quad_single_excitations(det, Q, O, B);
+  const auto no = o.count();
+  const auto nv = v.count();
+  if(!no or !nv) return;
+
+  const size_t LDV2 = LDV * LDV;
+  for(int ii = 0; ii < no; ++ii) {
+    const auto i = fls(o);
+    o.flip(i);
+    auto v_cpy = v;
+  for(int aa = 0; aa < nv; ++aa) {
+    const auto a = fls(v_cpy);
+    v_cpy.flip(a);
+
+    const auto* V_ai = V + a + i*LDV;
+    double sign_same = single_excitation_sign( det, a, i );
+
+    for( auto j : occ_othr )
+    for( auto b : vir_othr ) {
+      const auto jb = b + j*LDV;
+      const auto V_aibj = V_ai[jb*LDV2];
+
+      // Early Exist
+      if( std::abs(coeff * V_aibj) < h_el_tol ) continue;
+
+      //double sign_othr = single_excitation_sign( os_det >> (N/2),  b, j );
+      double sign_othr = single_excitation_sign(bitset_hi_word(os_det) ,  b, j );
+      double sign = sign_same * sign_othr;
+
+      // Compute Excited Determinant
+      auto ex_det = det | os_det; ex_det.flip(i).flip(a).flip(j+N/2).flip(b+N/2);
+
+      // Finalize Matrix Element
+      auto h_el = sign * V_aibj;
+
+      auto h_diag = 
+        //ham_gen.fast_diag_os_double( occ_same, occ_othr, i, j, a, b, root_diag );
+        ham_gen.fast_diag_os_double( eps_same[i], eps_othr[j],
+          eps_same[a], eps_othr[b], i, j, a, b, root_diag );
+      h_el /= ( E0 - h_diag );
+
+      asci_contributions.push_back( {ex_det, coeff*h_el} );
+    } // BJ
+
+  } // A
+  } // I
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 template <typename Integral, size_t N>
 auto dist_triplets_all(size_t norb, size_t ns_othr, size_t nd_othr,
   const std::vector<wfn_t<N>>& unique_alpha) {
@@ -734,12 +995,15 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
   {
   auto it = std::partition(triplet_sizes.begin(), triplet_sizes.end(),
     [=](const auto& a) { return a.second <= local_average; });
-  printf("[rank %d] NLARGE = %lu\n", world_rank, 
-    std::distance(it, triplet_sizes.end()));
+  //printf("[rank %d] NLARGE = %lu\n", world_rank, 
+  //  std::distance(it, triplet_sizes.end()));
 
-  //tps_to_quad = std::vector<std::pair<triplet,size_t>>(it, triplet_sizes.end());
-  //triplet_sizes.erase(it, triplet_sizes.end());
+  tps_to_quad = std::vector<std::pair<triplet,size_t>>(it, triplet_sizes.end());
+  triplet_sizes.erase(it, triplet_sizes.end());
+  for( auto [t,s] : tps_to_quad ) total_work -= s;
   }
+
+  //printf("[rank %2d] TSZ = %lu QSZ = %lu\n", world_rank, triplet_sizes.size(), tps_to_quad.size());
 
 
   // Sort to get optimal bucket partitioning
@@ -764,6 +1028,8 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 
 
 
+  //printf("[rank %2d] BEFORE LOCAL WORK = %lu TOTAL WORK = %lu\n", world_rank, 
+  //workloads[world_rank], total_work);
 
 
 
@@ -773,24 +1039,57 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
   quad_sizes.reserve(tps_to_quad.size() * norb);
 
   // Loop over triplets to break up
-  total_work = 0;
   for( auto [trip, nw_trip] : tps_to_quad ) {
 
     // Unpack triplets
     auto [q_i, q_j, q_k] = trip;
+    //if(world_rank == 0) printf("LARGE TRIP %d %d %d NW %lu\n",q_i,q_j,q_k, nw_trip);
+
+    #if 0
+    std::vector<wfn_t<N>> trip_singles, trip_doubles;
+    {
+      auto [T,O,B] = make_triplet_masks<N>(norb, q_i,q_j,q_k);
+      
+      std::vector<wfn_t<N>> ls, ld;
+      for( const auto& alpha : unique_alpha ) {
+        generate_triplet_singles(alpha, T,O,B, ls);
+        generate_triplet_doubles(alpha, T,O,B, ld);
+        trip_singles.insert(trip_singles.end(), ls.begin(), ls.end());
+        trip_doubles.insert(trip_doubles.end(), ld.begin(), ld.end());
+      }
+    }
+    #endif
+
     
+    size_t loc_sum = 0;
     // Loop over possible quads
+    //std::vector<wfn_t<N>> quad_singles, quad_doubles;
     for(auto q_l = 0; q_l < q_k; ++q_l) {
       // Generate quad masks / counts
       auto [Q,O,B] = make_quad_masks<N>(norb, q_i,q_j,q_k,q_l);
       size_t nw = 0;
+
+      
+      //std::vector<wfn_t<N>> ls, ld;
       for( const auto& alpha : unique_alpha ) {
+        //generate_quad_singles(alpha, Q,O,B, ls);
+        //generate_quad_doubles(alpha, Q,O,B, ld);
+        //quad_singles.insert(quad_singles.end(), ls.begin(), ls.end());
+        //quad_doubles.insert(quad_doubles.end(), ld.begin(), ld.end());
+
          nw += 
            quad_histogram(alpha, ns_othr, nd_othr, Q, O, B );
       }
+      //if(world_rank == 0) printf("  QUAD %d %d %d %d NW %lu\n",q_i,q_j,q_k, q_l, nw);
       if(nw) quad_sizes.emplace_back(quad{q_i, q_j, q_k, q_l}, nw);
       total_work += nw;
+      loc_sum += nw;
     }
+    //if( world_rank == 0 ) {
+    //  std::cout << "  * TS = " << trip_singles.size() << " QS = " << quad_singles.size() << std::endl;
+    //  std::cout << "  * TD = " << trip_doubles.size() << " QD = " << quad_doubles.size() << std::endl;
+    //}
+    //printf("[rank %2d] NW_REF = %lu NW = %lu\n", world_rank, nw_trip, loc_sum);
 
   }
 
@@ -803,7 +1102,7 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
   std::vector< quad > quads; 
   quads.reserve(quad_sizes.size() / world_size);
 
-  for( auto [trip, nw] : quad_sizes ) {
+  for( auto [quad, nw] : quad_sizes ) {
 
     // Get rank with least amount of work
     auto min_rank_it = std::min_element(workloads.begin(), workloads.end());
@@ -811,13 +1110,16 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 
     // Assign quad
     *min_rank_it += nw;
-    if(world_rank == min_rank) quads.emplace_back(trip);
+    if(world_rank == min_rank) quads.emplace_back(quad);
     
   }
 
+  if(world_rank == 0)
+  printf("[rank %2d] AFTER LOCAL WORK = %lu TOTAL WORK = %lu\n", world_rank, 
+    workloads[world_rank], total_work);
 
 
-  return triplets;
+  return std::make_pair(triplets,quads);
 }
 
 template <typename Integral, size_t N>

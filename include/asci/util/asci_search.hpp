@@ -289,14 +289,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
     triplets = dist_triplets_histogram<int>(norb, n_sing_alpha, n_doub_alpha,
       uniq_alpha_wfn, comm);
 #else
-    triplets = dist_34_histogram<int>(norb, n_sing_alpha, n_doub_alpha,
-      uniq_alpha_wfn, comm);
-    if(quads.size()) throw std::runtime_error("DIE DIE DIE");
+    std::tie(triplets,quads) = 
+      dist_34_histogram<int>(norb, n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
 #endif
-  
-
-
-  //std::vector<size_t> triplet_nontriv_counts(triplets.size());
   
   size_t max_size = std::min(asci_settings.pair_size_max,
     ncdets * 
@@ -306,6 +301,11 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
       )
   );
   asci_pairs.reserve(max_size);
+  
+
+  // DO TRIPLET WORK
+
+  //std::vector<size_t> triplet_nontriv_counts(triplets.size());
   // Loop over triplets
   size_t max_trip_sz = 0;
   std::tuple<int,int,int> max_trip;
@@ -432,6 +432,131 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
   //printf("[rank %d] MAX TRIP %d %d %d SZ = %lu\n",
   //  world_rank, std::get<0>(max_trip), std::get<1>(max_trip), std::get<2>(max_trip),
   //  max_trip_sz );
+
+
+
+
+  // DO QUAD WORK
+  size_t max_quad_sz = 0;
+  std::tuple<int,int,int,int> max_quad;
+  for( auto [q_i, q_j, q_k, q_l] : quads ) {
+    auto size_before = asci_pairs.size();
+
+    auto [Q,O,B] = 
+      make_quad_masks<N>(norb,q_i,q_j,q_k,q_l);
+
+    const double h_el_tol = asci_settings.h_el_tol;
+
+    // Loop over unique alpha strings
+    for( size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha ) {
+
+      const auto& det = uniq_alpha_wfn[i_alpha];
+      const auto occ_alpha = bits_to_indices(det);
+
+      // AA excitations
+      for( const auto& bcd : uad[i_alpha].bcd ) {
+        const auto& beta     = bcd.beta_string;
+        const auto& coeff    = bcd.coeff;
+        const auto& h_diag   = bcd.h_diag;
+        const auto& occ_beta = bcd.occ_beta;
+        const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
+        generate_quad_singles_contributions_ss(
+          coeff, det, Q, O, B, beta, occ_alpha, occ_beta, 
+          orb_ens_alpha.data(), T_pq, norb, G_red, norb, V_red, norb,
+          h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
+      }
+
+      // AAAA excitations
+      for( const auto& bcd : uad[i_alpha].bcd ) {
+        const auto& beta     = bcd.beta_string;
+        const auto& coeff    = bcd.coeff;
+        const auto& h_diag   = bcd.h_diag;
+        const auto& occ_beta = bcd.occ_beta;
+        const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
+        generate_quad_doubles_contributions_ss(
+          coeff, det, Q, O, B, beta, occ_alpha, occ_beta, 
+          orb_ens_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, 
+          ham_gen, asci_pairs );
+      }
+
+      // AABB excitations
+      for( const auto& bcd : uad[i_alpha].bcd ) {
+        const auto& beta     = bcd.beta_string;
+        const auto& coeff    = bcd.coeff;
+        const auto& h_diag   = bcd.h_diag;
+        const auto& occ_beta = bcd.occ_beta;
+        const auto& vir_beta = bcd.vir_beta;
+        const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
+        const auto& orb_ens_beta  = bcd.orb_ens_beta;
+        generate_quad_doubles_contributions_os(
+          coeff, det, Q, O, B, beta, occ_alpha, occ_beta,
+          vir_beta, orb_ens_alpha.data(), orb_ens_beta.data(),
+          V_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
+      }
+
+      if( satisfies_quad( det, Q, q_l ) ) {
+        for( const auto& bcd : uad[i_alpha].bcd ) {
+
+          const auto& beta     = bcd.beta_string;
+          const auto& coeff    = bcd.coeff;
+          const auto& h_diag   = bcd.h_diag;
+          const auto& occ_beta = bcd.occ_beta;
+          const auto& vir_beta = bcd.vir_beta;
+          const auto& eps_beta  = bcd.orb_ens_beta;
+
+          const auto state = det | beta;
+          const auto state_beta = bitset_hi_word(beta);
+          // BB Excitations
+          append_singles_asci_contributions<(N/2),(N/2)>( coeff, state,
+            state_beta, occ_beta, vir_beta, occ_alpha, eps_beta.data(), 
+            T_pq, norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI, 
+            ham_gen, asci_pairs ); 
+
+          // BBBB Excitations
+          append_ss_doubles_asci_contributions<N/2,N/2>( coeff, state,
+            state_beta, occ_beta, vir_beta, occ_alpha, eps_beta.data(),
+            G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
+
+        } // Beta Loop
+      } // Triplet Check
+
+      // Prune Down Contributions
+      if( asci_pairs.size() > asci_settings.pair_size_max ) {
+
+        // Remove small contributions
+        auto it = std::partition( asci_pairs.begin(), asci_pairs.end(),
+          [=](const auto& x){ 
+            return std::abs(x.rv) > asci_settings.rv_prune_tol;
+          });
+        asci_pairs.erase(it, asci_pairs.end());
+        logger->info("  * Pruning at QUAD = {} {} {} {}, NSZ = {}", 
+          q_i, q_j, q_k, q_l,  asci_pairs.size() );
+
+        // Extra Pruning if not sufficient
+        if( asci_pairs.size() > asci_settings.pair_size_max ) {
+          logger->info("    * Removing Duplicates");
+          sort_and_accumulate_asci_pairs( asci_pairs );
+          logger->info("    * NSZ = {}", asci_pairs.size());
+        }
+
+      } // Pruning 
+    } // Unique Alpha Loop
+
+    // Local S&A for each quad
+    {
+    auto uit = sort_and_accumulate_asci_pairs( 
+      asci_pairs.begin() + size_before, asci_pairs.end()
+    );
+    asci_pairs.erase(uit, asci_pairs.end());
+    }
+
+    auto size_after = asci_pairs.size();
+    if( size_after - size_before > max_quad_sz ) {
+      max_quad_sz = size_after - size_before;
+      max_quad = {q_i, q_j, q_k, q_l};
+    }
+
+  } // Quad Loop
 
 #if 0
   // Break apart largest triplet into quads
