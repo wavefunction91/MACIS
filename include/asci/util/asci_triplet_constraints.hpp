@@ -306,7 +306,7 @@ template <size_t N>
 auto generate_quad_double_excitations( wfn_t<N> det, 
   wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B
 ) {
-
+#if 0
   unsigned i,j,k,l;
   {
   auto Q_cpy = Q;
@@ -345,6 +345,55 @@ auto generate_quad_double_excitations( wfn_t<N> det,
   }
 
   return std::make_pair(O_quad, V_quad);
+#else
+  // Occ/Vir pairs to generate excitations
+  std::vector<wfn_t<N>> O,V; 
+
+  if((det & Q) == 0) return std::make_tuple(O,V);
+
+  auto o = det ^ Q;
+  auto v = (~det) & O_mask & B;
+
+  if((o & Q).count() == 3) return std::make_tuple(O,V); 
+
+  // Generate Virtual Pairs
+  if( (o & Q).count() == 2 ) {
+    v = o & Q;
+    o ^= v;
+  }
+
+  const auto virt_ind = bits_to_indices(v);
+  const auto o_and_t = o & Q;
+  switch( (o & Q).count() ) {
+    case 1:
+      for( auto a : virt_ind ) {
+        V.emplace_back(o_and_t).flip(a);
+      }
+      o ^= o_and_t;
+      break;
+    default:
+      generate_pairs(virt_ind, V);
+      break;
+  }
+
+  // Generate Occupied Pairs
+  const auto o_and_not_b = o & ~B;
+  if( o_and_not_b.count() > 2 ) return std::make_tuple(O,V);
+
+  switch(o_and_not_b.count()) {
+    case 1 :
+      for( auto i : bits_to_indices( o & B ) ) {
+        O.emplace_back(o_and_not_b).flip(i);
+      }
+      break;
+    default:
+      if( o_and_not_b.count() == 2 ) o = o_and_not_b;
+      generate_pairs( bits_to_indices(o), O );
+      break;
+  }
+
+  return std::make_tuple(O,V);
+#endif
 }
 
 template <size_t N>
@@ -1047,7 +1096,7 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
     auto min_rank_it = std::min_element(workloads.begin(), workloads.end());
     int min_rank = std::distance(workloads.begin(), min_rank_it);
 
-    // Assign triplet
+    // Assign constraint
     *min_rank_it += nw;
     if(world_rank == min_rank) {
       if(const auto* p = std::get_if<triplet>(&c)) triplets.emplace_back(*p);
@@ -1055,57 +1104,6 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
     }
     
   }
-
-
-#if 0
-  // Generate quads + heuristic
-  std::vector<std::pair<quad,size_t>> quad_sizes; 
-  quad_sizes.reserve(tps_to_quad.size() * norb);
-
-  // Loop over triplets to break up
-  for( auto [trip, nw_trip] : tps_to_quad ) {
-
-    // Unpack triplets
-    auto [q_i, q_j, q_k] = trip;
-    
-    // Loop over possible quads
-    for(auto q_l = 0; q_l < q_k; ++q_l) {
-      // Generate quad masks / counts
-      auto [Q,O,B] = make_quad_masks<N>(norb, q_i,q_j,q_k,q_l);
-      size_t nw = 0;
-
-      
-      for( const auto& alpha : unique_alpha ) {
-         nw += 
-           quad_histogram(alpha, ns_othr, nd_othr, Q, O, B );
-      }
-      if(nw) quad_sizes.emplace_back(quad{q_i, q_j, q_k, q_l}, nw);
-      total_work += nw;
-    }
-
-  }
-
-
-  // Sort to get optimal bucket partitioning
-  std::sort(quad_sizes.begin(), quad_sizes.end(),
-    [](const auto& a, const auto& b){ return a.second > b.second;} );
-
-  // Assign quad work
-  std::vector< quad > quads; 
-  quads.reserve(quad_sizes.size() / world_size);
-
-  for( auto [quad, nw] : quad_sizes ) {
-
-    // Get rank with least amount of work
-    auto min_rank_it = std::min_element(workloads.begin(), workloads.end());
-    int min_rank = std::distance(workloads.begin(), min_rank_it);
-
-    // Assign quad
-    *min_rank_it += nw;
-    if(world_rank == min_rank) quads.emplace_back(quad);
-    
-  }
-#endif
 
   if(world_rank == 0)
   printf("[rank %2d] AFTER LOCAL WORK = %lu TOTAL WORK = %lu\n", world_rank, 
