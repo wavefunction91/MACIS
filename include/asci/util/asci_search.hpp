@@ -330,7 +330,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto& h_diag   = bcd.h_diag;
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
-        generate_triplet_singles_contributions_ss(
+        generate_constraint_singles_contributions_ss(
           coeff, det, T, O, B, beta, occ_alpha, occ_beta, 
           orb_ens_alpha.data(), T_pq, norb, G_red, norb, V_red, norb,
           h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
@@ -343,7 +343,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto& h_diag   = bcd.h_diag;
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
-        generate_triplet_doubles_contributions_ss(
+        generate_constraint_doubles_contributions_ss(
           coeff, det, T, O, B, beta, occ_alpha, occ_beta, 
           orb_ens_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, 
           ham_gen, asci_pairs );
@@ -358,7 +358,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto& vir_beta = bcd.vir_beta;
         const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
         const auto& orb_ens_beta  = bcd.orb_ens_beta;
-        generate_triplet_doubles_contributions_os(
+        generate_constraint_doubles_contributions_os(
           coeff, det, T, O, B, beta, occ_alpha, occ_beta,
           vir_beta, orb_ens_alpha.data(), orb_ens_beta.data(),
           V_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
@@ -460,7 +460,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto& h_diag   = bcd.h_diag;
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
-        generate_quad_singles_contributions_ss(
+        generate_constraint_singles_contributions_ss(
           coeff, det, Q, O, B, beta, occ_alpha, occ_beta, 
           orb_ens_alpha.data(), T_pq, norb, G_red, norb, V_red, norb,
           h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
@@ -473,7 +473,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto& h_diag   = bcd.h_diag;
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
-        generate_quad_doubles_contributions_ss(
+        generate_constraint_doubles_contributions_ss(
           coeff, det, Q, O, B, beta, occ_alpha, occ_beta, 
           orb_ens_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, 
           ham_gen, asci_pairs );
@@ -488,13 +488,13 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto& vir_beta = bcd.vir_beta;
         const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
         const auto& orb_ens_beta  = bcd.orb_ens_beta;
-        generate_quad_doubles_contributions_os(
+        generate_constraint_doubles_contributions_os(
           coeff, det, Q, O, B, beta, occ_alpha, occ_beta,
           vir_beta, orb_ens_alpha.data(), orb_ens_beta.data(),
           V_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
       }
 
-      if( satisfies_quad( det, Q, q_l ) ) {
+      if( satisfies_constraint( det, Q, q_l ) ) {
         for( const auto& bcd : uad[i_alpha].bcd ) {
 
           const auto& beta     = bcd.beta_string;

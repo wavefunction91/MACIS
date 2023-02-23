@@ -36,12 +36,6 @@ bool satisfies_constraint( wfn_t<N> det, wfn_t<N> C, unsigned C_min ) {
   return (det & C).count() == C.count() and ((det ^ C) >> C_min).count() == 0;
 }
 
-template <size_t N>
-bool satisfies_quad( wfn_t<N> det, wfn_t<N> Q, unsigned Q_min ) {
-  //return (det & Q).count() == 4 and ((det ^ Q) >> Q_min).count() == 0;
-  return satisfies_constraint( det, Q, Q_min );
-}
-
 
 
 template <size_t N>
@@ -124,7 +118,7 @@ auto generate_constraint_double_excitations( wfn_t<N> det,
 
 
 template <size_t N>
-void generate_triplet_singles( wfn_t<N> det, 
+void generate_constraint_singles( wfn_t<N> det, 
   wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B,
   std::vector<wfn_t<N>>& t_singles
 ) {
@@ -146,7 +140,7 @@ void generate_triplet_singles( wfn_t<N> det,
 }
 
 template <typename... Args>
-unsigned count_triplet_singles(Args&&... args) {
+unsigned count_constraint_singles(Args&&... args) {
   auto [o,v] = generate_constraint_single_excitations( std::forward<Args>(args)... );
   return o.count() * v.count();
 }
@@ -154,7 +148,7 @@ unsigned count_triplet_singles(Args&&... args) {
 
 
 template <size_t N>
-void generate_triplet_doubles( wfn_t<N> det, 
+void generate_constraint_doubles( wfn_t<N> det, 
   wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B,
   std::vector<wfn_t<N>>& t_doubles
 ) {
@@ -177,24 +171,26 @@ void generate_triplet_doubles( wfn_t<N> det,
  *  @param[in]  B   B mask (?)
  */
 template <size_t N>
-unsigned count_triplet_doubles( wfn_t<N> det, 
-  wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B
+unsigned count_constraint_doubles( wfn_t<N> det, 
+  wfn_t<N> C, wfn_t<N> O, wfn_t<N> B
 ) {
 
-  if( (det & T) == 0 ) return 0;
+  if( (det & C) == 0 ) return 0;
 
-  auto o = det ^ T;
-  auto v = (~det) & O_mask & B;
+  auto o = det ^ C;
+  auto v = (~det) & O & B;
+
+  if((o & C).count() >= 3) return 0; 
 
   // Generate Virtual Pairs
-  if( (o & T).count() >= 2 ) {
-    v = o & T;
+  if( (o & C).count() == 2 ) {
+    v = o & C;
     o ^= v;
   }
 
   unsigned nv_pairs = v.count();
-  const auto o_and_t = o & T;
-  switch( (o & T).count() ) {
+  const auto o_and_t = o & C;
+  switch( (o & C).count() ) {
     case 1:
       o ^= o_and_t;
       break;
@@ -223,97 +219,18 @@ unsigned count_triplet_doubles( wfn_t<N> det,
 }
 
 template <size_t N, typename... Args>
-size_t triplet_histogram( wfn_t<N> det, size_t n_os_singles, size_t n_os_doubles, 
+size_t constraint_histogram( wfn_t<N> det, size_t n_os_singles, size_t n_os_doubles, 
   wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B ) {
 
-  auto ns = count_triplet_singles( det, T, O_mask, B );
-  auto nd = count_triplet_doubles( det, T, O_mask, B );
+  auto ns = count_constraint_singles( det, T, O_mask, B );
+  auto nd = count_constraint_doubles( det, T, O_mask, B );
 
   size_t ndet = 0;
   ndet += ns;                // AA
   ndet += nd;                // AAAA
   ndet += ns * n_os_singles; // AABB
   auto T_min = ffs(T) - 1;
-  if( (det & T).count() == 3 and ((det ^ T) >> T_min).count() == 0 ) {
-    ndet += n_os_singles + n_os_doubles + 1; // BB + BBBB + No Excitations
-  }
-
-  return ndet;
-}
-
-
-template <size_t N>
-void generate_quad_singles( wfn_t<N> det, 
-  wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B,
-  std::vector<wfn_t<N>>& t_singles
-) {
-
-  auto [o,v] = generate_constraint_single_excitations( det, T, O_mask, B );
-  const auto oc = o.count();
-  const auto vc = v.count();
-  if( !oc or !vc ) return;
-
-  t_singles.clear();
-  t_singles.reserve(oc*vc);
-  const auto occ = bits_to_indices(o);
-  const auto vir = bits_to_indices(v);
-  for( auto i : occ ) {
-    auto temp = det; temp.flip(i);
-    for( auto a : vir ) t_singles.emplace_back(temp).flip(a);
-  }
-  
-}
-
-template <typename... Args>
-unsigned count_quad_singles(Args&&... args) {
-  auto [o,v] = generate_constraint_single_excitations( std::forward<Args>(args)... );
-  return o.count() * v.count();
-}
-
-
-
-
-template <size_t N>
-void generate_quad_doubles( wfn_t<N> det, 
-  wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B,
-  std::vector<wfn_t<N>>& t_doubles
-) {
-
-  auto [O,V] = generate_constraint_double_excitations(det,Q,O_mask,B);
-
-  t_doubles.clear();
-  for(auto ij : O) {
-    const auto temp = det ^ ij;
-    for( auto ab : V ) {
-      t_doubles.emplace_back(temp | ab);
-    }
-  }
-}
-
-template <size_t N>
-unsigned count_quad_doubles( wfn_t<N> det, 
-  wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B
-) {
-
-  auto [O,V] = generate_constraint_double_excitations(det,Q,O_mask,B);
-  return O.size() * V.size();
-}
-
-
-
-
-template <size_t N, typename... Args>
-size_t quad_histogram( wfn_t<N> det, size_t n_os_singles, size_t n_os_doubles, 
-  wfn_t<N> Q, wfn_t<N> O, wfn_t<N> B ) {
-
-  auto ns = count_quad_singles( det, Q, O, B );
-  auto nd = count_quad_doubles( det, Q, O, B );
-
-  size_t ndet = 0;
-  ndet += ns;                // AA
-  ndet += nd;                // AAAA
-  ndet += ns * n_os_singles; // AABB
-  if( satisfies_quad(det, Q, ffs(Q)-1) ) {
+  if( satisfies_constraint( det, T, T_min ) ) {
     ndet += n_os_singles + n_os_doubles + 1; // BB + BBBB + No Excitations
   }
 
@@ -324,8 +241,11 @@ size_t quad_histogram( wfn_t<N> det, size_t n_os_singles, size_t n_os_doubles,
 
 
 
+
+
+
 template <size_t N>
-void generate_triplet_singles_contributions_ss(
+void generate_constraint_singles_contributions_ss(
   double coeff,
   wfn_t<N> det, wfn_t<N> T, wfn_t<N> O, wfn_t<N> B,
   wfn_t<N> os_det, 
@@ -391,7 +311,7 @@ void generate_triplet_singles_contributions_ss(
 
 
 template <size_t N>
-void generate_triplet_doubles_contributions_ss(
+void generate_constraint_doubles_contributions_ss(
   double coeff,
   wfn_t<N> det, wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B,
   wfn_t<N> os_det, 
@@ -460,7 +380,7 @@ void generate_triplet_doubles_contributions_ss(
 
 
 template <size_t N>
-void generate_triplet_doubles_contributions_os(
+void generate_constraint_doubles_contributions_os(
   double coeff,
   wfn_t<N> det, wfn_t<N> T, wfn_t<N> O, wfn_t<N> B,
   wfn_t<N> os_det, 
@@ -539,222 +459,6 @@ void generate_triplet_doubles_contributions_os(
 
 
 
-template <size_t N>
-void generate_quad_singles_contributions_ss(
-  double coeff,
-  wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O, wfn_t<N> B,
-  wfn_t<N> os_det, 
-  const std::vector<uint32_t>&        occ_same,
-  const std::vector<uint32_t>&        occ_othr,
-  const double*                       eps,
-  const double*                       T_pq,
-  const size_t                        LDT,
-  const double*                       G_kpq,
-  const size_t                        LDG,
-  const double*                       V_kpq,
-  const size_t                        LDV,
-  double                              h_el_tol,
-  double                              root_diag,
-  double                              E0,
-  HamiltonianGenerator<N>&            ham_gen,
-  asci_contrib_container<wfn_t<N>>& asci_contributions) {
-
-  auto [o,v] = generate_constraint_single_excitations(det, Q, O, B);
-  const auto no = o.count();
-  const auto nv = v.count();
-  if(!no or !nv) return;
-
-  const size_t LDG2 = LDG * LDG;
-  const size_t LDV2 = LDV * LDV;
-  for(int ii = 0; ii < no; ++ii) {
-    const auto i = fls(o);
-    o.flip(i);
-    auto v_cpy = v;
-  for(int aa = 0; aa < nv; ++aa) {
-    const auto a = fls(v_cpy);
-    v_cpy.flip(a);
-
-    double h_el = T_pq[a + i*LDT];
-    const double* G_ov = G_kpq + a*LDG + i*LDG2;
-    const double* V_ov = V_kpq + a*LDV + i*LDV2;
-    for( auto p : occ_same ) h_el += G_ov[p];
-    for( auto p : occ_othr ) h_el += V_ov[p];
-
-    // Early Exit
-    if( std::abs(coeff * h_el) < h_el_tol ) continue;
-
-    // Calculate Excited Determinant
-    auto ex_det = det | os_det; ex_det.flip(i).flip(a);
-
-    // Compute Sign in a Canonical Way
-    auto sign = single_excitation_sign(det, a, i);
-    h_el *= sign;
-
-    // Compute Fast Diagonal Matrix Element
-    auto h_diag =
-      //ham_gen.fast_diag_single(occ_same, occ_othr, i, a, root_diag);
-      ham_gen.fast_diag_single(eps[i], eps[a], i, a, 
-        root_diag);
-    h_el /= (E0 - h_diag);
-
-    asci_contributions.push_back( {ex_det, coeff * h_el} );
-  }
-  }
-
-}
-
-
-
-template <size_t N>
-void generate_quad_doubles_contributions_ss(
-  double coeff,
-  wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B,
-  wfn_t<N> os_det, 
-  const std::vector<uint32_t>&        occ_same,
-  const std::vector<uint32_t>&        occ_othr,
-  const double*                       eps,
-  const double*                       G,
-  const size_t                        LDG,
-  double                              h_el_tol,
-  double                              root_diag,
-  double                              E0,
-  HamiltonianGenerator<N>&            ham_gen,
-  asci_contrib_container<wfn_t<N>>& asci_contributions) {
-
-  auto [O,V] = generate_constraint_double_excitations(det, Q, O_mask, B);
-  const auto no_pairs = O.size();
-  const auto nv_pairs = V.size();
-  if( !no_pairs or !nv_pairs ) return;
-
-  const size_t LDG2 = LDG * LDG;
-  for(int _ij = 0; _ij < no_pairs; ++_ij) {
-    const auto ij = O[_ij];
-    const auto i  = ffs(ij) - 1;
-    const auto j  = fls(ij);
-    const auto G_ij = G + (j + i*LDG2)*LDG;
-    const auto ex_ij = det ^ ij;
-  for(int _ab = 0; _ab < nv_pairs; ++_ab) {
-    const auto ab = V[_ab];
-    const auto a  = ffs(ab) - 1;
-    const auto b  = fls(ab);
-    
-    const auto G_aibj = G_ij[b + a*LDG2];
-    //printf(" %d %d %d %d %.6e\n", i,j,a,b, G_aibj);
-
-    // Early Exit
-    if( std::abs(coeff * G_aibj) < h_el_tol ) continue;
-
-    // Calculate Excited Determinant (spin)
-    const auto full_ex_spin = ij | ab;
-    const auto ex_det_spin  = ex_ij | ab;
-    
-
-    // Compute Sign in a Canonical Way
-    auto sign = doubles_sign( det, ex_det_spin, full_ex_spin );
-    
-    // Calculate Full Excited Determinant
-    const auto full_ex = ex_det_spin | os_det;
-
-    // Update Sign of Matrix Element
-    auto h_el = sign * G_aibj;
-
-    // Evaluate fast diagonal matrix element
-    auto h_diag =
-      //ham_gen.fast_diag_ss_double( occ_same, occ_othr, i, j, a, b, root_diag);
-      ham_gen.fast_diag_ss_double( eps[i], eps[j],
-        eps[a], eps[b], i, j, a, b, root_diag);
-    h_el /= (E0 - h_diag);
-
-    asci_contributions.push_back( {full_ex, coeff * h_el} );
-
-  }
-  }
-}
-
-
-
-
-template <size_t N>
-void generate_quad_doubles_contributions_os(
-  double coeff,
-  wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O, wfn_t<N> B,
-  wfn_t<N> os_det, 
-  const std::vector<uint32_t>&        occ_same,
-  const std::vector<uint32_t>&        occ_othr,
-  const std::vector<uint32_t>&        vir_othr,
-  const double*                       eps_same,
-  const double*                       eps_othr,
-  const double*                       V,
-  const size_t                        LDV,
-  double                              h_el_tol,
-  double                              root_diag,
-  double                              E0,
-  HamiltonianGenerator<N>&            ham_gen,
-  asci_contrib_container<wfn_t<N>>& asci_contributions) {
-
-  
-  // Generate Single Excitations that Satisfy the Constraint
-  auto [o,v] = generate_constraint_single_excitations(det, Q, O, B);
-  const auto no = o.count();
-  const auto nv = v.count();
-  if(!no or !nv) return;
-
-  const size_t LDV2 = LDV * LDV;
-  for(int ii = 0; ii < no; ++ii) {
-    const auto i = fls(o);
-    o.flip(i);
-    auto v_cpy = v;
-  for(int aa = 0; aa < nv; ++aa) {
-    const auto a = fls(v_cpy);
-    v_cpy.flip(a);
-
-    const auto* V_ai = V + a + i*LDV;
-    double sign_same = single_excitation_sign( det, a, i );
-
-    for( auto j : occ_othr )
-    for( auto b : vir_othr ) {
-      const auto jb = b + j*LDV;
-      const auto V_aibj = V_ai[jb*LDV2];
-
-      // Early Exist
-      if( std::abs(coeff * V_aibj) < h_el_tol ) continue;
-
-      //double sign_othr = single_excitation_sign( os_det >> (N/2),  b, j );
-      double sign_othr = single_excitation_sign(bitset_hi_word(os_det) ,  b, j );
-      double sign = sign_same * sign_othr;
-
-      // Compute Excited Determinant
-      auto ex_det = det | os_det; ex_det.flip(i).flip(a).flip(j+N/2).flip(b+N/2);
-
-      // Finalize Matrix Element
-      auto h_el = sign * V_aibj;
-
-      auto h_diag = 
-        //ham_gen.fast_diag_os_double( occ_same, occ_othr, i, j, a, b, root_diag );
-        ham_gen.fast_diag_os_double( eps_same[i], eps_othr[j],
-          eps_same[a], eps_othr[b], i, j, a, b, root_diag );
-      h_el /= ( E0 - h_diag );
-
-      asci_contributions.push_back( {ex_det, coeff*h_el} );
-    } // BJ
-
-  } // A
-  } // I
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -790,7 +494,7 @@ auto dist_triplets_all(size_t norb, size_t ns_othr, size_t nd_othr,
     size_t nw = 0;
     for( const auto& alpha : unique_alpha ) {
        nw += 
-         triplet_histogram(alpha, ns_othr, nd_othr, T, O, B );
+         constraint_histogram(alpha, ns_othr, nd_othr, T, O, B );
     }
 
     if(nw) triplets.emplace_back(t_i,t_j,t_k);
@@ -819,7 +523,7 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
     size_t nw = 0;
     for( const auto& alpha : unique_alpha ) {
        nw += 
-         triplet_histogram(alpha, ns_othr, nd_othr, T, O, B );
+         constraint_histogram(alpha, ns_othr, nd_othr, T, O, B );
     }
     if(nw) triplet_sizes.emplace_back(triplet{t_i, t_j, t_k}, nw);
   }
@@ -879,7 +583,7 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
     size_t nw = 0;
     for( const auto& alpha : unique_alpha ) {
        nw += 
-         triplet_histogram(alpha, ns_othr, nd_othr, T, O, B );
+         constraint_histogram(alpha, ns_othr, nd_othr, T, O, B );
     }
     if(nw) constraint_sizes.emplace_back(triplet{t_i, t_j, t_k}, nw);
     total_work += nw;
@@ -918,7 +622,7 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
       
       for( const auto& alpha : unique_alpha ) {
          nw += 
-           quad_histogram(alpha, ns_othr, nd_othr, Q, O, B );
+           constraint_histogram(alpha, ns_othr, nd_othr, Q, O, B );
       }
       if(nw) constraint_sizes.emplace_back(quad{q_i, q_j, q_k, q_l}, nw);
       total_work += nw;

@@ -169,7 +169,7 @@ TEST_CASE("Triplets") {
         (n_singles * (n_singles - nocc - nvir + 1))/4;
 
       new_triplet_hist[label] += 
-        asci::triplet_histogram( det, n_singles, n_doubles, T, overfill, B );
+        asci::constraint_histogram( det, n_singles, n_doubles, T, overfill, B );
     }
   }
 
@@ -202,7 +202,7 @@ TEST_CASE("Triplets") {
         (n_singles * (n_singles - nocc - nvir + 1))/4;
 
       new_quad_hist[label] += 
-        asci::quad_histogram( det, n_singles, n_doubles, Q, overfill, B );
+        asci::constraint_histogram( det, n_singles, n_doubles, Q, overfill, B );
     }
   }
 
