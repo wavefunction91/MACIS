@@ -122,34 +122,6 @@ auto generate_constraint_double_excitations( wfn_t<N> det,
 }
 
 
-template <size_t N>
-auto generate_triplet_single_excitations( wfn_t<N> det,
-  wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B ) {
-
-#if 0
-  if( (det & T).count() < 2 ) 
-    return std::make_pair(wfn_t<N>(0), wfn_t<N>(0));
-
-  auto o = det ^ T;
-  auto v = (~det) & O_mask & B;
-
-  if( (o & T).count() >= 1 ) {
-    v = o & T;
-    o ^= v;
-  }
-
-  if( (o & ~B).count() >  1 )
-    return std::make_pair(wfn_t<N>(0), wfn_t<N>(0));
-
-  if( (o & ~B).count() == 1 ) o &= ~B;
-
-  return std::make_pair(o,v);
-#else
-  return generate_constraint_single_excitations( det, T, O_mask, B );
-#endif
-
-
-}
 
 template <size_t N>
 void generate_triplet_singles( wfn_t<N> det, 
@@ -157,7 +129,7 @@ void generate_triplet_singles( wfn_t<N> det,
   std::vector<wfn_t<N>>& t_singles
 ) {
 
-  auto [o,v] = generate_triplet_single_excitations( det, T, O_mask, B );
+  auto [o,v] = generate_constraint_single_excitations( det, T, O_mask, B );
   const auto oc = o.count();
   const auto vc = v.count();
   if( !oc or !vc ) return;
@@ -175,73 +147,11 @@ void generate_triplet_singles( wfn_t<N> det,
 
 template <typename... Args>
 unsigned count_triplet_singles(Args&&... args) {
-  auto [o,v] = generate_triplet_single_excitations( std::forward<Args>(args)... );
+  auto [o,v] = generate_constraint_single_excitations( std::forward<Args>(args)... );
   return o.count() * v.count();
 }
 
 
-/**
- *  @param[in]  det       Input root determinant
- *  @param[in]  T         Triplet constraint mask
- *  @param[in]  O         Overfill mask (full mask 0 -> norb)
- *  @param[in]  B         B mask (?)
- *  @param[out] t_doubles 
- */
-template <size_t N>
-auto generate_triplet_double_excitations( wfn_t<N> det, 
-  wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B
-) {
-#if 0
-  // Occ/Vir pairs to generate excitations
-  std::vector<wfn_t<N>> O,V; 
-
-  if( (det & T) == 0 ) return std::make_tuple(O,V);
-
-  auto o = det ^ T;
-  auto v = (~det) & O_mask & B;
-
-
-  // Generate Virtual Pairs
-  if( (o & T).count() >= 2 ) {
-    v = o & T;
-    o ^= v;
-  }
-
-  const auto virt_ind = bits_to_indices(v);
-  const auto o_and_t = o & T;
-  switch( (o & T).count() ) {
-    case 1:
-      for( auto a : virt_ind ) {
-        V.emplace_back(o_and_t).flip(a);
-      }
-      o ^= o_and_t;
-      break;
-    default:
-      generate_pairs(virt_ind, V);
-      break;
-  }
-
-  // Generate Occupied Pairs
-  const auto o_and_not_b = o & ~B;
-  if( o_and_not_b.count() > 2 ) return std::make_tuple(O,V);
-
-  switch(o_and_not_b.count()) {
-    case 1 :
-      for( auto i : bits_to_indices( o & B ) ) {
-        O.emplace_back(o_and_not_b).flip(i);
-      }
-      break;
-    default:
-      if( o_and_not_b.count() == 2 ) o = o_and_not_b;
-      generate_pairs( bits_to_indices(o), O );
-      break;
-  }
-
-  return std::make_tuple(O,V);
-#else
-  return generate_constraint_double_excitations(det, T, O_mask, B);
-#endif
-}
 
 template <size_t N>
 void generate_triplet_doubles( wfn_t<N> det, 
@@ -249,7 +159,7 @@ void generate_triplet_doubles( wfn_t<N> det,
   std::vector<wfn_t<N>>& t_doubles
 ) {
 
-  auto [O,V] = generate_triplet_double_excitations(det,T,O_mask,B);
+  auto [O,V] = generate_constraint_double_excitations(det,T,O_mask,B);
 
   t_doubles.clear();
   for(auto ij : O) {
@@ -331,45 +241,6 @@ size_t triplet_histogram( wfn_t<N> det, size_t n_os_singles, size_t n_os_doubles
   return ndet;
 }
 
-template <size_t N>
-auto generate_quad_single_excitations( wfn_t<N> det,
-  wfn_t<N> Q, wfn_t<N> O, wfn_t<N> B ) {
-
-#if 0
-  unsigned i,j,k,l;
-  {
-  auto Q_cpy = Q;
-  i = fls(Q_cpy); Q_cpy.flip(i);
-  j = fls(Q_cpy); Q_cpy.flip(j);
-  k = fls(Q_cpy); Q_cpy.flip(k);
-  l = fls(Q_cpy); Q_cpy.flip(l);
-  }
-  
-  auto [T,_dummy,B_trip] = make_triplet_masks<N>(1,i,j,k);
-  
-  // Get triplet singles
-  auto [o,v] = generate_triplet_single_excitations(det, T, O, B_trip);
-  if( !o.count() or !v.count() ) return std::make_pair(o,v);
-
-  // Generate quad singles
-  const auto occ = bits_to_indices(o);
-  const auto vir = bits_to_indices(v);
-
-  wfn_t<N> o_quad(0), v_quad(0);
-  for(auto i : occ) 
-  for(auto a : vir) {
-    wfn_t<N> temp = det; temp.flip(i).flip(a);
-    if(satisfies_quad(temp, Q, l)) {
-      o_quad |= (wfn_t<N>(1) << i);
-      v_quad |= (wfn_t<N>(1) << a);
-    }
-  }
-
-  return std::make_pair(o_quad,v_quad);
-#else
-  return generate_constraint_single_excitations( det, Q, O, B );
-#endif
-}
 
 template <size_t N>
 void generate_quad_singles( wfn_t<N> det, 
@@ -377,7 +248,7 @@ void generate_quad_singles( wfn_t<N> det,
   std::vector<wfn_t<N>>& t_singles
 ) {
 
-  auto [o,v] = generate_quad_single_excitations( det, T, O_mask, B );
+  auto [o,v] = generate_constraint_single_excitations( det, T, O_mask, B );
   const auto oc = o.count();
   const auto vc = v.count();
   if( !oc or !vc ) return;
@@ -395,59 +266,12 @@ void generate_quad_singles( wfn_t<N> det,
 
 template <typename... Args>
 unsigned count_quad_singles(Args&&... args) {
-  auto [o,v] = generate_quad_single_excitations( std::forward<Args>(args)... );
+  auto [o,v] = generate_constraint_single_excitations( std::forward<Args>(args)... );
   return o.count() * v.count();
 }
 
 
 
-template <size_t N>
-auto generate_quad_double_excitations( wfn_t<N> det, 
-  wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B
-) {
-#if 0
-  unsigned i,j,k,l;
-  {
-  auto Q_cpy = Q;
-  i = fls(Q_cpy); Q_cpy.flip(i);
-  j = fls(Q_cpy); Q_cpy.flip(j);
-  k = fls(Q_cpy); Q_cpy.flip(k);
-  l = fls(Q_cpy); Q_cpy.flip(l);
-  }
-  
-  auto [T,_dummy,B_trip] = make_triplet_masks<N>(1,i,j,k);
-  
-  // Get triplet doubles
-  auto [O,V] = generate_triplet_double_excitations(det, T, O_mask, B_trip);
-  if( !O.size() or !V.size() ) return std::make_pair(O,V);
-
-  std::vector<wfn_t<N>> O_quad, V_quad;
-  for(auto ij : O) 
-  for(auto ab : V) {
-    wfn_t<N> temp = (det ^ ij) | ab;
-    if(satisfies_quad(temp, Q, l)) {
-      O_quad.emplace_back(ij);
-      V_quad.emplace_back(ab);
-    };
-  }
-
-  // Remove duplicates - this is insane 
-  std::sort(O_quad.begin(), O_quad.end(), bitset_less_comparator<N>{});
-  std::sort(V_quad.begin(), V_quad.end(), bitset_less_comparator<N>{});
-  {
-    auto it = std::unique(O_quad.begin(), O_quad.end());
-    O_quad.erase(it, O_quad.end());
-  }
-  {
-    auto it = std::unique(V_quad.begin(), V_quad.end());
-    V_quad.erase(it, V_quad.end());
-  }
-
-  return std::make_pair(O_quad, V_quad);
-#else
-  return generate_constraint_double_excitations( det, Q, O_mask, B );
-#endif
-}
 
 template <size_t N>
 void generate_quad_doubles( wfn_t<N> det, 
@@ -455,7 +279,7 @@ void generate_quad_doubles( wfn_t<N> det,
   std::vector<wfn_t<N>>& t_doubles
 ) {
 
-  auto [O,V] = generate_quad_double_excitations(det,Q,O_mask,B);
+  auto [O,V] = generate_constraint_double_excitations(det,Q,O_mask,B);
 
   t_doubles.clear();
   for(auto ij : O) {
@@ -471,41 +295,11 @@ unsigned count_quad_doubles( wfn_t<N> det,
   wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B
 ) {
 
-  auto [O,V] = generate_quad_double_excitations(det,Q,O_mask,B);
+  auto [O,V] = generate_constraint_double_excitations(det,Q,O_mask,B);
   return O.size() * V.size();
 }
 
 
-
-
-#if 0
-template <size_t N>
-auto count_quad_doubles( wfn_t<N> det, wfn_t<N> Q, wfn_t<N> O_mask, wfn_t<N> B ) {
-  unsigned i,j,k,l;
-  {
-  auto Q_cpy = Q;
-  i = fls(Q_cpy); Q_cpy.flip(i);
-  j = fls(Q_cpy); Q_cpy.flip(j);
-  k = fls(Q_cpy); Q_cpy.flip(k);
-  l = fls(Q_cpy); Q_cpy.flip(l);
-  }
-  
-  auto [T,_dummy,B_trip] = make_triplet_masks<N>(1,i,j,k);
-  
-  // Get triplet doubles
-  auto [O,V] = generate_triplet_double_excitations(det, T, O_mask, B_trip);
-  if( !O.size() or !V.size() ) return 0ul;
-
-  size_t n_quad_doubles = 0;
-  for(auto ij : O) 
-  for(auto ab : V) {
-    wfn_t<N> temp = (det ^ ij) | ab;
-    if(satisfies_quad(temp, Q, l)) n_quad_doubles++;
-  }
-
-  return n_quad_doubles;
-}
-#endif
 
 
 template <size_t N, typename... Args>
@@ -550,7 +344,7 @@ void generate_triplet_singles_contributions_ss(
   HamiltonianGenerator<N>&            ham_gen,
   asci_contrib_container<wfn_t<N>>& asci_contributions) {
 
-  auto [o,v] = generate_triplet_single_excitations(det, T, O, B);
+  auto [o,v] = generate_constraint_single_excitations(det, T, O, B);
   const auto no = o.count();
   const auto nv = v.count();
   if(!no or !nv) return;
@@ -612,7 +406,7 @@ void generate_triplet_doubles_contributions_ss(
   HamiltonianGenerator<N>&            ham_gen,
   asci_contrib_container<wfn_t<N>>& asci_contributions) {
 
-  auto [O,V] = generate_triplet_double_excitations(det, T, O_mask, B);
+  auto [O,V] = generate_constraint_double_excitations(det, T, O_mask, B);
   const auto no_pairs = O.size();
   const auto nv_pairs = V.size();
   if( !no_pairs or !nv_pairs ) return;
@@ -685,7 +479,7 @@ void generate_triplet_doubles_contributions_os(
 
   
   // Generate Single Excitations that Satisfy the Constraint
-  auto [o,v] = generate_triplet_single_excitations(det, T, O, B);
+  auto [o,v] = generate_constraint_single_excitations(det, T, O, B);
   const auto no = o.count();
   const auto nv = v.count();
   if(!no or !nv) return;
@@ -765,7 +559,7 @@ void generate_quad_singles_contributions_ss(
   HamiltonianGenerator<N>&            ham_gen,
   asci_contrib_container<wfn_t<N>>& asci_contributions) {
 
-  auto [o,v] = generate_quad_single_excitations(det, Q, O, B);
+  auto [o,v] = generate_constraint_single_excitations(det, Q, O, B);
   const auto no = o.count();
   const auto nv = v.count();
   if(!no or !nv) return;
@@ -827,7 +621,7 @@ void generate_quad_doubles_contributions_ss(
   HamiltonianGenerator<N>&            ham_gen,
   asci_contrib_container<wfn_t<N>>& asci_contributions) {
 
-  auto [O,V] = generate_quad_double_excitations(det, Q, O_mask, B);
+  auto [O,V] = generate_constraint_double_excitations(det, Q, O_mask, B);
   const auto no_pairs = O.size();
   const auto nv_pairs = V.size();
   if( !no_pairs or !nv_pairs ) return;
@@ -900,7 +694,7 @@ void generate_quad_doubles_contributions_os(
 
   
   // Generate Single Excitations that Satisfy the Constraint
-  auto [o,v] = generate_quad_single_excitations(det, Q, O, B);
+  auto [o,v] = generate_constraint_single_excitations(det, Q, O, B);
   const auto no = o.count();
   const auto nv = v.count();
   if(!no or !nv) return;
