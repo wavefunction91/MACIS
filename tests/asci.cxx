@@ -155,11 +155,13 @@ TEST_CASE("Triplets") {
     triplets.emplace_back(i,j,k);
   }
 
+  const auto overfill = asci::full_mask<num_bits>(norb);
+
   std::vector<size_t> new_triplet_hist(triplet_hist.size(), 0);
   for( auto [i,j,k] : triplets ) {
     const auto label = i*32*32 + j*32 + k;
-    auto [T, overfill, B] = 
-      asci::make_triplet_masks<num_bits>(norb,i,j,k);
+    auto [T, B, T_min] = 
+      asci::make_triplet<num_bits>(i,j,k);
 
     for( auto det : wfn_a_uniq ) {
       const size_t nocc = det.count();
@@ -191,8 +193,7 @@ TEST_CASE("Triplets") {
      
   for( auto [i,j,k,l] : quads ) {
     const size_t label = i*32ul*32ul*32ul + j*32ul*32ul + k*32ul + l;
-    auto [Q, overfill, B] = 
-      asci::make_quad_masks<num_bits>(norb,i,j,k,l);
+    auto [Q, B, Q_min] = asci::make_quad<num_bits>(i,j,k,l);
 
     for( auto det : wfn_a_uniq ) {
       const size_t nocc = det.count();

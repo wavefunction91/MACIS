@@ -8,26 +8,33 @@ namespace asci {
 #if 1
 
 template <size_t N>
-auto make_triplet_masks(size_t norb,
-  unsigned i, unsigned j, unsigned k) {
+struct wfn_constraint {
+  wfn_t<N> C;
+  wfn_t<N> B;
+  unsigned C_min;
+};
 
-  wfn_t<N> T(0); T.flip(i).flip(j).flip(k);
-  auto overfill = full_mask<N>(norb);
-  wfn_t<N> B(1); B <<= k; B = B.to_ullong() - 1;
+template <size_t N>
+auto make_triplet(unsigned i, unsigned j, unsigned k) {
+  wfn_constraint<N> con;
+  
+  con.C = 0; con.C.flip(i).flip(j).flip(k);
+  con.B = 1; con.B <<= k; con.B = con.B.to_ullong() - 1;
+  con.C_min = k;
 
-  return std::make_tuple(T,overfill,B);
+  return con;
 }
 
 
 template <size_t N>
-auto make_quad_masks(size_t norb,
-  unsigned i, unsigned j, unsigned k, unsigned l) {
+auto make_quad(unsigned i, unsigned j, unsigned k, unsigned l) {
+  wfn_constraint<N> con;
+  
+  con.C = 0; con.C.flip(i).flip(j).flip(k).flip(l);
+  con.B = 1; con.B <<= l; con.B = con.B.to_ullong() - 1;
+  con.C_min = l;
 
-  wfn_t<N> Q(0); Q.flip(i).flip(j).flip(k).flip(l);
-  auto overfill = full_mask<N>(norb);
-  wfn_t<N> B(1); B <<= l; B = B.to_ullong() - 1;
-
-  return std::make_tuple(Q,overfill,B);
+  return con;
 }
 
 
@@ -481,23 +488,27 @@ void generate_constraint_doubles_contributions_os(
 
 
 
-template <typename Integral, size_t N>
+template <size_t N>
 auto dist_triplets_all(size_t norb, size_t ns_othr, size_t nd_othr,
   const std::vector<wfn_t<N>>& unique_alpha) {
 
-  std::vector< std::tuple<Integral,Integral,Integral> > triplets; 
+  wfn_t<N> O = full_mask<N>(norb);
+
+  std::vector< wfn_constraint<N> > triplets; 
   triplets.reserve(norb*norb*norb);
   for(int t_i = 0; t_i < norb; ++t_i)
   for(int t_j = 0; t_j < t_i;  ++t_j)
   for(int t_k = 0; t_k < t_j;  ++t_k) {
-    auto [T,O,B] = make_triplet_masks<N>(norb,t_i,t_j,t_k);
+    auto constraint = make_triplet<N>(t_i,t_j,t_k);
+    const auto [T, B, _] = constraint;
+
     size_t nw = 0;
     for( const auto& alpha : unique_alpha ) {
        nw += 
          constraint_histogram(alpha, ns_othr, nd_othr, T, O, B );
     }
 
-    if(nw) triplets.emplace_back(t_i,t_j,t_k);
+    if(nw) triplets.emplace_back(constraint);
   }
   
 
@@ -505,27 +516,29 @@ auto dist_triplets_all(size_t norb, size_t ns_othr, size_t nd_othr,
 }
 
 
-template <typename Integral, size_t N>
+template <size_t N>
 auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
   const std::vector<wfn_t<N>>& unique_alpha, MPI_Comm comm) {
 
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
-  using triplet = std::tuple<Integral, Integral, Integral>;
+  wfn_t<N> O = full_mask<N>(norb);
 
   // Generate triplets + heuristic
-  std::vector<std::pair<triplet,size_t>> triplet_sizes; 
+  std::vector<std::pair<wfn_constraint<N>,size_t>> triplet_sizes; 
   triplet_sizes.reserve(norb*norb*norb);
   for(int t_i = 0; t_i < norb; ++t_i)
   for(int t_j = 0; t_j < t_i;  ++t_j)
   for(int t_k = 0; t_k < t_j;  ++t_k) {
-    auto [T,O,B] = make_triplet_masks<N>(norb,t_i,t_j,t_k);
+    auto constraint = make_triplet<N>(t_i,t_j,t_k);
+    const auto& [T,B,_] = constraint;
+
     size_t nw = 0;
     for( const auto& alpha : unique_alpha ) {
        nw += 
          constraint_histogram(alpha, ns_othr, nd_othr, T, O, B );
     }
-    if(nw) triplet_sizes.emplace_back(triplet{t_i, t_j, t_k}, nw);
+    if(nw) triplet_sizes.emplace_back(constraint, nw);
   }
 
   // Sort to get optimal bucket partitioning
@@ -534,7 +547,7 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
   
   // Assign work
   std::vector<size_t> workloads(world_size, 0);
-  std::vector< triplet > triplets; 
+  std::vector< wfn_constraint<N> > triplets; 
   triplets.reserve((norb*norb*norb) / world_size);
 
   for( auto [trip, nw] : triplet_sizes ) {
@@ -559,33 +572,34 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 
 
 
-template <typename Integral, size_t N>
+template <size_t N>
 auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
   const std::vector<wfn_t<N>>& unique_alpha, MPI_Comm comm) {
 
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
-  using triplet = std::tuple<Integral, Integral, Integral>;
-  using quad    = std::tuple<Integral, Integral, Integral, Integral>;
-  using constraint = std::variant<triplet, quad>;
+
+  wfn_t<N> O = full_mask<N>(norb);
 
   // Global workloads
   std::vector<size_t> workloads(world_size, 0);
 
   // Generate triplets + heuristic
-  std::vector<std::pair<constraint ,size_t>> constraint_sizes; 
+  std::vector<std::pair<wfn_constraint<N> ,size_t>> constraint_sizes; 
   constraint_sizes.reserve(norb*norb*norb);
   size_t total_work = 0;
   for(int t_i = 0; t_i < norb; ++t_i)
   for(int t_j = 0; t_j < t_i;  ++t_j)
   for(int t_k = 0; t_k < t_j;  ++t_k) {
-    auto [T,O,B] = make_triplet_masks<N>(norb,t_i,t_j,t_k);
+    auto constraint = make_triplet<N>(t_i,t_j,t_k);
+    const auto& [T,B,_] = constraint;
+
     size_t nw = 0;
     for( const auto& alpha : unique_alpha ) {
        nw += 
          constraint_histogram(alpha, ns_othr, nd_othr, T, O, B );
     }
-    if(nw) constraint_sizes.emplace_back(triplet{t_i, t_j, t_k}, nw);
+    if(nw) constraint_sizes.emplace_back(constraint, nw);
     total_work += nw;
   }
 
@@ -593,38 +607,41 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 
   // Select triplets larger than average to be broken apart
   size_t local_average = (0.8*total_work) / world_size;
-  std::vector<std::pair<constraint,size_t>> tps_to_quad;
+
+
+  std::vector<std::pair<wfn_constraint<N>,size_t>> tps_to_next;
   {
   auto it = std::partition(constraint_sizes.begin(), constraint_sizes.end(),
     [=](const auto& a) { return a.second <= local_average; });
 
   // Remove triplets from full list
-  tps_to_quad = std::vector<std::pair<constraint,size_t>>(it, constraint_sizes.end());
+  tps_to_next = decltype(tps_to_next)(it, constraint_sizes.end());
   constraint_sizes.erase(it, constraint_sizes.end());
-  for( auto [t,s] : tps_to_quad ) total_work -= s;
+  for( auto [t,s] : tps_to_next ) total_work -= s;
   }
 
 
 
-  // Break apart triplets
-  for( auto [c, nw_trip] : tps_to_quad ) {
-    const auto trip = std::get<triplet>(c);
+  // Break apart constraints 
+  for( auto [c, nw_trip] : tps_to_next ) {
 
-    // Unpack triplets
-    auto [q_i, q_j, q_k] = trip;
-    
-    // Loop over possible quads
-    for(auto q_l = 0; q_l < q_k; ++q_l) {
-      // Generate quad masks / counts
-      auto [Q,O,B] = make_quad_masks<N>(norb, q_i,q_j,q_k,q_l);
+    const auto C_min = c.C_min;
+
+    // Loop over possible constraints with one more element
+    for(auto q_l = 0; q_l < C_min; ++q_l) {
+      // Generate masks / counts
+      wfn_constraint<N> c_next = c;
+      c_next.C.flip(q_l);
+      c_next.B >>= (C_min - q_l);
+      c_next.C_min = q_l;
+
       size_t nw = 0;
 
-      
       for( const auto& alpha : unique_alpha ) {
          nw += 
-           constraint_histogram(alpha, ns_othr, nd_othr, Q, O, B );
+           constraint_histogram(alpha, ns_othr, nd_othr,c_next.C, O, c_next.B );
       }
-      if(nw) constraint_sizes.emplace_back(quad{q_i, q_j, q_k, q_l}, nw);
+      if(nw) constraint_sizes.emplace_back(c_next, nw);
       total_work += nw;
     }
 
@@ -637,9 +654,8 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
     [](const auto& a, const auto& b){ return a.second > b.second;} );
   
   // Assign work
-  std::vector< triplet > triplets; 
-  std::vector< quad > quads; 
-  triplets.reserve(constraint_sizes.size() / world_size);
+  std::vector< wfn_constraint<N> > constraints; 
+  constraints.reserve(constraint_sizes.size() / world_size);
 
   for( auto [c, nw] : constraint_sizes ) {
 
@@ -650,8 +666,7 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
     // Assign constraint
     *min_rank_it += nw;
     if(world_rank == min_rank) {
-      if(const auto* p = std::get_if<triplet>(&c)) triplets.emplace_back(*p);
-      else quads.emplace_back(std::get<quad>(c));
+      constraints.emplace_back(c);
     }
     
   }
@@ -661,7 +676,7 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
     workloads[world_rank], total_work);
 
 
-  return std::make_pair(triplets,quads);
+  return constraints;
 }
 
 template <typename Integral, size_t N>

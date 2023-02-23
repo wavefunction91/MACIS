@@ -25,33 +25,6 @@ struct mpi_traits<std::bitset<N>> {
 };
 
 template <typename WfnT>
-struct mpi_traits<asci_contrib<WfnT>> {
-  using type = asci_contrib<WfnT>;
-  inline static mpi_datatype datatype() {
-  
-    type dummy;
-  
-    int lengths[2] = {1,1};
-    MPI_Aint displacements[2];
-    MPI_Aint base_address;
-    MPI_Get_address(&dummy,       &base_address);
-    MPI_Get_address(&dummy.state, displacements + 0);
-    MPI_Get_address(&dummy.rv,    displacements + 1);
-    displacements[0] = MPI_Aint_diff(displacements[0], base_address);
-    displacements[1] = MPI_Aint_diff(displacements[1], base_address);
-  
-    auto wfn_dtype = mpi_traits<WfnT>::datatype();
-    MPI_Datatype types[2] = {wfn_dtype, MPI_DOUBLE};
-    MPI_Datatype custom_type;
-    MPI_Type_create_struct( 2, lengths, displacements, types, &custom_type );
-    MPI_Type_commit( &custom_type );
-  
-    return make_managed_mpi_datatype( custom_type );
-    
-  }
-};
-
-template <typename WfnT>
 struct asci_contrib_topk_comparator {
   using type = asci_contrib<WfnT>;
   constexpr bool operator()(const type& a, const type& b) const {
@@ -177,7 +150,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
 }
 
 template <size_t N>
-asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
+asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   ASCISettings               asci_settings, 
   wavefunction_iterator_t<N> cdets_begin, 
   wavefunction_iterator_t<N> cdets_end,
@@ -278,8 +251,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
   logger->info(" * NS = {} ND = {}", n_sing_alpha, n_doub_alpha); 
 
   // Generate triplets
-  std::vector< std::tuple<int,int,int> > triplets; 
-  std::vector< std::tuple<int,int,int,int> > quads; 
+  //std::vector< std::tuple<int,int,int> > triplets; 
+  //std::vector< std::tuple<int,int,int,int> > quads; 
 
 #if 0
   if( asci_settings.dist_triplet_random )
@@ -289,8 +262,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
     triplets = dist_triplets_histogram<int>(norb, n_sing_alpha, n_doub_alpha,
       uniq_alpha_wfn, comm);
 #else
-    std::tie(triplets,quads) = 
-      dist_34_histogram<int>(norb, n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
+    auto constraints = 
+      dist_34_histogram(norb, n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
 #endif
   
   size_t max_size = std::min(asci_settings.pair_size_max,
@@ -303,6 +276,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
   asci_pairs.reserve(max_size);
   
 
+#if 0
   // DO TRIPLET WORK
 
   //std::vector<size_t> triplet_nontriv_counts(triplets.size());
@@ -432,20 +406,18 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
   //printf("[rank %d] MAX TRIP %d %d %d SZ = %lu\n",
   //  world_rank, std::get<0>(max_trip), std::get<1>(max_trip), std::get<2>(max_trip),
   //  max_trip_sz );
+#endif
 
 
 
 
   // DO QUAD WORK
-  size_t max_quad_sz = 0;
-  std::tuple<int,int,int,int> max_quad;
-  for( auto [q_i, q_j, q_k, q_l] : quads ) {
+  for( auto con : constraints ) {
     auto size_before = asci_pairs.size();
 
-    auto [Q,O,B] = 
-      make_quad_masks<N>(norb,q_i,q_j,q_k,q_l);
-
     const double h_el_tol = asci_settings.h_el_tol;
+    const auto& [C,B,C_min] = con;
+    wfn_t<N> O = full_mask<N>(norb);
 
     // Loop over unique alpha strings
     for( size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha ) {
@@ -461,7 +433,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
         generate_constraint_singles_contributions_ss(
-          coeff, det, Q, O, B, beta, occ_alpha, occ_beta, 
+          coeff, det, C, O, B, beta, occ_alpha, occ_beta, 
           orb_ens_alpha.data(), T_pq, norb, G_red, norb, V_red, norb,
           h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
       }
@@ -474,7 +446,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
         generate_constraint_doubles_contributions_ss(
-          coeff, det, Q, O, B, beta, occ_alpha, occ_beta, 
+          coeff, det, C, O, B, beta, occ_alpha, occ_beta, 
           orb_ens_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, 
           ham_gen, asci_pairs );
       }
@@ -489,12 +461,12 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
         const auto& orb_ens_alpha  = bcd.orb_ens_alpha;
         const auto& orb_ens_beta  = bcd.orb_ens_beta;
         generate_constraint_doubles_contributions_os(
-          coeff, det, Q, O, B, beta, occ_alpha, occ_beta,
+          coeff, det, C, O, B, beta, occ_alpha, occ_beta,
           vir_beta, orb_ens_alpha.data(), orb_ens_beta.data(),
           V_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs );
       }
 
-      if( satisfies_constraint( det, Q, q_l ) ) {
+      if( satisfies_constraint( det, C, C_min ) ) {
         for( const auto& bcd : uad[i_alpha].bcd ) {
 
           const auto& beta     = bcd.beta_string;
@@ -529,8 +501,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
             return std::abs(x.rv) > asci_settings.rv_prune_tol;
           });
         asci_pairs.erase(it, asci_pairs.end());
-        logger->info("  * Pruning at QUAD = {} {} {} {}, NSZ = {}", 
-          q_i, q_j, q_k, q_l,  asci_pairs.size() );
+        //logger->info("  * Pruning at QUAD = {} {} {} {}, NSZ = {}", 
+        //  q_i, q_j, q_k, q_l,  asci_pairs.size() );
 
         // Extra Pruning if not sufficient
         if( asci_pairs.size() > asci_settings.pair_size_max ) {
@@ -551,95 +523,13 @@ asci_contrib_container<wfn_t<N>> asci_contributions_triplet(
     }
 
     auto size_after = asci_pairs.size();
-    if( size_after - size_before > max_quad_sz ) {
-      max_quad_sz = size_after - size_before;
-      max_quad = {q_i, q_j, q_k, q_l};
-    }
+    //if( size_after - size_before > max_quad_sz ) {
+    //  max_quad_sz = size_after - size_before;
+    //  max_quad = {q_i, q_j, q_k, q_l};
+    //}
 
   } // Quad Loop
 
-#if 0
-  // Break apart largest triplet into quads
-  std::vector<size_t> quad_histogram(norb*norb*norb*norb, 0);
-  std::vector<size_t> quint_histogram(norb*norb*norb*norb*norb, 0);
-  {
-    auto [t_i, t_j, t_k] = max_trip;
-    auto [T,O,B] = 
-      make_triplet_masks<N/2>(norb,t_i,t_j,t_k);
-
-    // Loop over pairs
-    for( auto [state, rv] : asci_pairs ) {
-      // Grab alpha word
-      auto det = bitset_lo_word(state);    
-
-      // If det satisfies T
-      if( (det & T).count() == 3 and ((det ^ T) >> t_k).count() == 0 ) {
-
-        // Compute quad index
-        unsigned q_i, q_j, q_k, q_l;
-        {
-        auto word = det;
-        q_i = asci::fls(word); word.flip(q_i);
-        q_j = asci::fls(word); word.flip(q_j);
-        q_k = asci::fls(word); word.flip(q_k);
-        q_l = asci::fls(word); word.flip(q_l);
-        }
-
-        { 
-        const size_t label = q_l + q_k*norb + q_j*norb*norb + q_i*norb*norb*norb;
-        quad_histogram[label]++;
-        }
-
-        // Compute quint index
-        unsigned f_i, f_j, f_k, f_l, f_m;
-        {
-        auto word = det;
-        f_i = asci::fls(word); word.flip(f_i);
-        f_j = asci::fls(word); word.flip(f_j);
-        f_k = asci::fls(word); word.flip(f_k);
-        f_l = asci::fls(word); word.flip(f_l);
-        f_m = asci::fls(word); word.flip(f_m);
-        }
-
-        { 
-        const size_t label = f_m + (f_l + f_k*norb + f_j*norb*norb + f_i*norb*norb*norb)*norb;
-        quint_histogram[label]++;
-        }
-      }
-    }
-  }
-
-  {
-  std::ofstream quad_file("quad_file."+std::to_string(world_rank)+".txt");
-  quad_file << "MAX TRIP = " << std::get<0>(max_trip) << " "
-                             << std::get<1>(max_trip) << " "
-                             << std::get<2>(max_trip) << " SZ = "
-                             << max_trip_sz << std::endl;
-  for(int i = 0; i < norb; ++i)
-  for(int j = 0; j < i;    ++j)
-  for(int k = 0; k < j;    ++k)
-  for(int l = 0; l < k;    ++l) {
-    const size_t label = l + k*norb + j*norb*norb + i*norb*norb*norb;
-    if(quad_histogram[label]) {
-      quad_file << i << " " << j << " " << k << " " << l << " SZ = " 
-                << quad_histogram[label] << std::endl;
-    }
-  }
-
-  quad_file << std::endl;
-  for(int i = 0; i < norb; ++i)
-  for(int j = 0; j < i;    ++j)
-  for(int k = 0; k < j;    ++k)
-  for(int l = 0; l < k;    ++l) 
-  for(int m = 0; m < l;    ++m) {
-    const size_t label = m + (l + k*norb + j*norb*norb + i*norb*norb*norb)*norb;
-    if(quint_histogram[label]) {
-      quad_file << i << " " << j << " " << k << " " << l << " " << m << " SZ = " 
-                << quint_histogram[label] << std::endl;
-    }
-  }
-  }
-#endif
 
   return asci_pairs;
 }
@@ -698,7 +588,7 @@ std::vector< wfn_t<N> > asci_search(
       cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
       V_red, G_pqrs, V_pqrs, ham_gen );
   else
-    asci_pairs = asci_contributions_triplet( asci_settings, 
+    asci_pairs = asci_contributions_constraint( asci_settings, 
       cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
       V_red, G_pqrs, V_pqrs, ham_gen, comm );
   auto pairs_en = clock_type::now();
