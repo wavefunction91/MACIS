@@ -37,6 +37,85 @@ bool satisfies_quad( wfn_t<N> det, wfn_t<N> Q, unsigned Q_min ) {
 }
 
 
+
+template <size_t N>
+auto generate_generic_single_excitations( wfn_t<N> det,
+  wfn_t<N> C, wfn_t<N> O_mask, wfn_t<N> B ) {
+
+  if( (det & C).count() < (C.count() -1) )  //need to have at most one different from the constraint 
+    return std::make_pair(wfn_t<N>(0), wfn_t<N>(0));
+
+  auto o = det ^ C;
+  auto v = (~det) & O_mask & B;
+
+  if( (o & C).count() == 1 ) {  //don't have to change this necessarily, but more clear without >=
+    v = o & C;
+    o ^= v;
+  }
+
+  if( (o & ~B).count() >  1 )
+    return std::make_pair(wfn_t<N>(0), wfn_t<N>(0));
+
+  if( (o & ~B).count() == 1 ) o &= ~B;
+
+  return std::make_pair(o,v);
+
+}
+
+template <size_t N>
+auto generate_generic_double_excitations( wfn_t<N> det,
+  wfn_t<N> C, wfn_t<N> O_mask, wfn_t<N> B ) {
+
+  // Occ/Vir pairs to generate excitations
+  std::vector<wfn_t<N>> O,V; 
+
+  if((det & C) == 0) return std::make_tuple(O,V);
+
+  auto o = det ^ C;
+  auto v = (~det) & O_mask & B;
+
+  if((o & C).count() >= 3) return std::make_tuple(O,V); 
+
+  // Generate Virtual Pairs
+  if( (o & C).count() == 2 ) {
+    v = o & C;
+    o ^= v;
+  }
+
+  const auto virt_ind = bits_to_indices(v);
+  const auto o_and_t = o & C;
+  switch( (o & C).count() ) {
+    case 1:
+      for( auto a : virt_ind ) {
+        V.emplace_back(o_and_t).flip(a);
+      }
+      o ^= o_and_t;
+      break;
+    default:
+      generate_pairs(virt_ind, V);
+      break;
+  }
+
+  // Generate Occupied Pairs
+  const auto o_and_not_b = o & ~B;
+  if( o_and_not_b.count() > 2 ) return std::make_tuple(O,V);
+
+  switch(o_and_not_b.count()) {
+    case 1 :
+      for( auto i : bits_to_indices( o & B ) ) {
+        O.emplace_back(o_and_not_b).flip(i);
+      }
+      break;
+    default:
+      if( o_and_not_b.count() == 2 ) o = o_and_not_b;
+      generate_pairs( bits_to_indices(o), O );
+      break;
+  }
+
+  return std::make_tuple(O,V);
+}
+
+
 template <size_t N>
 auto generate_triplet_single_excitations( wfn_t<N> det,
   wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B ) {
@@ -240,6 +319,7 @@ template <size_t N>
 auto generate_quad_single_excitations( wfn_t<N> det,
   wfn_t<N> Q, wfn_t<N> O, wfn_t<N> B ) {
 
+#if 0
   unsigned i,j,k,l;
   {
   auto Q_cpy = Q;
@@ -270,6 +350,25 @@ auto generate_quad_single_excitations( wfn_t<N> det,
   }
 
   return std::make_pair(o_quad,v_quad);
+#else
+  if( (det & Q).count() < (Q.count() -1) )  //need to have at most one different from the constraint 
+    return std::make_pair(wfn_t<N>(0), wfn_t<N>(0));
+
+  auto o = det ^ Q;
+  auto v = (~det) & O & B;
+
+  if( (o & Q).count() == 1 ) {  //don't have to change this necessarily, but more clear without >=
+    v = o & Q;
+    o ^= v;
+  }
+
+  if( (o & ~B).count() >  1 )
+    return std::make_pair(wfn_t<N>(0), wfn_t<N>(0));
+
+  if( (o & ~B).count() == 1 ) o &= ~B;
+
+  return std::make_pair(o,v);
+#endif
 }
 
 template <size_t N>
