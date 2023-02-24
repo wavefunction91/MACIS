@@ -263,7 +263,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       uniq_alpha_wfn, comm);
 #else
     auto constraints = 
-      dist_34_histogram(norb, n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
+      dist_34_histogram(2, norb, n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
 #endif
   
   size_t max_size = std::min(asci_settings.pair_size_max,
@@ -507,7 +507,10 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         // Extra Pruning if not sufficient
         if( asci_pairs.size() > asci_settings.pair_size_max ) {
           logger->info("    * Removing Duplicates");
-          sort_and_accumulate_asci_pairs( asci_pairs );
+          auto uit = sort_and_accumulate_asci_pairs( 
+            asci_pairs.begin() + size_before, asci_pairs.end()
+          );
+          asci_pairs.erase(uit, asci_pairs.end());
           logger->info("    * NSZ = {}", asci_pairs.size());
         }
 

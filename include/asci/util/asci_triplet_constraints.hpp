@@ -573,7 +573,7 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 
 
 template <size_t N>
-auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
+auto dist_34_histogram(size_t nlevels, size_t norb, size_t ns_othr, size_t nd_othr,
   const std::vector<wfn_t<N>>& unique_alpha, MPI_Comm comm) {
 
   auto world_rank = comm_rank(comm);
@@ -605,48 +605,68 @@ auto dist_34_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 
 
 
-  // Select triplets larger than average to be broken apart
-  size_t local_average = (0.8*total_work) / world_size;
+  size_t local_average = (0.6*total_work) / world_size;
 
 
-  std::vector<std::pair<wfn_constraint<N>,size_t>> tps_to_next;
-  {
-  auto it = std::partition(constraint_sizes.begin(), constraint_sizes.end(),
-    [=](const auto& a) { return a.second <= local_average; });
+  for(size_t ilevel = 0; ilevel < nlevels; ++ilevel) {
 
-  // Remove triplets from full list
-  tps_to_next = decltype(tps_to_next)(it, constraint_sizes.end());
-  constraint_sizes.erase(it, constraint_sizes.end());
-  for( auto [t,s] : tps_to_next ) total_work -= s;
-  }
+    // Select constraints larger than average to be broken apart
+    std::vector<std::pair<wfn_constraint<N>,size_t>> tps_to_next;
+    {
+    auto it = std::partition(constraint_sizes.begin(), constraint_sizes.end(),
+      [=](const auto& a) { return a.second <= local_average; });
 
-
-
-  // Break apart constraints 
-  for( auto [c, nw_trip] : tps_to_next ) {
-
-    const auto C_min = c.C_min;
-
-    // Loop over possible constraints with one more element
-    for(auto q_l = 0; q_l < C_min; ++q_l) {
-      // Generate masks / counts
-      wfn_constraint<N> c_next = c;
-      c_next.C.flip(q_l);
-      c_next.B >>= (C_min - q_l);
-      c_next.C_min = q_l;
-
-      size_t nw = 0;
-
-      for( const auto& alpha : unique_alpha ) {
-         nw += 
-           constraint_histogram(alpha, ns_othr, nd_othr,c_next.C, O, c_next.B );
-      }
-      if(nw) constraint_sizes.emplace_back(c_next, nw);
-      total_work += nw;
+    // Remove constraints from full list
+    tps_to_next = decltype(tps_to_next)(it, constraint_sizes.end());
+    constraint_sizes.erase(it, constraint_sizes.end());
+    for( auto [t,s] : tps_to_next ) total_work -= s;
     }
+    
 
+    if(!tps_to_next.size()) break;
+
+
+    // Break apart constraints 
+    for( auto [c, nw_trip] : tps_to_next ) {
+
+      const auto C_min = c.C_min;
+
+      // Loop over possible constraints with one more element
+      for(auto q_l = 0; q_l < C_min; ++q_l) {
+        // Generate masks / counts
+        wfn_constraint<N> c_next = c;
+        c_next.C.flip(q_l);
+        c_next.B >>= (C_min - q_l);
+        c_next.C_min = q_l;
+
+        size_t nw = 0;
+
+        for( const auto& alpha : unique_alpha ) {
+           nw += 
+             constraint_histogram(alpha, ns_othr, nd_othr,c_next.C, O, c_next.B );
+        }
+        if(nw) constraint_sizes.emplace_back(c_next, nw);
+        total_work += nw;
+      }
+
+    }
+  } // Recurse into constraints
+
+  if(!world_rank) {
+    const auto ntrip = std::count_if(constraint_sizes.begin(), 
+      constraint_sizes.end(), [](auto &c){ return c.first.C.count() == 3; });
+    printf("[rank 0] NTRIP = %lu\n", ntrip);
+    if(nlevels > 0) {
+      const auto nquad = std::count_if(constraint_sizes.begin(), 
+        constraint_sizes.end(), [](auto &c){ return c.first.C.count() == 4; });
+      printf("[rank 0] NQUAD = %lu\n", nquad);
+    }
+    if(nlevels > 1) {
+      const auto nquint = std::count_if(constraint_sizes.begin(), 
+        constraint_sizes.end(), [](auto &c){ return c.first.C.count() == 5; });
+      printf("[rank 0] NQINT = %lu\n", nquint);
+    }
   }
-
 
 
   // Sort to get optimal bucket partitioning
