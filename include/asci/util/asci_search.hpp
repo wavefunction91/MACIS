@@ -50,6 +50,7 @@ struct ASCISettings {
   size_t rot_size_start = 1000;
 
   bool dist_triplet_random = false;
+  int constraint_level = 2; // Up To Quints
 };
 
 template <size_t N>
@@ -262,8 +263,28 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     triplets = dist_triplets_histogram<int>(norb, n_sing_alpha, n_doub_alpha,
       uniq_alpha_wfn, comm);
 #else
+    if(!world_rank) {
+    std::cout << "  * Will Generate up to ";
+    switch(asci_settings.constraint_level) {
+      case 0: 
+        std::cout << "Triplets" << std::endl;
+        break;
+      case 1: 
+        std::cout << "Quadruplets" << std::endl;
+        break;
+      case 2: 
+        std::cout << "Quintuplets" << std::endl;
+        break;
+      case 3: 
+        std::cout << "Hextuplets" << std::endl;
+        break;
+      default: 
+        std::cout << "Something I dont recognize" << std::endl;
+        break;
+    }
+    }
     auto constraints = 
-      dist_34_histogram(2, norb, n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
+      dist_34_histogram(asci_settings.constraint_level, norb, n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
 #endif
   
   size_t max_size = std::min(asci_settings.pair_size_max,

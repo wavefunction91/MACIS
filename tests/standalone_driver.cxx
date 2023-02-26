@@ -182,6 +182,7 @@ int main(int argc, char** argv) {
   OPT_KEYWORD("ASCI.GROW_WITH_ROT",   asci_settings.grow_with_rot,     bool   );
   OPT_KEYWORD("ASCI.ROT_SIZE_START",  asci_settings.rot_size_start,    size_t );
   OPT_KEYWORD("ASCI.DIST_TRIP_RAND",  asci_settings.dist_triplet_random, bool );
+  OPT_KEYWORD("ASCI.CONSTRAINT_LVL",  asci_settings.constraint_level, int);
   OPT_KEYWORD("ASCI.WFN_FILE",     asci_wfn_fname,              std::string );
   OPT_KEYWORD("ASCI.WFN_OUT_FILE", asci_wfn_out_fname,          std::string );
   if(input.containsData("ASCI.E0_WFN")) {
