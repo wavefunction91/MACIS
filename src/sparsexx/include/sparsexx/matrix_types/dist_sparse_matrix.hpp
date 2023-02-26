@@ -22,6 +22,7 @@ public:
   using index_type = detail::index_type_t<SpMatType>;
   using size_type  = detail::size_type_t<SpMatType>;
   using tile_type  = SpMatType;
+  using extent_type = std::pair<index_type,index_type>;
 
 protected:
 
@@ -35,7 +36,7 @@ protected:
   std::shared_ptr<tile_type> diagonal_tile_     = nullptr;
   std::shared_ptr<tile_type> off_diagonal_tile_ = nullptr;
 
-  std::vector< std::pair<index_type,index_type> > dist_row_extents_;
+  std::vector< extent_type > dist_row_extents_;
 
 public:
 
@@ -61,6 +62,29 @@ public:
   
   }
 
+  dist_sparse_matrix( MPI_Comm c, size_t M, size_t N,
+    const std::vector<extent_type>& row_tiles) :
+    comm_(c), global_m_(M), global_n_(N), dist_row_extents_(row_tiles) {
+
+    comm_size_ = detail::get_mpi_size(comm_);
+    comm_rank_ = detail::get_mpi_rank(comm_);
+
+    if(dist_row_extents_.size() != comm_size_)
+      throw std::runtime_error("Incorrect Row Tile Size");
+
+    if(dist_row_extents_[0].first != 0 or dist_row_extents_.back().second != M)
+      throw std::runtime_error("Invalid Row Tile Bounds");
+
+    for(auto [i,j] : dist_row_extents_) {
+      if(i > j) throw std::runtime_error("Row Tiles Must Be Sorted");
+    }
+    for(auto i = 0; i < comm_size_-1; ++i) {
+      if(dist_row_extents_[i].second != dist_row_extents_[i+1].first)
+        throw std::runtime_error("Row Tiles Must Be Contiguous");
+    }
+
+  }
+
   dist_sparse_matrix( const dist_sparse_matrix& other ) :
     dist_sparse_matrix( other.comm_, other.global_m_, other.global_n_ ) {
 
@@ -72,6 +96,25 @@ public:
 
   dist_sparse_matrix( MPI_Comm c, const SpMatType& A ) :
     dist_sparse_matrix( c, A.m(), A.n() ) {
+
+    auto [local_row_st, local_row_en] = dist_row_extents_[comm_rank_];
+    auto local_lo = std::make_pair<int64_t,int64_t>(local_row_st, local_row_st);
+    auto local_up = std::make_pair<int64_t,int64_t>(local_row_en, local_row_en);
+    diagonal_tile_ = std::make_shared<tile_type>(
+      extract_submatrix( A, local_lo, local_up )
+    );
+    off_diagonal_tile_ = std::make_shared<tile_type>(
+      extract_submatrix_inclrow_exclcol( A, local_lo, local_up )
+    );
+    diagonal_tile_->set_indexing(0);
+    off_diagonal_tile_->set_indexing(0);
+      
+  }
+
+  dist_sparse_matrix( MPI_Comm c, const SpMatType& A,  
+    const std::vector<extent_type>& row_tiles ) :
+    dist_sparse_matrix( c, A.m(), A.n(), row_tiles ) {
+
 
     auto [local_row_st, local_row_en] = dist_row_extents_[comm_rank_];
     auto local_lo = std::make_pair<int64_t,int64_t>(local_row_st, local_row_st);

@@ -114,7 +114,7 @@ target_link_libraries( sparsexx PUBLIC MPI::MPI_CXX  )
 if( TARGET OpenMP::OpenMP_CXX )
   target_link_libraries( sparsexx PUBLIC OpenMP::OpenMP_CXX )
 endif()
-#target_link_libraries     ( sparsexx PRIVATE metis )
+target_link_libraries     ( sparsexx PRIVATE ${SPARSEXX_EXTERNAL_LIBRARIES} )
 target_include_directories( sparsexx PUBLIC 
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
@@ -189,9 +189,9 @@ install( FILES
   DESTINATION ${INSTALL_CONFIGDIR}
 )
 
+add_subdirectory( examples )
 include(CTest)
 if( CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND SPARSEXX_ENABLE_TESTS AND BUILD_TESTING )
-  add_subdirectory( examples )
   add_subdirectory( tests )
 endif()
 

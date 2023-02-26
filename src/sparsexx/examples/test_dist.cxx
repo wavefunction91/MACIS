@@ -8,6 +8,7 @@
 #include <sparsexx/spblas/spmbv.hpp>
 #include <sparsexx/spblas/pspmbv.hpp>
 #include <random>
+#include <iomanip>
 
 template <typename T>
 auto operator-(const std::vector<T>& a, const std::vector<T>& b ) {
@@ -57,7 +58,7 @@ int main(int argc, char** argv) {
   auto world_size = sparsexx::detail::get_mpi_size( MPI_COMM_WORLD );
   auto world_rank = sparsexx::detail::get_mpi_rank( MPI_COMM_WORLD );
   {
-  assert( argc == 2 );
+  assert( argc >= 2 );
   using spmat_type = sparsexx::csr_matrix<double, int32_t>;
   #if 1
   if(world_rank == 0) std::cout << "READING MATRIX" << std::endl;
@@ -87,26 +88,26 @@ int main(int argc, char** argv) {
     1, 2, 3, 4, 8 
   };
 
-  //std::fill(A.nzval().begin(), A.nzval().end(), 1. );
-  std::iota(A.nzval().begin(), A.nzval().end(), 1. );
-  /*
+  //std::iota(A.nzval().begin(), A.nzval().end(), 1. );
+    
   A.nzval() = {
-    1, 1, 1, 1, 1,
-    2, 2, 2, 2, 2,
-    3, 3, 3, 3, 3,
-    4, 4, 4, 4, 4,
-    5, 5, 5, 5,
-    6, 6, 6, 6,
-    7, 7, 7, 7,
-    8, 8, 8, 8,
-    9, 9, 9, 9, 9 
+    10, 11, 14, 15, 18,
+    20, 21, 24, 25, 28,
+    32, 33, 36, 37, 38,
+    42, 43, 46, 47, 48,
+    50, 51, 54, 55,
+    60, 61, 64, 65,
+    72, 73, 76, 77,
+    82, 83, 86, 87,
+    91, 92, 93, 94, 98 
   };
-  */
+    
   #endif
   const int N = A.m();
 
-  const bool do_reorder = true;
+  const bool do_reorder = argc >= 3 ? std::stoi(argv[2]) : false;
   std::vector<int32_t> mat_perm;
+  std::vector<std::pair<int32_t,int32_t>> row_extents;
   if( do_reorder ) {
 
     int nparts = std::max(2l,world_size);
@@ -118,7 +119,18 @@ int main(int argc, char** argv) {
       auto kway_part_end = clock_type::now(); 
 
       // Form permutation from partition
-      std::tie( mat_perm, std::ignore)  = sparsexx::perm_from_part( nparts, part );
+      std::vector<int32_t> partptr;
+      std::tie( mat_perm, partptr ) = sparsexx::perm_from_part( nparts, part );
+
+      row_extents.resize(nparts);
+      for(int i = 0; i < nparts; ++i) {
+        row_extents[i] = {partptr[i], partptr[i+1]};
+        std::cout << "PARTITION " << i << " " << partptr[i+1] - partptr[i] << std::endl;
+      }
+
+      //std::cout << "PERM ";
+      //for( auto x : mat_perm ) std::cout << x << " ";
+      //std::cout << std::endl;
 
       // Permute rows/cols of A 
       // A(I,P(J)) = A(P(I),J)
@@ -144,10 +156,34 @@ int main(int argc, char** argv) {
     }
   }
 
+  //sparsexx::detail::mpi_bcast( row_extents, 0, MPI_COMM_WORLD );
+  size_t re_size = row_extents.size();
+  sparsexx::detail::mpi_bcast(&re_size, 1, 0, MPI_COMM_WORLD);
+  if(re_size) {
+    row_extents.resize(re_size); // Safe on root rank
+    MPI_Bcast( &row_extents[0], 2*re_size, MPI_INT, 0, MPI_COMM_WORLD);
+  }
+
+  //MPI_Barrier(MPI_COMM_WORLD);
+  //if(!world_rank) {
+  //std::vector<double> A_dense(A.n() * A.m());
+  //sparsexx::convert_to_dense(A, A_dense.data(), A.n());
+  //for(int i = 0 ; i < A.n(); ++i) {
+  //for(int j = 0 ; j < A.n(); ++j)
+  //  std::cout << std::setw(4) << A_dense[i + j*A.n()] << " ";
+  //std::cout << std::endl;
+  //}
+  //}
+  //MPI_Barrier(MPI_COMM_WORLD);
+
   // Get distributed matrix 
-  sparsexx::dist_sparse_matrix<spmat_type> A_dist( MPI_COMM_WORLD, A );
+  using dist_mat_type = sparsexx::dist_sparse_matrix<spmat_type>;
+  auto A_dist = row_extents.size() ? 
+    dist_mat_type( MPI_COMM_WORLD, A, row_extents ) :
+    dist_mat_type( MPI_COMM_WORLD, A );
   auto spmv_info = sparsexx::spblas::generate_spmv_comm_info( A_dist );
 
+  printf("[rank %2ld] nnz = %lu\n", world_rank, A_dist.nnz());
   size_t comm_vol = spmv_info.communication_volume();
   if( world_rank == 0 ) std::cout << "COMM VOLUME = " << comm_vol << std::endl;
 
@@ -167,12 +203,14 @@ int main(int argc, char** argv) {
   }
 
   auto spmv_st = clock_type::now();
+  if(world_rank == 0)
   sparsexx::spblas::gespmbv(1, 1., A, V.data(), N, 0., AV.data(), N );
   auto spmv_en = clock_type::now();
   if( mat_perm.size() ) {
     sparsexx::permute_vector( N, AV.data(), mat_perm.data(), 
       sparsexx::PermuteDirection::Forward );
   }
+  MPI_Barrier(MPI_COMM_WORLD);
 
   // Parallel SPMV
   std::vector<double> V_dist ( A_dist.local_row_extent() ),
@@ -200,17 +238,20 @@ int main(int argc, char** argv) {
 
   // Compare results
   std::vector<double> AV_dist_combine(N);
-  size_t n_per_rank = N / world_size;
-  MPI_Allgather( AV_dist.data(), n_per_rank, MPI_DOUBLE, AV_dist_combine.data(),
-    n_per_rank, MPI_DOUBLE, MPI_COMM_WORLD );
-  if( N % world_size and world_size > 1 ) {
-    if( world_rank == (world_size-1) ) {
-      std::copy_n( AV_dist.data() + n_per_rank, N % world_size, 
-        AV_dist_combine.data() + world_size*n_per_rank );
-    }
-    MPI_Bcast( AV_dist_combine.data() + world_size*n_per_rank, N%world_size,
-      MPI_DOUBLE, world_size-1, MPI_COMM_WORLD );
+  std::vector<int> recv_counts(world_size);
+  std::vector<int> displs(world_size);
+  for(auto i = 0; i < world_size; ++i) {
+    auto [st,en] = A_dist.row_bounds(i);
+    recv_counts[i] = en - st;
+    displs[i] = st;
   }
+  MPI_Allgatherv( AV_dist.data(), A_dist.local_row_extent(), MPI_DOUBLE,
+    AV_dist_combine.data(), recv_counts.data(), displs.data(), 
+    MPI_DOUBLE, MPI_COMM_WORLD );
+
+
+
+
   if( mat_perm.size() ) {
     sparsexx::permute_vector( N, AV_dist_combine.data(), mat_perm.data(), 
       sparsexx::PermuteDirection::Forward );

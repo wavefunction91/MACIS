@@ -347,6 +347,54 @@ int main(int argc, char** argv) {
       }
 
 
+      // Dump Hamiltonian
+      if(0){
+      auto H = asci::make_dist_csr_hamiltonian<int64_t>( MPI_COMM_WORLD,
+        dets.begin(), dets.end(), ham_gen, 1e-16);
+
+      // Write MM files
+      {
+      std::ofstream ofile("H_diag." + std::to_string(world_rank) + ".mtx");
+      const auto& H_loc = H.diagonal_tile();
+      
+      ofile << "%%MatrixMarket matrix coordinate real general" << std::endl;
+      ofile << H.m() << " " << H.n() << " " << H_loc.nnz() << std::endl;
+      ofile << std::scientific << std::setprecision(12);
+      for(auto i = 0; i < H_loc.m(); ++i) {
+        auto row_st = H_loc.rowptr()[i];
+        auto row_en = H_loc.rowptr()[i+1];
+        for(auto j = row_st; j < row_en; ++j) {
+          ofile << i + H.local_row_start() + 1 << " " 
+                << H_loc.colind()[j] + H.local_row_start() + 1 << " "
+                << H_loc.nzval()[j] << std::endl;
+        }
+      }
+
+      }
+
+      {
+      std::ofstream ofile("H_offdiag." + std::to_string(world_rank) + ".mtx");
+      const auto& H_loc = H.off_diagonal_tile();
+      
+      ofile << "%%MatrixMarket matrix coordinate real general" << std::endl;
+      ofile << H.m() << " " << H.n() << " " << H_loc.nnz() << std::endl;
+      ofile << std::scientific << std::setprecision(12);
+      for(auto i = 0; i < H_loc.m(); ++i) {
+        auto row_st = H_loc.rowptr()[i];
+        auto row_en = H_loc.rowptr()[i+1];
+        for(auto j = row_st; j < row_en; ++j) {
+          ofile << i  + 1 << " " 
+                << H_loc.colind()[j] + 1  << " "
+                << H_loc.nzval()[j] << std::endl;
+        }
+      }
+
+      }
+
+
+      }
+
+
     }
 
 
