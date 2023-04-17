@@ -4,6 +4,8 @@
 #include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
 #include <sparsexx/matrix_types/dense_conversions.hpp>
 #include <sparsexx/io/read_mm.hpp>
+#include <sparsexx/io/write_mm.hpp>
+#include <sparsexx/io/write_dist_mm.hpp>
 
 #include <sparsexx/spblas/spmbv.hpp>
 #include <sparsexx/spblas/pspmbv.hpp>
@@ -103,6 +105,11 @@ int main(int argc, char** argv) {
   };
     
   #endif
+  //sparsexx::write_mm( "test.mtx", A, false, 1 );
+  //auto A_cpy = sparsexx::read_mm<spmat_type>( "test.mtx" );
+  //std::cout << (A.rowptr() == A_cpy.rowptr()) << std::endl;
+  //std::cout << (A.colind() == A_cpy.colind()) << std::endl;
+  
   const int N = A.m();
 
   const bool do_reorder = argc >= 3 ? std::stoi(argv[2]) : false;
@@ -183,7 +190,14 @@ int main(int argc, char** argv) {
     dist_mat_type( MPI_COMM_WORLD, A );
   auto spmv_info = sparsexx::spblas::generate_spmv_comm_info( A_dist );
 
-  printf("[rank %2ld] nnz = %lu\n", world_rank, A_dist.nnz());
+  //write_dist_mm("test_dist.mtx", A_dist, 1);
+  //auto A_cpy = sparsexx::read_mm<spmat_type>( "test_dist.mtx" );
+  //std::cout << (A.rowptr() == A_cpy.rowptr()) << std::endl;
+  //std::cout << (A.colind() == A_cpy.colind()) << std::endl;
+
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  //printf("[rank %2ld] nnz = %lu\n", world_rank, A_dist.nnz());
   size_t comm_vol = spmv_info.communication_volume();
   if( world_rank == 0 ) std::cout << "COMM VOLUME = " << comm_vol << std::endl;
 

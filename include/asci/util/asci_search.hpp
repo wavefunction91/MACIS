@@ -279,12 +279,19 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         std::cout << "Hextuplets" << std::endl;
         break;
       default: 
-        std::cout << "Something I dont recognize" << std::endl;
+        std::cout << "Something I dont recognize (" << asci_settings.constraint_level << ")" << std::endl;
         break;
     }
     }
+    using clock_type = std::chrono::high_resolution_clock;
+    using duration_type = std::chrono::duration<double,std::milli>;
+    auto gen_c_st = clock_type::now();
     auto constraints = 
       dist_34_histogram(asci_settings.constraint_level, norb, n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
+    auto gen_c_en = clock_type::now();
+    duration_type gen_c_dur = gen_c_en - gen_c_st;
+    if(!world_rank) std::cout << "GENC = " << gen_c_dur.count() << std::endl;
+
 #endif
   
   size_t max_size = std::min(asci_settings.pair_size_max,
