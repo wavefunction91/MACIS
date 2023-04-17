@@ -78,9 +78,6 @@ uint32_t ffs( std::bitset<N> bits ) {
   if constexpr (N <= 32)      return ffsl ( fast_to_ulong (bits) );
   else if constexpr (N <= 64) return ffsll( fast_to_ullong(bits) );
   else if constexpr (N <= 128) {
-    //if(bits.any()) {
-    //  return std::countr_zero( to_uint128(bits) ) + 1;
-    //} else { return 0; }
     auto as_words = reinterpret_cast<uint64_t*>(&bits);
     if(as_words[0]) return ffsll(as_words[0]);
     else            return ffsll(as_words[1]) + 64;
@@ -117,10 +114,6 @@ uint32_t fls( std::bitset<N> bits ) {
 template <size_t N>
 void bits_to_indices( std::bitset<N> bits, std::vector<uint32_t>& indices ) {
   indices.clear();
-#if 0
-  for( auto i = 0ul; i < N; ++i )
-  if( bits[i] ) indices.emplace_back(i);
-#else
   auto c = bits.count();
   indices.resize(c);
   if( ! c ) return;
@@ -129,7 +122,6 @@ void bits_to_indices( std::bitset<N> bits, std::vector<uint32_t>& indices ) {
     bits.flip(ind);
     indices[i] = ind;
   }
-#endif
 }
 
 template <size_t N>
