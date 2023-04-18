@@ -77,7 +77,6 @@ auto asci_grow( ASCISettings asci_settings, MCSCFSettings mcscf_settings,
         lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, norb,
           ordm.data(), norb, ONS.data());
         for( auto& x : ONS ) x *= -1.0;
-        //for(auto x : ONS) std::cout << x << std::endl;
         auto nos_en = hrt_t::now();
         dur_t nos_dur = nos_en - nos_st;
         logger->trace("    * NOS_DUR = {:.2e} ms", nos_dur.count() );

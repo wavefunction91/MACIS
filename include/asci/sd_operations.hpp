@@ -130,14 +130,12 @@ void append_singles( std::bitset<N> state,
 
   const size_t nocc = occ.size();
   const size_t nvir = vir.size();
-  //const std::bitset<N> one = 1ul;
 
   singles.clear();
   singles.reserve(nocc*nvir);
 
   for( size_t a = 0; a < nvir; ++a )
   for( size_t i = 0; i < nocc; ++i ) {
-    //std::bitset<N> ex = (one << occ[i]) ^ (one << vir[a]);
     auto ex = std::bitset<N>(0).flip(occ[i]).flip(vir[a]) ;
     singles.emplace_back( state ^ ex );
   }
@@ -162,8 +160,6 @@ void append_doubles( std::bitset<N> state,
   for( size_t i = 0; i < nocc; ++i ) 
   for( size_t b = a+1; b < nvir; ++b )
   for( size_t j = i+1; j < nocc; ++j ) {
-    //std::bitset<N> ex = (one << occ[i]) ^ (one << occ[j]) ^
-    //                    (one << vir[a]) ^ (one << vir[b]);
     auto ex = std::bitset<N>(0).flip(occ[i]).flip(vir[a]).flip(occ[j]).flip(vir[b]);
     doubles.emplace_back( state ^ ex );
   }
@@ -596,11 +592,9 @@ void generate_residues( std::bitset<N> state, std::vector<std::bitset<N>>& res )
   auto state_alpha = bitset_lo_word(state);
   auto state_beta  = bitset_hi_word(state);
 
-  //auto occ_alpha = bits_to_indices(state_alpha, occ_alpha);
   auto occ_alpha = bits_to_indices(state_alpha);
   const int nalpha = occ_alpha.size();
 
-  //auto occ_beta = bits_to_indices(state_beta, occ_beta);
   auto occ_beta = bits_to_indices(state_beta);
   const int nbeta  = occ_beta.size();
 

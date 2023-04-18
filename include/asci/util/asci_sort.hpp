@@ -46,7 +46,7 @@ PairIterator sort_and_accumulate_asci_pairs(
   };
 
   // Sort by bitstring
-  #ifdef ASCU_USE_BOOST_SORT
+  #ifdef ASCI_USE_BOOST_SORT
   boost::sort::pdqsort_branchless
   #else
   std::sort
@@ -87,7 +87,7 @@ void keep_only_largest_copy_asci_pairs(
   };
 
   // Sort by bitstring
-  #ifdef ASCU_USE_BOOST_SORT
+  #ifdef ASCI_USE_BOOST_SORT
   boost::sort::pdqsort_branchless
   #else
   std::sort

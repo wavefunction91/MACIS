@@ -10,7 +10,7 @@
 #include <asci/util/transform.hpp>
 #include <asci/util/memory.hpp>
 #include <asci/util/mpi.hpp>
-#include <asci/read_wavefunction.hpp>
+#include <asci/wavefunction_io.hpp>
 
 #include <sparsexx/io/write_dist_mm.hpp>
 
@@ -351,7 +351,7 @@ int main(int argc, char** argv) {
 
 
       // Dump Hamiltonian
-      if(1){
+      if(0){
         auto H = asci::make_dist_csr_hamiltonian<int64_t>( MPI_COMM_WORLD,
           dets.begin(), dets.end(), ham_gen, 1e-16);
         sparsexx::write_dist_mm("ham.mtx", H, 1);
