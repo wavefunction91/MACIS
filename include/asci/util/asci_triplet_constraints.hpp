@@ -5,7 +5,6 @@
 #include <variant>
 
 namespace asci {
-#if 1
 
 template <size_t N>
 struct wfn_constraint {
@@ -304,7 +303,6 @@ void generate_constraint_singles_contributions_ss(
 
     // Compute Fast Diagonal Matrix Element
     auto h_diag =
-      //ham_gen.fast_diag_single(occ_same, occ_othr, i, a, root_diag);
       ham_gen.fast_diag_single(eps[i], eps[a], i, a, 
         root_diag);
     h_el /= (E0 - h_diag);
@@ -351,7 +349,6 @@ void generate_constraint_doubles_contributions_ss(
     const auto b  = fls(ab);
     
     const auto G_aibj = G_ij[b + a*LDG2];
-    //printf(" %d %d %d %d %.6e\n", i,j,a,b, G_aibj);
 
     // Early Exit
     if( std::abs(coeff * G_aibj) < h_el_tol ) continue;
@@ -372,7 +369,6 @@ void generate_constraint_doubles_contributions_ss(
 
     // Evaluate fast diagonal matrix element
     auto h_diag =
-      //ham_gen.fast_diag_ss_double( occ_same, occ_othr, i, j, a, b, root_diag);
       ham_gen.fast_diag_ss_double( eps[i], eps[j],
         eps[a], eps[b], i, j, a, b, root_diag);
     h_el /= (E0 - h_diag);
@@ -442,7 +438,6 @@ void generate_constraint_doubles_contributions_os(
       auto h_el = sign * V_aibj;
 
       auto h_diag = 
-        //ham_gen.fast_diag_os_double( occ_same, occ_othr, i, j, a, b, root_diag );
         ham_gen.fast_diag_os_double( eps_same[i], eps_othr[j],
           eps_same[a], eps_othr[b], i, j, a, b, root_diag );
       h_el /= ( E0 - h_diag );
@@ -488,6 +483,7 @@ void generate_constraint_doubles_contributions_os(
 
 
 
+#if 0
 template <size_t N>
 auto dist_triplets_all(size_t norb, size_t ns_othr, size_t nd_othr,
   const std::vector<wfn_t<N>>& unique_alpha) {
@@ -564,6 +560,7 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 
   return triplets;
 }
+#endif
 
 
 
@@ -573,7 +570,7 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 
 
 template <size_t N>
-auto dist_34_histogram(size_t nlevels, size_t norb, size_t ns_othr, size_t nd_othr,
+auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr, size_t nd_othr,
   const std::vector<wfn_t<N>>& unique_alpha, MPI_Comm comm) {
 
   auto world_rank = comm_rank(comm);
@@ -652,21 +649,21 @@ auto dist_34_histogram(size_t nlevels, size_t norb, size_t ns_othr, size_t nd_ot
     }
   } // Recurse into constraints
 
-  if(!world_rank) {
-    const auto ntrip = std::count_if(constraint_sizes.begin(), 
-      constraint_sizes.end(), [](auto &c){ return c.first.C.count() == 3; });
-    printf("[rank 0] NTRIP = %lu\n", ntrip);
-    if(nlevels > 0) {
-      const auto nquad = std::count_if(constraint_sizes.begin(), 
-        constraint_sizes.end(), [](auto &c){ return c.first.C.count() == 4; });
-      printf("[rank 0] NQUAD = %lu\n", nquad);
-    }
-    if(nlevels > 1) {
-      const auto nquint = std::count_if(constraint_sizes.begin(), 
-        constraint_sizes.end(), [](auto &c){ return c.first.C.count() == 5; });
-      printf("[rank 0] NQINT = %lu\n", nquint);
-    }
-  }
+  //if(!world_rank) {
+  //  const auto ntrip = std::count_if(constraint_sizes.begin(), 
+  //    constraint_sizes.end(), [](auto &c){ return c.first.C.count() == 3; });
+  //  printf("[rank 0] NTRIP = %lu\n", ntrip);
+  //  if(nlevels > 0) {
+  //    const auto nquad = std::count_if(constraint_sizes.begin(), 
+  //      constraint_sizes.end(), [](auto &c){ return c.first.C.count() == 4; });
+  //    printf("[rank 0] NQUAD = %lu\n", nquad);
+  //  }
+  //  if(nlevels > 1) {
+  //    const auto nquint = std::count_if(constraint_sizes.begin(), 
+  //      constraint_sizes.end(), [](auto &c){ return c.first.C.count() == 5; });
+  //    printf("[rank 0] NQINT = %lu\n", nquint);
+  //  }
+  //}
 
 
   // Sort to get optimal bucket partitioning
@@ -691,14 +688,15 @@ auto dist_34_histogram(size_t nlevels, size_t norb, size_t ns_othr, size_t nd_ot
     
   }
 
-  if(world_rank == 0)
-  printf("[rank %2d] AFTER LOCAL WORK = %lu TOTAL WORK = %lu\n", world_rank, 
-    workloads[world_rank], total_work);
+  //if(world_rank == 0)
+  //printf("[rank %2d] AFTER LOCAL WORK = %lu TOTAL WORK = %lu\n", world_rank, 
+  //  workloads[world_rank], total_work);
 
 
   return constraints;
 }
 
+#if 0
 template <typename Integral, size_t N>
 auto dist_triplets_random(size_t norb, size_t ns_othr, size_t nd_othr,
   const std::vector<wfn_t<N>>& unique_alpha, MPI_Comm comm) {
@@ -720,7 +718,7 @@ auto dist_triplets_random(size_t norb, size_t ns_othr, size_t nd_othr,
 
   return triplets;
 }
-
-
 #endif
+
+
 }

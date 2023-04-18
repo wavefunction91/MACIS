@@ -271,7 +271,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
   auto gen_c_st = clock_type::now();
   auto constraints = 
-    dist_34_histogram(asci_settings.constraint_level, norb, n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
+    dist_constraint_general(asci_settings.constraint_level, norb, n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count() );
