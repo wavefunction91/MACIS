@@ -68,12 +68,10 @@ typename RandomIt::value_type dist_quickselect( RandomIt begin, RandomIt end,
     size_t local_n = std::distance(local_begin, local_end);
     total_n = 
       total_gather_and_exclusive_scan(local_n, local_sizes, local_start, comm);
-    //if(!world_rank) printf("N = %lu\n", total_n);
     if(total_n < world_size) break;
 
     // Select a pivot index
     int pivot_idx = g() % (total_n-1);
-    //printf("[rank %d] PIVOT IDX %d\n", world_rank, pivot_idx);
 
     // Get owning rank for pivot element
     int pivot_owner;
