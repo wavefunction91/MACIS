@@ -13,6 +13,9 @@ find_dependency( lobpcgxx )
 find_dependency( sparsexx )
 find_dependency( mdspan )
 find_dependency( spdlog )
+if(ASCI_ENABLE_BOOST)
+  find_dependency(Boost)
+endif()
 
 
 #list(REMOVE_AT CMAKE_MODULE_PATH -1)
