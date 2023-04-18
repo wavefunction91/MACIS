@@ -12,6 +12,8 @@ add_executable( asci_test
   transform.cxx
   fock_matrices.cxx
   mcscf.cxx
+  asci.cxx
+  dist_quickselect.cxx
 )
 target_link_libraries( asci_test PUBLIC asci Catch2::Catch2 )
 target_include_directories( asci_test PUBLIC ${PROJECT_BINARY_DIR}/tests )

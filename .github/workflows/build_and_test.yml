@@ -23,7 +23,7 @@ jobs:
             compiler_version: 9
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Install Newer CMake
       env:
@@ -42,7 +42,7 @@ jobs:
  
     - name: Ubuntu Apt Setup
       shell: bash
-      run: sudo apt install software-properties-common libeigen3-dev &&
+      run: sudo apt install software-properties-common libeigen3-dev libboost-all-dev &&
            sudo add-apt-repository ppa:ubuntu-toolchain-r/test 
 
     - name: Install GNU Compiler Version

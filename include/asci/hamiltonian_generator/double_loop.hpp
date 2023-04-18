@@ -50,8 +50,8 @@ protected:
       if( bra.count() ) {
 
         // Separate out into alpha/beta components 
-        spin_det_t bra_alpha = truncate_bitset<N/2>(bra);
-        spin_det_t bra_beta  = truncate_bitset<N/2>(bra >> (N/2));
+        spin_det_t bra_alpha = bitset_lo_word(bra);
+        spin_det_t bra_beta  = bitset_hi_word(bra);
         
         // Get occupied indices
         bits_to_indices( bra_alpha, bra_occ_alpha );
@@ -61,14 +61,14 @@ protected:
         for( size_t j = 0; j < nket_dets; ++j ) {
           const auto ket = *(ket_begin + j);
           if( ket.count() ) {
-            spin_det_t ket_alpha = truncate_bitset<N/2>(ket);
-            spin_det_t ket_beta  = truncate_bitset<N/2>(ket >> (N/2));
+            spin_det_t ket_alpha = bitset_lo_word(ket);
+            spin_det_t ket_beta  = bitset_hi_word(ket);
 
             full_det_t ex_total = bra ^ ket;
             if( ex_total.count() <= 4 ) {
             
-              spin_det_t ex_alpha = truncate_bitset<N/2>( ex_total );
-              spin_det_t ex_beta  = truncate_bitset<N/2>( ex_total >> (N/2) );
+              spin_det_t ex_alpha = bitset_lo_word( ex_total );
+              spin_det_t ex_beta  = bitset_hi_word( ex_total  );
 
               // Compute Matrix Element
               const auto h_el = this->matrix_element( bra_alpha, ket_alpha,
@@ -142,8 +142,8 @@ public:
       if( bra.count() ) {
 
         // Separate out into alpha/beta components 
-        spin_det_t bra_alpha = truncate_bitset<N/2>(bra);
-        spin_det_t bra_beta  = truncate_bitset<N/2>(bra >> (N/2));
+        spin_det_t bra_alpha = bitset_lo_word(bra);
+        spin_det_t bra_beta  = bitset_hi_word(bra);
         
         // Get occupied indices
         bits_to_indices( bra_alpha, bra_occ_alpha );
@@ -153,14 +153,14 @@ public:
         for( size_t j = 0; j < nket_dets; ++j ) {
           const auto ket = *(ket_begin + j);
           if( ket.count() ) {
-            spin_det_t ket_alpha = truncate_bitset<N/2>(ket);
-            spin_det_t ket_beta  = truncate_bitset<N/2>(ket >> (N/2));
+            spin_det_t ket_alpha = bitset_lo_word(ket);
+            spin_det_t ket_beta  = bitset_hi_word(ket);
 
             full_det_t ex_total = bra ^ ket;
             if( ex_total.count() <= 4 ) {
             
-              spin_det_t ex_alpha = truncate_bitset<N/2>( ex_total );
-              spin_det_t ex_beta  = truncate_bitset<N/2>( ex_total >> (N/2) );
+              spin_det_t ex_alpha = bitset_lo_word( ex_total );
+              spin_det_t ex_beta  = bitset_hi_word( ex_total  );
 
               const double val = C[i] * C[j];
 

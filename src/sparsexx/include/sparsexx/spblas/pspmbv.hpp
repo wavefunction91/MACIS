@@ -7,11 +7,16 @@
 
 #include <sparsexx/util/permute.hpp>
 #include <numeric>
+#include <chrono>
 
 namespace sparsexx::spblas {
 
 namespace detail {
   using namespace sparsexx::detail;
+  template <typename T>
+  auto no_init_array(size_t n) {
+    return std::unique_ptr<T[]>(new T[n]);
+  }
 }
 
 
@@ -21,9 +26,6 @@ struct spmv_info {
   using index_type = IndexType;
 
   MPI_Comm comm;
-
-  //std::vector< std::vector<index_type> > send_indices;
-  //std::vector< std::vector<index_type> > recv_indices;
 
   std::vector< index_type > send_indices;
   std::vector< index_type > recv_indices;
@@ -228,46 +230,73 @@ void pgespmv( detail::type_identity_t<ScalarType> ALPHA, const DistSpMatType& A,
 
   /***** Initial Communication Part *****/
 
+  //auto st_alloc = std::chrono::high_resolution_clock::now();
   // Allocated packed buffers
   size_t nrecv_pack = recv_indices.size();
   size_t nsend_pack = send_indices.size();
-  std::vector<value_type> V_recv_pack(nrecv_pack);
-  std::vector<value_type> V_send_pack(nsend_pack);
+  auto V_recv_pack = detail::no_init_array<value_type>(nrecv_pack);
+  auto V_send_pack = detail::no_init_array<value_type>(nsend_pack);
 
   // Buffer for offdiagonal matvec
-  std::vector<value_type> V_remote( N );
+
+  //std::vector<value_type> V_remote( N );
+  auto V_remote = detail::no_init_array<value_type>(N);
+  //auto en_alloc = std::chrono::high_resolution_clock::now();
 
   // Post async recv's for remote data required for offdiagonal
   // matvec
-  auto recv_reqs = spmv_info.post_remote_recv( V_recv_pack.data() );
+  auto recv_reqs = spmv_info.post_remote_recv( V_recv_pack.get() );
 
   // Pack data to send to remote processes
+  //auto st_permb = std::chrono::high_resolution_clock::now();
   sparsexx::permute_vector( nsend_pack, V, send_indices.data(), 
-    V_send_pack.data(), sparsexx::PermuteDirection::Backward );
+    V_send_pack.get(), sparsexx::PermuteDirection::Backward );
+  //auto en_permb = std::chrono::high_resolution_clock::now();
 
   // Send data (async) to remote processes
-  auto send_reqs = spmv_info.post_remote_send( V_send_pack.data() );
+  //auto st_send = std::chrono::high_resolution_clock::now();
+  auto send_reqs = spmv_info.post_remote_send( V_send_pack.get() );
+  //auto en_send = std::chrono::high_resolution_clock::now();
 
 
 
   /***** Diagonal Matvec *****/
+  //auto st_loc = std::chrono::high_resolution_clock::now();
   gespmbv( 1, ALPHA, A.diagonal_tile(), V, N, BETA, AV, N );
+  //auto en_loc = std::chrono::high_resolution_clock::now();
 
   // Wait for receives to complete 
+  //auto st_wait1 = std::chrono::high_resolution_clock::now();
   detail::mpi_waitall_ignore_status( recv_reqs );
+  //auto en_wait1 = std::chrono::high_resolution_clock::now();
 
   // Unpack data into contiguous buffer 
-  sparsexx::permute_vector( nrecv_pack, V_recv_pack.data(), recv_indices.data(),
-    V_remote.data(), sparsexx::PermuteDirection::Forward );
+  //auto st_permf = std::chrono::high_resolution_clock::now();
+  sparsexx::permute_vector( nrecv_pack, V_recv_pack.get(), recv_indices.data(),
+    V_remote.get(), sparsexx::PermuteDirection::Forward );
+  //auto en_permf = std::chrono::high_resolution_clock::now();
 
 
   /***** Off-diagonal Matvec *****/
+  //auto st_rem = std::chrono::high_resolution_clock::now();
   if( A.off_diagonal_tile_ptr() )
-  gespmbv( 1, ALPHA, A.off_diagonal_tile(), V_remote.data(), N, 1., AV, N );
+  gespmbv( 1, ALPHA, A.off_diagonal_tile(), V_remote.get(), N, 1., AV, N );
+  //auto en_rem = std::chrono::high_resolution_clock::now();
 
   // Wait for all sends to complete to keep packed buffer in scope
+  //auto st_wait2 = std::chrono::high_resolution_clock::now();
   detail::mpi_waitall_ignore_status( send_reqs );
+  //auto en_wait2 = std::chrono::high_resolution_clock::now();
 
+  //printf("ALLOC = %.2e PRB = %.2e PRF = %.2e SND = %.2e LOC = %.2e REM = %.2e WAIT1 = %.2e WAIT2 = %.2e\n",
+  //  std::chrono::duration<double,std::milli>(en_alloc - st_alloc).count(),
+  //  std::chrono::duration<double,std::milli>(en_permb - st_permb).count(),
+  //  std::chrono::duration<double,std::milli>(en_permf - st_permf).count(),
+  //  std::chrono::duration<double,std::milli>(en_send - st_send).count(),
+  //  std::chrono::duration<double,std::milli>(en_loc - st_loc).count(),
+  //  std::chrono::duration<double,std::milli>(en_rem - st_rem).count(),
+  //  std::chrono::duration<double,std::milli>(en_wait1 - st_wait1).count(),
+  //  std::chrono::duration<double,std::milli>(en_wait2 - st_wait2).count());
 }
 
 }

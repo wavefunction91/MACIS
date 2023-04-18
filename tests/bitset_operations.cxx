@@ -81,10 +81,27 @@ TEST_CASE("Bitset Operations") {
     SECTION("Arbitrary") {
       bs<64> a(0x0A0A); REQUIRE( asci::ffs(a) == 2 );
       bs<32> b(0x0A0A); REQUIRE( asci::ffs(b) == 2 );
-      bs<128> c(0xABC); REQUIRE( asci::ffs(c) == 3 );
-      bs<256> d(0xABC); REQUIRE( asci::ffs(d) == 3 );
+      bs<128> c(0xABC); 
+        REQUIRE( asci::ffs(c) == 3 );
+        REQUIRE( asci::ffs(c << 64) == 3 + 64);
+      bs<256> d(0xABC); 
+        REQUIRE( asci::ffs(d) == 3 );
+        REQUIRE( asci::ffs(d << 64)  == 3 + 64);
+        REQUIRE( asci::ffs(d << 128) == 3 + 128);
     }
 
+  }
+
+  SECTION("FLS") {
+    bs<64> a(0x0A0A); REQUIRE( asci::fls(a) == 12 - 1 );
+    bs<32> b(0x0A0A); REQUIRE( asci::fls(b) == 12 - 1 );
+    bs<128> c(0xDEADBEEF); 
+      REQUIRE( asci::fls(c) == 31 );
+      REQUIRE( asci::fls(c << 64) == 31 + 64 );
+    bs<256> d(0xDEADBEEF); 
+      REQUIRE( asci::fls(d) == 31 );
+      REQUIRE( asci::fls(d << 64)  == 31 + 64 );
+      REQUIRE( asci::fls(d << 128) == 31 + 128 );
   }
 
   SECTION("Indices") {

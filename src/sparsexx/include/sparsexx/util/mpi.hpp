@@ -29,7 +29,7 @@ struct mpi_data;
 #define REGISTER_MPI_STATIC_TYPE(TYPE, MPI_TYPE)\
 template <>                                     \
 struct mpi_data<TYPE>{                          \
-  inline static constexpr auto type = MPI_TYPE; \
+  inline static auto type() {return MPI_TYPE;}  \
 };
 
 REGISTER_MPI_STATIC_TYPE( double,   MPI_DOUBLE   )
@@ -41,18 +41,15 @@ REGISTER_MPI_STATIC_TYPE( unsigned, MPI_UNSIGNED )
 #undef REGISTER_MPI_STATIC_TYPE
 
 template <typename T>
-inline static constexpr auto mpi_data_t = mpi_data<T>::type;
-
-template <typename T>
 T mpi_allreduce( const T& value, MPI_Op op, MPI_Comm comm ) {
   T reduced_value;
-  MPI_Allreduce( &value, &reduced_value, 1, mpi_data_t<T>, op , comm );
+  MPI_Allreduce( &value, &reduced_value, 1, mpi_data<T>::type(), op , comm );
   return reduced_value;
 }
 
 template <typename T>
 void mpi_allgather( const T* data, size_t count, T* gathered_data, MPI_Comm comm ){
-  MPI_Allgather( data, count, mpi_data_t<T>, gathered_data, count, mpi_data_t<T>,
+  MPI_Allgather( data, count, mpi_data<T>::type(), gathered_data, count, mpi_data<T>::type(),
     comm );
 }
 
@@ -62,15 +59,15 @@ std::vector<T> mpi_allgather( const std::vector<T>& data, MPI_Comm comm ) {
   const auto   comm_size = get_mpi_size(comm);
   std::vector<T> gathered_data( count * comm_size );
 
-  MPI_Allgather( data.data(), count, mpi_data_t<T>, gathered_data.data(),
-    count, mpi_data_t<T>, comm );
+  MPI_Allgather( data.data(), count, mpi_data<T>::type(), gathered_data.data(),
+    count, mpi_data<T>::type(), comm );
 
   return gathered_data;
 }
 
 template <typename T>
 void mpi_bcast( T* data, size_t count, int root, MPI_Comm comm ) {
-  MPI_Bcast( data, count, mpi_data_t<T>, root, comm );
+  MPI_Bcast( data, count, mpi_data<T>::type(), root, comm );
 }
 
 template <typename T>
@@ -83,7 +80,7 @@ MPI_Request mpi_irecv( T* data, size_t count, int source_rank, int tag,
   MPI_Comm comm ) {
 
   MPI_Request req;
-  MPI_Irecv( data, count, mpi_data_t<T>, source_rank, tag, comm, &req );
+  MPI_Irecv( data, count, mpi_data<T>::type(), source_rank, tag, comm, &req );
   return req;
 
 }
@@ -99,7 +96,7 @@ MPI_Request mpi_isend( const T* data, size_t count, int dest_rank, int tag,
   MPI_Comm comm ) {
 
   MPI_Request req;
-  MPI_Isend( data, count, mpi_data_t<T>, dest_rank, tag, comm, &req );
+  MPI_Isend( data, count, mpi_data<T>::type(), dest_rank, tag, comm, &req );
   return req;
 
 }

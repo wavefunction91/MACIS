@@ -31,10 +31,10 @@ public:
 public:
 
   inline spin_det_t alpha_string( full_det_t str ) {
-    return asci::truncate_bitset<N/2>(str);
+    return bitset_lo_word(str);
   }
   inline spin_det_t beta_string( full_det_t str ) {
-    return asci::truncate_bitset<N/2>(str >> (N/2));
+    return bitset_hi_word(str);
   }
 
   size_t norb_;
@@ -115,10 +115,27 @@ public:
     const std::vector<uint32_t>& ss_occ,
     const std::vector<uint32_t>& os_occ ) const;
 
+  std::vector<double> single_orbital_ens(
+    size_t norb, 
+    const std::vector<uint32_t>& ss_occ,
+    const std::vector<uint32_t>& os_occ ) const;
+
   double fast_diag_single( 
     const std::vector<uint32_t>& ss_occ, 
     const std::vector<uint32_t>& os_occ, 
     uint32_t orb_hol, uint32_t orb_par, 
+    double orig_det_Hii ) const;
+
+  double fast_diag_single( 
+    double hol_en, double par_en,
+    uint32_t orb_hol, uint32_t orb_par, 
+    double orig_det_Hii ) const;
+
+  double fast_diag_ss_double( 
+    double en_hol1, double en_hol2,
+    double en_par1, double en_par2, 
+    uint32_t orb_hol1, uint32_t orb_hol2,
+    uint32_t orb_par1, uint32_t orb_par2, 
     double orig_det_Hii ) const;
 
   double fast_diag_ss_double( 
@@ -126,6 +143,13 @@ public:
     const std::vector<uint32_t>& os_occ, 
     uint32_t orb_hol1, uint32_t orb_hol2,
     uint32_t orb_par1, uint32_t orb_par2, 
+    double orig_det_Hii ) const;
+
+  double fast_diag_os_double( 
+    double en_holu, double en_hold,
+    double en_paru, double en_pard, 
+    uint32_t orb_holu, uint32_t orb_hold,
+    uint32_t orb_paru, uint32_t orb_pard, 
     double orig_det_Hii ) const;
 
   double fast_diag_os_double( 
@@ -159,36 +183,6 @@ public:
   }
 
 
-#if 0
-  void rdm_contributions_4( spin_det_t bra, spin_det_t ket, 
-    spin_det_t ex, double val, double* trdm );
-  void rdm_contributions_22( spin_det_t bra_alpha, 
-    spin_det_t ket_alpha, spin_det_t ex_alpha, 
-    spin_det_t bra_beta, spin_det_t ket_beta,
-    spin_det_t ex_beta, double val, double* trdm );
-  void rdm_contributions_2( spin_det_t bra, spin_det_t ket, 
-    spin_det_t ex,
-    const std::vector<uint32_t>& bra_occ_alpha,
-    const std::vector<uint32_t>& bra_occ_beta,
-    double val, double* ordm, double* trdm);
-  void rdm_contributions_diag( 
-    const std::vector<uint32_t>& occ_alpha,
-    const std::vector<uint32_t>& occ_beta, double val, 
-    double* ordm, double* trdm );
-  
-  void rdm_contributions( spin_det_t bra_alpha, 
-    spin_det_t ket_alpha, spin_det_t ex_alpha, 
-    spin_det_t bra_beta, spin_det_t ket_beta,
-    spin_det_t ex_beta, 
-    const std::vector<uint32_t>& bra_occ_alpha,
-    const std::vector<uint32_t>& bra_occ_beta, 
-    double val, double* ordm, double* trdm);
-
-
-  virtual void form_rdms( full_det_iterator, full_det_iterator, 
-    full_det_iterator, full_det_iterator, double* C, 
-    double* ordm, double* trdm ) = 0;
-#else
   void rdm_contributions_4( spin_det_t bra, spin_det_t ket, 
     spin_det_t ex, double val, rank4_span_t trdm );
   void rdm_contributions_22( spin_det_t bra_alpha, 
@@ -219,7 +213,6 @@ public:
   virtual void form_rdms( full_det_iterator, full_det_iterator, 
     full_det_iterator, full_det_iterator, double* C, 
     matrix_span_t ordm, rank4_span_t trdm ) = 0;
-#endif
 
 
   void rotate_hamiltonian_ordm( const double* ordm ); 

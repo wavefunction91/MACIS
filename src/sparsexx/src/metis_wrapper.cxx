@@ -16,6 +16,16 @@ void metis_kway_partitioning(int64_t _nvert, int64_t _npart, IndexType* _xadj,
   idx_t nweights = 1;
   idx_t nparts   = _npart;
   idx_t obj;
+  idx_t options[METIS_NOPTIONS];
+
+  METIS_SetDefaultOptions(options);
+#if 0
+  //options[METIS_OPTION_OBJTYPE] = METIS_OBJTYPE_VOL;
+  //options[METIS_OPTION_CTYPE]   = METIS_CTYPE_SHEM;
+  //options[METIS_OPTION_RTYPE]   = METIS_RTYPE_GREEDY;
+  options[METIS_OPTION_NCUTS]   = 10;
+  //options[METIS_OPTION_DBGLVL]  = 256;
+#endif
 
   std::vector<idx_t> xadj_local, adjncy_local, part_local;
   idx_t *xadj, *adjncy, *part;
@@ -27,8 +37,8 @@ void metis_kway_partitioning(int64_t _nvert, int64_t _npart, IndexType* _xadj,
     throw std::runtime_error("METIS + Index Mismatch NYI");
   }
 
-  METIS_PartGraphKway( &nvert, &ndeights, xadj, adjncy, NULL, NULL, NULL
-    &nparts, NULL, NULL, NULL, &obj, part );
+  METIS_PartGraphKway( &nvert, &nweights, xadj, adjncy, NULL, NULL, NULL,
+    &nparts, NULL, NULL, options, &obj, part );
 #else
   throw std::runtime_error("METIS Not Enabled");
 #endif

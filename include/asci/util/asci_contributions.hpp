@@ -22,6 +22,7 @@ void append_singles_asci_contributions(
   const std::vector<uint32_t>&        occ_same,
   const std::vector<uint32_t>&        vir_same,
   const std::vector<uint32_t>&        occ_othr,
+  const double*                       eps_same,
   const double*                       T_pq,
   const size_t                        LDT,
   const double*                       G_kpq,
@@ -60,7 +61,7 @@ void append_singles_asci_contributions(
 
     // Calculate fast diagonal matrix element
     auto h_diag = 
-      ham_gen.fast_diag_single( occ_same, occ_othr, i, a, root_diag );
+      ham_gen.fast_diag_single( eps_same[i], eps_same[a], i, a, root_diag );
     h_el /= (E0 - h_diag);
 
     // Append to return values
@@ -81,6 +82,7 @@ void append_ss_doubles_asci_contributions(
   const std::vector<uint32_t>&        ss_occ,
   const std::vector<uint32_t>&        vir,
   const std::vector<uint32_t>&        os_occ,
+  const double*                       eps_same,
   const double*                       G,
   size_t                              LDG,
   double                              h_el_tol,
@@ -111,11 +113,7 @@ void append_ss_doubles_asci_contributions(
       if( std::abs(G_aibj) < h_el_tol ) continue;
 
       // Calculate excited determinant string (spin)
-      #if 0
-      const auto full_ex_spin = (one << i) ^ (one << j) ^ (one << a) ^ (one << b);
-      #else
       const auto full_ex_spin = wfn_t<N>(0).flip(i).flip(j).flip(a).flip(b);
-      #endif
       auto ex_det_spin = state_spin ^ full_ex_spin;
 
       // Calculate the sign in a canonical way
@@ -130,7 +128,8 @@ void append_ss_doubles_asci_contributions(
 
       // Evaluate fast diagonal matrix element
       auto h_diag = 
-        ham_gen.fast_diag_ss_double( ss_occ, os_occ, i, j, a, b, root_diag );
+        ham_gen.fast_diag_ss_double( eps_same[i], eps_same[j], eps_same[a],
+          eps_same[b], i, j, a, b, root_diag );
       h_el /= (E0 - h_diag);
 
       // Append {det, c*h_el}
@@ -157,6 +156,8 @@ void append_os_doubles_asci_contributions(
   const std::vector<uint32_t>&        occ_beta,
   const std::vector<uint32_t>&        vir_alpha,
   const std::vector<uint32_t>&        vir_beta,
+  const double*                       eps_alpha,
+  const double*                       eps_beta,
   const double*                       V,
   size_t                              LDV,
   double                              h_el_tol,
@@ -181,18 +182,14 @@ void append_os_doubles_asci_contributions(
 
       double sign_beta = single_excitation_sign( state_beta,  b, j );
       double sign = sign_alpha * sign_beta;
-#if 0
-      auto ex_det = state_full ^ (one << i) ^ (one << a) ^
-                               (((one << j) ^ (one << b)) << N);
-#else
       auto ex_det = state_full;
       ex_det.flip(a).flip(i).flip(j+N).flip(b+N);
-#endif
       auto h_el = sign * V_aibj;
 
       // Evaluate fast diagonal element
       auto h_diag = 
-        ham_gen.fast_diag_os_double( occ_alpha, occ_beta, i, j, a, b, root_diag );
+        ham_gen.fast_diag_os_double( eps_alpha[i], eps_beta[j], eps_alpha[a],
+          eps_beta[b], i, j, a, b, root_diag );
       h_el /= ( E0 - h_diag );
 
       asci_contributions.push_back( {ex_det, coeff*h_el} );
@@ -201,4 +198,23 @@ void append_os_doubles_asci_contributions(
 
 }
 
+
+
+
+
+template <size_t N, typename IndContainer>
+void generate_pairs( const IndContainer& inds, std::vector<wfn_t<N>>& w ) {
+  const size_t nind = inds.size();
+  w.resize((nind * (nind-1))/2,0);
+  for(int i = 0, ij = 0; i < nind; ++i      )
+  for(int j = i+1;       j < nind; ++j, ++ij) {
+    w[ij].flip(inds[i]).flip(inds[j]);
+  }
 }
+
+
+
+
+}
+
+#include <asci/util/asci_triplet_constraints.hpp>

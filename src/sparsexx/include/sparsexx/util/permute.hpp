@@ -44,11 +44,8 @@ std::vector<IndexType> invert_perm( const std::vector<IndexType>& perm ) {
   const auto n = perm.size();
   std::vector<IndexType> iperm( n );
 
-  #pragma omp parallel for
-  for( size_t i = 0; i < n; ++i ) {
-    const auto it = std::find( perm.begin(), perm.end(), i );
-    if( it == perm.end() ) throw std::runtime_error("Something terrible happened");
-    iperm[i] = std::distance( perm.begin(), it );
+  for(size_t i = 0; i < n; ++i) {
+    iperm[perm[i]] = i;
   }
     
   return iperm;

@@ -3,6 +3,9 @@ cmake_minimum_required( VERSION 3.14 FATAL_ERROR )
 get_filename_component( asci_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH )
 
 #list( APPEND CMAKE_MODULE_PATH ${asci_CMAKE_DIR} )
+
+set( ASCI_ENABLE_BOOST @ASCI_ENABLE_BOOST@ )
+
 include( CMakeFindDependencyMacro )
 find_dependency( MPI )
 find_dependency( OpenMP )
@@ -13,6 +16,9 @@ find_dependency( lobpcgxx )
 find_dependency( sparsexx )
 find_dependency( mdspan )
 find_dependency( spdlog )
+if(ASCI_ENABLE_BOOST)
+  find_dependency(Boost)
+endif()
 
 
 #list(REMOVE_AT CMAKE_MODULE_PATH -1)

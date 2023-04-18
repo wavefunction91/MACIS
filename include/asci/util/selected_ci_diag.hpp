@@ -3,6 +3,8 @@
 #include <asci/hamiltonian_generator.hpp>
 #include <asci/csr_hamiltonian.hpp>
 #include <asci/davidson.hpp>
+#include <asci/util/mpi.hpp>
+#include <sparsexx/matrix_types/dense_conversions.hpp>
 #include <chrono>
 
 
@@ -99,20 +101,39 @@ double selected_ci_diag(
   using duration_type = std::chrono::duration<double, std::milli>;
 
   // Generate Hamiltonian
-  MPI_Barrier(comm); auto H_st = clock_type::now();
+  MPI_Barrier(comm); 
+  auto H_st = clock_type::now();
 
   auto H = make_dist_csr_hamiltonian<index_t>( comm, dets_begin, dets_end,
     ham_gen, h_el_tol );
 
-  MPI_Barrier(comm); auto H_en = clock_type::now();
+  auto H_en = clock_type::now();
+  MPI_Barrier(comm); 
 
   // Get total NNZ
   size_t local_nnz = H.nnz();
-  size_t total_nnz;
-  MPI_Allreduce( &local_nnz, &total_nnz, 1, MPI_UINT64_T, MPI_SUM, comm );
+  size_t total_nnz = allreduce( local_nnz, MPI_SUM, comm );
+  size_t max_nnz   = allreduce( local_nnz, MPI_MAX, comm );
+  size_t min_nnz   = allreduce( local_nnz, MPI_MIN, comm );
   logger->info("  {}   = {:6}, {}     = {:.5e} ms",
     "NNZ", total_nnz, "H_DUR", duration_type(H_en-H_st).count()
   );
+  auto world_size = comm_size(comm);
+  if(world_size > 1) {
+    double local_hdur = duration_type(H_en-H_st).count();
+    double max_hdur = allreduce(local_hdur, MPI_MAX, comm);
+    double min_hdur = allreduce(local_hdur, MPI_MIN, comm);
+    double avg_hdur = allreduce(local_hdur, MPI_SUM, comm);
+    avg_hdur /= world_size;
+    logger->info("  H_DUR_MAX = {:.2e} ms, H_DUR_MIN = {:.2e} ms, H_DUR_AVG = {:.2e} ms",
+      max_hdur, min_hdur, avg_hdur );
+  }
+  logger->info("  {} = {:.2e} GiB", "HMEM_LOC", H.mem_footprint()/1073741824.);
+  logger->info("  {} = {:.2f}%", "H_SPARSE", total_nnz/double(H.n() * H.n()) * 100);
+  if( world_size > 1 ) {
+    logger->info("  NNZ_MAX = {}, NNZ_MIN = {}, NNZ_AVG = {}",
+      max_nnz, min_nnz, total_nnz/double(world_size));
+  }
 
   // Solve EVP
   auto E = selected_ci_diag(H, davidson_max_m, 

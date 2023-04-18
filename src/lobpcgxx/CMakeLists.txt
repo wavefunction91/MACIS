@@ -1,10 +1,11 @@
 cmake_minimum_required( VERSION 3.13 FATAL_ERROR )
 project( lobpcgxx VERSION 0.0.1 LANGUAGES C CXX )
 
+option( LOBPCGXX_ENABLE_TESTS "Enable Testing" ON )
 
-find_package( OpenMP )
 find_package( LAPACK REQUIRED )
 find_package( BLAS REQUIRED )
+
 # BLAS++/LAPACK++
 find_package(lapackpp CONFIG QUIET)
 if(NOT lapackpp_FOUND )
@@ -28,14 +29,14 @@ target_compile_features( lobpcgxx INTERFACE cxx_std_17 )
 
 target_include_directories( lobpcgxx INTERFACE
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-  #$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
 
-
-
-add_executable( lobpcg_tester examples/tester.cpp )
-target_link_libraries( lobpcg_tester PUBLIC lobpcgxx )
+include(CTest)
+if( CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND LOBPCGXX_ENABLE_TESTS AND BUILD_TESTING )
+  add_executable( lobpcg_tester examples/tester.cpp )
+  target_link_libraries( lobpcg_tester PUBLIC lobpcgxx )
+endif()
 
 # INSTALL rules
 add_library( lobpcgxx::lobpcgxx ALIAS lobpcgxx )

@@ -264,7 +264,7 @@ void HamiltonianGenerator<N>::rotate_hamiltonian_ordm( const double* ordm ) {
     0., V_pqrs_.data_handle(), norb3_ );
 
   // Regenerate intermediates
-  generate_integral_intermediates( norb_, V_pqrs_ );
+  generate_integral_intermediates( V_pqrs_ );
   
 }
 

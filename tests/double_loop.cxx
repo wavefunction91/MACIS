@@ -1,6 +1,6 @@
 #include "ut_common.hpp"
 #include <asci/fcidump.hpp>
-#include <asci/read_wavefunction.hpp>
+#include <asci/wavefunction_io.hpp>
 #include <asci/hamiltonian_generator/double_loop.hpp>
 #include <iostream>
 #include <iomanip>

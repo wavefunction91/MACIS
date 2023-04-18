@@ -1,5 +1,5 @@
 #include "ut_common.hpp"
-#include <asci/read_wavefunction.hpp>
+#include <asci/wavefunction_io.hpp>
 #include <iostream>
 #include <iomanip>
 
