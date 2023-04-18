@@ -15,14 +15,6 @@
 
 namespace asci {
 
-// Generate MPI types
-template <size_t N>
-struct mpi_traits<std::bitset<N>> {
-  using type = std::bitset<N>;
-  inline static mpi_datatype datatype() { 
-    return make_contiguous_mpi_datatype<char>(sizeof(type));
-  }
-};
 
 template <typename WfnT>
 struct asci_contrib_topk_comparator {
@@ -49,7 +41,7 @@ struct ASCISettings {
   bool grow_with_rot    = false;
   size_t rot_size_start = 1000;
 
-  bool dist_triplet_random = false;
+  //bool dist_triplet_random = false;
   int constraint_level = 2; // Up To Quints
 };
 
@@ -252,7 +244,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   const auto n_doub_alpha = 
     (n_sing_alpha * ( n_sing_alpha - norb + 1 )) / 4;
 
-  logger->info(" * NS = {} ND = {}", n_sing_alpha, n_doub_alpha); 
+  logger->info("  * NS = {} ND = {}", n_sing_alpha, n_doub_alpha); 
 
   // Generate mask constraints
   if(!world_rank) {
@@ -451,8 +443,18 @@ std::vector< wfn_t<N> > asci_search(
     spdlog::null_logger_mt ("asci_search") :
     spdlog::stdout_color_mt("asci_search");
   
+  auto print_mpi_stats = [&](auto str, auto vmin, auto vmax, auto vavg) {
+    std::string fmt_string = "    * {0}_MIN = {1}, {0}_MAX = {2}, {0}_AVG = {3}, RATIO = {4:.2e}";
+    if constexpr (std::is_floating_point_v<std::decay_t<decltype(vmin)>>)
+      fmt_string = "    * {0}_MIN = {1:.2e}, {0}_MAX = {2:.2e}, {0}_AVG = {3:.2e}, RATIO = {4:.2e}";
+    logger->info(fmt_string, str, vmin, vmax, vavg, vmax / float(vmin) );
+  };
 
-  // Print to logger
+
+
+
+
+  // Print Search Header to logger
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
   logger->info("[ASCI Search Settings]:");
   logger->info(
@@ -461,11 +463,8 @@ std::vector< wfn_t<N> > asci_search(
     asci_settings.rv_prune_tol);
   logger->info("  MAX_RV_SIZE = {}, JUST_SINGLES = {}", 
     asci_settings.pair_size_max, asci_settings.just_singles);
-  if(world_size > 1) {
-    logger->info("  DIST_TRIPLET_RANDOM = {}", 
-      asci_settings.dist_triplet_random);
-  }
 
+  MPI_Barrier(comm);
   auto asci_search_st = clock_type::now();
   
   // Expand Search Space with Connected ASCI Contributions 
@@ -481,6 +480,7 @@ std::vector< wfn_t<N> > asci_search(
       V_red, G_pqrs, V_pqrs, ham_gen, comm );
   auto pairs_en = clock_type::now();
 
+
   {
   size_t npairs  = allreduce( asci_pairs.size(), MPI_SUM, comm );
   logger->info("  * ASCI Kept {} Pairs", npairs);
@@ -488,11 +488,18 @@ std::vector< wfn_t<N> > asci_search(
   if(world_size > 1) {
     size_t npairs_max = allreduce( asci_pairs.size(), MPI_MAX, comm);
     size_t npairs_min = allreduce( asci_pairs.size(), MPI_MIN, comm);
-    logger->info("    * PAIRS_MIN = {}, PAIRS_MAX = {}, PAIRS_AVG = {}, RATIO = {}", 
-      npairs_min, npairs_max, npairs / double(world_size), 
-      npairs_max / double(npairs_min) );
+    print_mpi_stats("PAIRS_LOC", npairs_min, npairs_max, npairs / world_size);
   } 
-  logger->info("  * Pairs Mem = {:.2e} GiB", to_gib(asci_pairs));
+  
+  if(world_size == 1) {
+    logger->info("  * Pairs Mem = {:.2e} GiB", to_gib(asci_pairs));
+  } else {
+    float local_mem = to_gib(asci_pairs);
+    float total_mem = allreduce( local_mem, MPI_SUM, comm );
+    float min_mem   = allreduce( local_mem, MPI_MIN, comm );
+    float max_mem   = allreduce( local_mem, MPI_MAX, comm );
+    print_mpi_stats("PAIRS_MEM", min_mem, max_mem, total_mem / world_size);
+  }
   }
 
 #if 0
@@ -515,8 +522,6 @@ std::vector< wfn_t<N> > asci_search(
 
   float pairs_dur = duration_type(pairs_en - pairs_st).count();
   float bit_sort_dur = duration_type(bit_sort_en - bit_sort_st).count();
-  logger->info("  * PAIR_DUR = {:.2e} s, SORT_ACC_DUR = {:.2e} s",
-    pairs_dur, bit_sort_dur );
 
   if(world_size > 1) {
     float timings = pairs_dur;
@@ -525,10 +530,10 @@ std::vector< wfn_t<N> > asci_search(
     allreduce( &timings, &timings_min, 1, MPI_MIN, comm );
     allreduce( &timings, &timings_avg, 1, MPI_SUM, comm );
     timings_avg /= world_size;
-
-    logger->info("    * PAIR_DUR_MIN = {:.2e} s", timings_min);
-    logger->info("    * PAIR_DUR_MAX = {:.2e} s", timings_max);
-    logger->info("    * PAIR_DUR_AVG = {:.2e} s", timings_avg);
+    print_mpi_stats("PAIRS_DUR", timings_min, timings_max, timings_avg);
+  } else {
+    logger->info("  * PAIR_DUR = {:.2e} s, SORT_ACC_DUR = {:.2e} s",
+      pairs_dur, bit_sort_dur );
   }
   }
 
@@ -558,14 +563,14 @@ std::vector< wfn_t<N> > asci_search(
 
   auto keep_large_en = clock_type::now();
   duration_type keep_large_dur = keep_large_en - keep_large_st;
-  logger->info("  * KEEP_LARGE_DUR = {:.2e} s", keep_large_dur.count() );
   if(world_size > 1) {
     float dur = keep_large_dur.count();
     auto  dmin = allreduce( dur, MPI_MIN, comm );
     auto  dmax = allreduce( dur, MPI_MAX, comm );
     auto  davg = allreduce( dur, MPI_SUM, comm ) / world_size;
-    logger->info("    * KEEP_LARGE_DUR_MIN = {:.2e} s, MAX = {:.2e} s, AVG = {:.2e} s",
-      dmin, dmax, davg );
+    print_mpi_stats("KEEP_LARG_DUR", dmin, dmax, davg);
+  } else {
+    logger->info("  * KEEP_LARG_DUR = {:.2e} s", keep_large_dur.count() );
   }
 
 
@@ -626,16 +631,16 @@ std::vector< wfn_t<N> > asci_search(
     asci_pairs = std::move(topk);
   }
   auto asci_sort_en = clock_type::now();
-  logger->info("  * ASCI_SORT_DUR = {:.2e} s", 
-    duration_type(asci_sort_en - asci_sort_st).count()
-  );
   if(world_size > 1) {
     float dur = duration_type(asci_sort_en - asci_sort_st).count();
     auto  dmin = allreduce( dur, MPI_MIN, comm );
     auto  dmax = allreduce( dur, MPI_MAX, comm );
     auto  davg = allreduce( dur, MPI_SUM, comm ) / world_size;
-    logger->info("    * ASCI_SORT_DUR_MIN = {:.2e} s, MAX = {:.2e} s, AVG = {:.2e} s",
-      dmin, dmax, davg );
+    print_mpi_stats("ASCI_SORT_DUR", dmin, dmax, davg);
+  } else {
+    logger->info("  * ASCI_SORT_DUR = {:.2e} s", 
+      duration_type(asci_sort_en - asci_sort_st).count()
+    );
   }
 
   // Shrink to max search space
@@ -653,6 +658,7 @@ std::vector< wfn_t<N> > asci_search(
 
   logger->info("  * New Dets Mem = {:.2e} GiB", to_gib(new_dets));
 
+  MPI_Barrier(comm);
   auto asci_search_en = clock_type::now();
   duration_type asci_search_dur = asci_search_en - asci_search_st;
   logger->info("  * ASCI_SEARCH DUR = {:.2e} s", asci_search_dur.count() );

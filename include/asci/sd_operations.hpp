@@ -149,7 +149,6 @@ void append_doubles( std::bitset<N> state,
 
   const size_t nocc = occ.size();
   const size_t nvir = vir.size();
-  //const std::bitset<N> one = 1ul;
 
   doubles.clear();
   const size_t nv2 = (nvir * (nvir-1)) / 2;

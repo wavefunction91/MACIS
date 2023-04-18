@@ -2,6 +2,7 @@
 #include <mpi.h>
 #include <memory>
 #include <iostream>
+#include <bitset>
 
 namespace asci {
 
@@ -157,6 +158,17 @@ void bcast( T* buffer, size_t count, int root, MPI_Comm comm ) {
 
 }
 
+
+
+
+// Generate MPI types
+template <size_t N>
+struct mpi_traits<std::bitset<N>> {
+  using type = std::bitset<N>;
+  inline static mpi_datatype datatype() { 
+    return make_contiguous_mpi_datatype<char>(sizeof(type));
+  }
+};
 
 
 }
