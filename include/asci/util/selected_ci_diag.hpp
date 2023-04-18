@@ -31,7 +31,6 @@ double selected_ci_diag(
 
   // Resize eigenvector size
   C_local.resize( H.local_row_extent(), 0 );
-  //printf("RANK %d C_local size %d\n", world_rank, int(C_local.size()));
 
   // Extract Diagonal
   auto D_local = extract_diagonal_elements( H.diagonal_tile() );
@@ -54,19 +53,8 @@ double selected_ci_diag(
   // Solve EVP
   MPI_Barrier(comm); auto dav_st = clock_type::now();
 
-#if 1
   auto [niter, E] = p_davidson( H.local_row_extent(), davidson_max_m, op, 
     D_local.data(), davidson_res_tol, C_local.data(), H.comm() );
-#else
-  std::vector<double> H_dense(H.m() * H.m());
-  std::vector<double> W(H.m());
-  sparsexx::convert_to_dense( H.diagonal_tile(), H_dense.data(), H.m() );
-  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, H.m(),
-    H_dense.data(), H.m(), W.data());
-  auto E = W[0];
-  std::copy_n(H_dense.data(), C_local.size(), C_local.data());
-  size_t niter = 0;
-#endif
 
   MPI_Barrier(comm); auto dav_en = clock_type::now();
 

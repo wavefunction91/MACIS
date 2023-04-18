@@ -13,6 +13,10 @@ namespace sparsexx::spblas {
 
 namespace detail {
   using namespace sparsexx::detail;
+  template <typename T>
+  auto no_init_array(size_t n) {
+    return std::unique_ptr<T[]>(new T[n]);
+  }
 }
 
 
@@ -22,9 +26,6 @@ struct spmv_info {
   using index_type = IndexType;
 
   MPI_Comm comm;
-
-  //std::vector< std::vector<index_type> > send_indices;
-  //std::vector< std::vector<index_type> > recv_indices;
 
   std::vector< index_type > send_indices;
   std::vector< index_type > recv_indices;
@@ -233,15 +234,13 @@ void pgespmv( detail::type_identity_t<ScalarType> ALPHA, const DistSpMatType& A,
   // Allocated packed buffers
   size_t nrecv_pack = recv_indices.size();
   size_t nsend_pack = send_indices.size();
-  //std::vector<value_type> V_recv_pack(nrecv_pack);
-  //std::vector<value_type> V_send_pack(nsend_pack);
-  auto V_recv_pack = std::unique_ptr<value_type[]>(new value_type[nrecv_pack]);
-  auto V_send_pack = std::unique_ptr<value_type[]>(new value_type[nsend_pack]);
+  auto V_recv_pack = detail::no_init_array<value_type>(nrecv_pack);
+  auto V_send_pack = detail::no_init_array<value_type>(nsend_pack);
 
   // Buffer for offdiagonal matvec
 
   //std::vector<value_type> V_remote( N );
-  auto V_remote = std::unique_ptr<value_type[]>(new value_type[N]);
+  auto V_remote = detail::no_init_array<value_type>(N);
   //auto en_alloc = std::chrono::high_resolution_clock::now();
 
   // Post async recv's for remote data required for offdiagonal

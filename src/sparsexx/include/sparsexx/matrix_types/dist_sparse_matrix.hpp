@@ -43,6 +43,7 @@ public:
   constexpr dist_sparse_matrix() noexcept = default;
   dist_sparse_matrix( dist_sparse_matrix&& ) noexcept = default;
 
+  // Ctor with default row partitioning
   dist_sparse_matrix( MPI_Comm c, size_type M, size_type N ) :
     comm_(c), global_m_(M), global_n_(N) {
 
@@ -62,6 +63,7 @@ public:
   
   }
 
+  // Ctor with custom row partitioning
   dist_sparse_matrix( MPI_Comm c, size_t M, size_t N,
     const std::vector<extent_type>& row_tiles) :
     comm_(c), global_m_(M), global_n_(N), dist_row_extents_(row_tiles) {

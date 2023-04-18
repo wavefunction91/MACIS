@@ -13,7 +13,6 @@ add_executable( asci_test
   fock_matrices.cxx
   mcscf.cxx
   asci.cxx
-  #topk.cxx
   dist_quickselect.cxx
 )
 target_link_libraries( asci_test PUBLIC asci Catch2::Catch2 )
