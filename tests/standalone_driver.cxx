@@ -302,7 +302,7 @@ int main(int argc, char** argv) {
         auto dets = asci::generate_hilbert_space<generator_t::nbits>(n_active, nalpha, nbeta);
         for(size_t i = 0; i < dets.size(); ++i) {
           if(std::abs(C_local[i]) > determinants_threshold) {
-            det_logger->info("{:.12f} {}", C_local[i], asci::to_canonical_string(dets[i])); 
+            det_logger->info("{:>16.12f}   {}", C_local[i], asci::to_canonical_string(dets[i])); 
           }
         }
       }
