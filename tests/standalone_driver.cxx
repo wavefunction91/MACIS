@@ -217,7 +217,7 @@ int main(int argc, char** argv) {
   // Setup printing
   bool print_davidson = false, print_ci = false, print_mcscf = true,
        print_diis = false, print_asci_search = false, print_determinants = false;
-  double determinants_threshold = 1e-5;
+  double determinants_threshold = 1e-2;
   OPT_KEYWORD("PRINT.DAVIDSON",    print_davidson,    bool );
   OPT_KEYWORD("PRINT.CI",          print_ci,          bool );
   OPT_KEYWORD("PRINT.MCSCF",       print_mcscf,       bool );
@@ -295,10 +295,14 @@ int main(int argc, char** argv) {
       E0 += E_inactive + E_core;
 
       if(print_determinants) {
+        auto det_logger = world_rank ? 
+          spdlog::null_logger_mt ("determinants") : 
+          spdlog::stdout_color_mt("determinants");        
+        det_logger->info("Print leading determinants > {:.12f}",determinants_threshold);
         auto dets = asci::generate_hilbert_space<generator_t::nbits>(n_active, nalpha, nbeta);
         for(size_t i = 0; i < dets.size(); ++i) {
           if(std::abs(C_local[i]) > determinants_threshold) {
-            std::cout << C_local[i] << " " << asci::to_canonical_string(dets[i]) << std::endl;
+            det_logger->info("{:.12f} {}", C_local[i], asci::to_canonical_string(dets[i])); 
           }
         }
       }
