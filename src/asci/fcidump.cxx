@@ -135,7 +135,7 @@ void read_fcidump_1body( std::string fname, double* T, size_t LDT ) {
   auto norb = read_fcidump_norb(fname);
   col_major_span<double,2> T_map(T, LDT, norb);
   read_fcidump_1body(fname, 
-    stdex::submdspan(T_map, std::pair{0,norb}, stdex::full_extent));
+    KokkosEx::submdspan(T_map, std::pair{0,norb}, Kokkos::full_extent));
 
 }
 
@@ -180,7 +180,7 @@ void read_fcidump_2body( std::string fname, double* V, size_t LDV ) {
   col_major_span<double,4> V_map(V, LDV, LDV, LDV, norb);
   auto sl = std::pair{0,norb};
   read_fcidump_2body(fname, 
-    stdex::submdspan(V_map, sl, sl ,sl, stdex::full_extent));
+    KokkosEx::submdspan(V_map, sl, sl ,sl, Kokkos::full_extent));
 
 }
 

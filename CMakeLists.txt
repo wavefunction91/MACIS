@@ -8,7 +8,9 @@ option( ASCI_ENABLE_BOOST  "Enable Boost" ON )
 # CMake Modules
 list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )
 include( asci-cmake-modules )
-find_package( OpenMP )
+if( ASCI_ENABLE_OPENMP )
+  find_package(OpenMP)
+endif()
 
 add_subdirectory(src)
 
