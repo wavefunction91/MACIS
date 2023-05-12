@@ -1,5 +1,5 @@
 #include "ut_common.hpp"
-#include <asci/util/transform.hpp>
+#include <macis/util/transform.hpp>
 #include <algorithm>
 
 #define FOUR_IDX(arr,i,j,k,l,n) arr[i + j*n + k*n*n + l*n*n*n] 
@@ -27,7 +27,7 @@ TEST_CASE("One Index Transform") {
       0.0, 0.0, 0.0, 1.0
     };
     std::vector<double> B(n*n);
-    asci::two_index_transform( n, n,
+    macis::two_index_transform( n, n,
       A.data(), n, C.data(), n, B.data(), n);
 
     for( auto i = 0; i < n*n; ++i )
@@ -46,7 +46,7 @@ TEST_CASE("One Index Transform") {
       0.0, 1.0, 0.0, 0.0
     };
     std::vector<double> B(A.size());
-    asci::two_index_transform( n, n,
+    macis::two_index_transform( n, n,
       A.data(), n, C.data(), n, B.data(), n);
 
 
@@ -69,7 +69,7 @@ TEST_CASE("One Index Transform") {
     };
     size_t m = 3;
     std::vector<double> B(m*m);
-    asci::two_index_transform(n, m,
+    macis::two_index_transform(n, m,
       A.data(), n, C.data(), n, B.data(), m);
 
     std::vector<double> refB = {
@@ -96,7 +96,7 @@ TEST_CASE("One Index Transform") {
     };
     size_t m = 3;
     std::vector<double> B(m*m);
-    asci::two_index_transform( n, m,
+    macis::two_index_transform( n, m,
       A.data(), n, C.data(), n, B.data(), m);
 
 
@@ -130,7 +130,7 @@ TEST_CASE("Four Index Transform") {
       0.0, 0.0, 0.0, 1.0
     };
     std::vector<double> B(n4);
-    asci::four_index_transform( n, n, 10000,
+    macis::four_index_transform( n, n, 10000,
       A.data(), n, C.data(), n, B.data(), n);
 
     for( size_t i = 0; i < n4; ++i )
@@ -150,7 +150,7 @@ TEST_CASE("Four Index Transform") {
       0.0, 1.0, 0.0, 0.0
     };
     std::vector<double> B(n4);
-    asci::four_index_transform( n, n, 10000,
+    macis::four_index_transform( n, n, 10000,
       A.data(), n, C.data(), n, B.data(), n);
 
     std::vector<double> refB(n4);
@@ -186,7 +186,7 @@ TEST_CASE("Four Index Transform") {
     size_t m3 = m2 * m;
     size_t m4 = m2 * m2;
     std::vector<double> B(m4);
-    asci::four_index_transform(n, m, 10000,
+    macis::four_index_transform(n, m, 10000,
       A.data(), n, C.data(), n, B.data(), m);
 
     std::vector<double> refB(m4);
@@ -229,7 +229,7 @@ TEST_CASE("Four Index Transform") {
     size_t m3 = m2 * m;
     size_t m4 = m2 * m2;
     std::vector<double> B(m4);
-    asci::four_index_transform(n, m, 10000,
+    macis::four_index_transform(n, m, 10000,
       A.data(), n, C.data(), n, B.data(), m);
 
 

@@ -1,5 +1,5 @@
 #include "ut_common.hpp"
-#include <asci/sd_operations.hpp>
+#include <macis/sd_operations.hpp>
 #include <iostream>
 
 TEST_CASE("Slater Det Operations") {
@@ -8,13 +8,13 @@ TEST_CASE("Slater Det Operations") {
 
   SECTION("HF Determinant") {
     SECTION("Canonical Ordering") {
-      auto hf = asci::canonical_hf_determinant<32>(4,2);
+      auto hf = macis::canonical_hf_determinant<32>(4,2);
       REQUIRE(hf == 0x0003000F);
     }
 
     SECTION("Unordered") {
       std::vector<double> orb_energies = { 3, 2, 7, 8, 5 };
-      auto hf = asci::canonical_hf_determinant<32>(3,2, orb_energies);
+      auto hf = macis::canonical_hf_determinant<32>(3,2, orb_energies);
       REQUIRE(hf == 0x00030013);
     }
   }
@@ -28,7 +28,7 @@ TEST_CASE("Slater Det Operations") {
        std::vector<uint32_t> ref_vir = {4,6,8,9,10,11};
 
        std::vector<uint32_t> occ, vir;
-       asci::bitset_to_occ_vir( 12, state, occ, vir );
+       macis::bitset_to_occ_vir( 12, state, occ, vir );
       
        REQUIRE( occ == ref_occ );
        REQUIRE( vir == ref_vir );
@@ -50,10 +50,10 @@ TEST_CASE("Slater Det Operations") {
       };
 
       std::vector<std::bitset<64>> singles;
-      auto state = asci::canonical_hf_determinant<64>(4,0); // all alpha
-      asci::generate_singles(8, state, singles);
+      auto state = macis::canonical_hf_determinant<64>(4,0); // all alpha
+      macis::generate_singles(8, state, singles);
        
-      auto cmp = asci::bitset_less_comparator<64>{};
+      auto cmp = macis::bitset_less_comparator<64>{};
       std::sort(singles.begin(), singles.end(), cmp);
       std::sort(ref_singles.begin(), ref_singles.end(), cmp);
 
@@ -73,11 +73,11 @@ TEST_CASE("Slater Det Operations") {
         0x8E0000000F, 0x8D0000000F, 0x8B0000000f, 0x870000000f
       };
 
-      auto state = asci::canonical_hf_determinant<64>(4,4);
+      auto state = macis::canonical_hf_determinant<64>(4,4);
       std::vector<std::bitset<64>> singles;
-      asci::generate_singles_spin(8, state, singles);
+      macis::generate_singles_spin(8, state, singles);
 
-      auto cmp = asci::bitset_less_comparator<64>{};
+      auto cmp = macis::bitset_less_comparator<64>{};
       std::sort(singles.begin(), singles.end(), cmp);
       std::sort(ref_singles.begin(), ref_singles.end(), cmp);
       
@@ -102,10 +102,10 @@ TEST_CASE("Slater Det Operations") {
       };
 
       std::vector<std::bitset<64>> doubles;
-      auto state = asci::canonical_hf_determinant<64>(4,0); // all alpha
-      asci::generate_doubles(8, state, doubles);
+      auto state = macis::canonical_hf_determinant<64>(4,0); // all alpha
+      macis::generate_doubles(8, state, doubles);
        
-      auto cmp = asci::bitset_less_comparator<64>{};
+      auto cmp = macis::bitset_less_comparator<64>{};
       std::sort(doubles.begin(), doubles.end(), cmp);
       std::sort(ref_doubles.begin(), ref_doubles.end(), cmp);
 
@@ -182,11 +182,11 @@ TEST_CASE("Slater Det Operations") {
         0x4E00000087, 0x4D00000087, 0x4B00000087, 0x4700000087, 0x8E00000087,
         0x8D00000087, 0x8B00000087, 0x8700000087 
       }; 
-      auto state = asci::canonical_hf_determinant<64>(4,4);
+      auto state = macis::canonical_hf_determinant<64>(4,4);
       std::vector<std::bitset<64>> singles, doubles;
-      asci::generate_singles_doubles_spin(8, state, singles, doubles);
+      macis::generate_singles_doubles_spin(8, state, singles, doubles);
        
-      auto cmp = asci::bitset_less_comparator<64>{};
+      auto cmp = macis::bitset_less_comparator<64>{};
       std::sort(doubles.begin(), doubles.end(), cmp);
       std::sort(ref_doubles.begin(), ref_doubles.end(), cmp);
 
@@ -205,27 +205,27 @@ TEST_CASE("Slater Det Operations") {
 
 
   SECTION("CIS") {
-    auto state = asci::canonical_hf_determinant<64>(4,4);
+    auto state = macis::canonical_hf_determinant<64>(4,4);
     std::vector<std::bitset<64>> singles;
-    asci::generate_singles_spin(8, state, singles);
+    macis::generate_singles_spin(8, state, singles);
     singles.push_back(state);
-    auto cis = asci::generate_cis_hilbert_space(8, state);
+    auto cis = macis::generate_cis_hilbert_space(8, state);
 
-    auto cmp = asci::bitset_less_comparator<64>{};
+    auto cmp = macis::bitset_less_comparator<64>{};
     std::sort(singles.begin(), singles.end(), cmp);
     std::sort(cis.begin(), cis.end(), cmp);
     REQUIRE( singles == cis );
   }
 
   SECTION("CISD") {
-    auto state = asci::canonical_hf_determinant<64>(4,4);
+    auto state = macis::canonical_hf_determinant<64>(4,4);
     std::vector<std::bitset<64>> singles, doubles;
-    asci::generate_singles_doubles_spin(8, state, singles, doubles);
+    macis::generate_singles_doubles_spin(8, state, singles, doubles);
     singles.insert(singles.end(), doubles.begin(), doubles.end());
     singles.push_back(state);
-    auto cisd = asci::generate_cisd_hilbert_space(8, state);
+    auto cisd = macis::generate_cisd_hilbert_space(8, state);
 
-    auto cmp = asci::bitset_less_comparator<64>{};
+    auto cmp = macis::bitset_less_comparator<64>{};
     std::sort(singles.begin(), singles.end(), cmp);
     std::sort(cisd.begin(), cisd.end(), cmp);
     REQUIRE( singles == cisd );
@@ -236,7 +236,7 @@ TEST_CASE("Slater Det Operations") {
       std::vector<std::bitset<64>> ref_combs = {
         0x3, 0x5, 0x9, 0x6, 0xA, 0xC
       };
-      auto combs = asci::generate_combs<64>(4,2);
+      auto combs = macis::generate_combs<64>(4,2);
       REQUIRE( combs == ref_combs );
     }
 
@@ -253,7 +253,7 @@ TEST_CASE("Slater Det Operations") {
         0xC0000000C
       };
 
-      auto dets = asci::generate_hilbert_space<64>(4,2,2);
+      auto dets = macis::generate_hilbert_space<64>(4,2,2);
       REQUIRE( dets == ref_dets );
     }
   }
@@ -261,10 +261,10 @@ TEST_CASE("Slater Det Operations") {
 
   SECTION("String Conversions") {
 
-    auto state = asci::canonical_hf_determinant<64>(2,2).flip(3).flip(4+32);
+    auto state = macis::canonical_hf_determinant<64>(2,2).flip(3).flip(4+32);
 
     SECTION("To String") {
-      auto str = asci::to_canonical_string(state);
+      auto str = macis::to_canonical_string(state);
       REQUIRE(str == "220ud000000000000000000000000000");
     }
 
@@ -272,13 +272,13 @@ TEST_CASE("Slater Det Operations") {
 
       SECTION("Full String") {
         std::string str = "220ud000000000000000000000000000";
-        auto det = asci::from_canonical_string<64>(str);
+        auto det = macis::from_canonical_string<64>(str);
         REQUIRE(det == state);
       }
 
       SECTION("Short String") {
         std::string str = "220ud";
-        auto det = asci::from_canonical_string<64>(str);
+        auto det = macis::from_canonical_string<64>(str);
         REQUIRE(det == state);
       }
 

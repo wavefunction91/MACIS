@@ -1,23 +1,23 @@
 #include "ut_common.hpp"
-#include <asci/fcidump.hpp>
-#include <asci/util/fock_matrices.hpp>
+#include <macis/fcidump.hpp>
+#include <macis/util/fock_matrices.hpp>
 #include <iomanip>
 
 TEST_CASE("Fock Matrices") {
   ROOT_ONLY(MPI_COMM_WORLD);
 
-  const size_t norb  = asci::read_fcidump_norb(water_ccpvdz_fcidump);
+  const size_t norb  = macis::read_fcidump_norb(water_ccpvdz_fcidump);
   const size_t norb2 = norb  * norb;
   const size_t norb4 = norb2 * norb2;
 
-  using asci::NumOrbital;
-  using asci::NumInactive;
-  using asci::NumActive;
-  using asci::NumVirtual;
+  using macis::NumOrbital;
+  using macis::NumInactive;
+  using macis::NumActive;
+  using macis::NumVirtual;
 
   std::vector<double> T(norb2), V(norb4);
-  asci::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
-  asci::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
+  macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
+  macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
   SECTION("Inactive Fock Matrix + Energy") {
 
@@ -46,12 +46,12 @@ TEST_CASE("Fock Matrices") {
     std::vector<double> Fi(norb2,0.0);
     for(size_t i = 0; i < norb; ++i) {
       NumInactive ninact(i);
-      asci::inactive_fock_matrix(NumOrbital(norb), ninact,
+      macis::inactive_fock_matrix(NumOrbital(norb), ninact,
         T.data(), norb, V.data(), norb, Fi.data(), norb);
       double sum = std::accumulate(Fi.begin(),Fi.end(),0.0);
       REQUIRE(sum == Approx(ref_sums[i]));
 
-      double E = asci::inactive_energy(ninact, T.data(), norb,
+      double E = macis::inactive_energy(ninact, T.data(), norb,
         Fi.data(), norb);
       REQUIRE(E == Approx(ref_ene[i]));
     }
@@ -67,14 +67,14 @@ TEST_CASE("Fock Matrices") {
 
     // Compute the inactive Fock matrix
     std::vector<double> Fi_ref(norb2);
-    asci::inactive_fock_matrix(NumOrbital(norb), ninact,
+    macis::inactive_fock_matrix(NumOrbital(norb), ninact,
       T.data(), norb, V.data(), norb, Fi_ref.data(), norb );
 
 
     std::vector<double> T_active(nact.get() * nact.get()),
       V_active(T_active.size() * T_active.size()),
       Fi(norb2);
-    asci::active_hamiltonian(NumOrbital(norb), nact, ninact,
+    macis::active_hamiltonian(NumOrbital(norb), nact, ninact,
       T.data(), norb, V.data(), norb, Fi.data(), norb,
       T_active.data(), nact.get(), V_active.data(), nact.get());
 
@@ -82,20 +82,20 @@ TEST_CASE("Fock Matrices") {
       REQUIRE(Fi[i] == Approx(Fi_ref[i]));
 
 
-    asci::matrix_span<double> Ta(T_active.data(),nact.get(),nact.get());
-    asci::matrix_span<double> Fi_span(Fi.data(),norb,norb);
+    macis::matrix_span<double> Ta(T_active.data(),nact.get(),nact.get());
+    macis::matrix_span<double> Fi_span(Fi.data(),norb,norb);
 
     auto act_range = std::make_pair(ninact.get(), ninact.get() + nact.get());
-    auto Fi_active = asci::stdex::submdspan(Fi_span, act_range, act_range);
+    auto Fi_active = macis::stdex::submdspan(Fi_span, act_range, act_range);
     for( auto i = 0; i < nact.get(); ++i )
     for( auto j = 0; j < nact.get(); ++j ) {
       REQUIRE(Ta(i,j) == Fi_active(i,j));
     }
     
-    asci::rank4_span<double> V_span(V.data(),norb,norb,norb,norb);
+    macis::rank4_span<double> V_span(V.data(),norb,norb,norb,norb);
     auto V_act_span = 
-      asci::stdex::submdspan(V_span,act_range,act_range,act_range,act_range);
-    asci::rank4_span<double> 
+      macis::stdex::submdspan(V_span,act_range,act_range,act_range,act_range);
+    macis::rank4_span<double> 
       Va(V_active.data(),nact.get(),nact.get(),nact.get(),nact.get());
     for( auto i = 0; i < nact.get(); ++i )
     for( auto j = 0; j < nact.get(); ++j )
@@ -113,12 +113,12 @@ TEST_CASE("Fock Matrices") {
     size_t na2 = nact.get() * nact.get();
     size_t na4 = na2 * na2;
     std::vector<double> active_1rdm(na2), active_2rdm(na4);
-    asci::read_rdms_binary(water_ccpvdz_rdms_fname, nact.get(), active_1rdm.data(), nact.get(),
+    macis::read_rdms_binary(water_ccpvdz_rdms_fname, nact.get(), active_1rdm.data(), nact.get(),
       active_2rdm.data(), nact.get());
 
     REQUIRE(active_1rdm.size() == nact.get()*nact.get());
     std::vector<double> Fa(norb2);
-    asci::active_fock_matrix(NumOrbital(norb), ninact, nact,
+    macis::active_fock_matrix(NumOrbital(norb), ninact, nact,
       V.data(), norb, active_1rdm.data(), nact.get(),
       Fa.data(), norb);
     auto sum = std::accumulate(Fa.begin(),Fa.end(),0.0);
@@ -133,11 +133,11 @@ TEST_CASE("Fock Matrices") {
     size_t na2 = nact.get() * nact.get();
     size_t na4 = na2 * na2;
     std::vector<double> active_1rdm(na2), active_2rdm(na4);
-    asci::read_rdms_binary(water_ccpvdz_rdms_fname, nact.get(), active_1rdm.data(), nact.get(),
+    macis::read_rdms_binary(water_ccpvdz_rdms_fname, nact.get(), active_1rdm.data(), nact.get(),
       active_2rdm.data(), nact.get());
 
     std::vector<double> Q(nact.get()*norb);
-    asci::aux_q_matrix(nact, NumOrbital(norb), ninact, V.data(), norb, 
+    macis::aux_q_matrix(nact, NumOrbital(norb), ninact, V.data(), norb, 
       active_2rdm.data(), nact.get(), Q.data(), nact.get());
     auto sum = std::accumulate(Q.begin(),Q.end(),0.0);
     REQUIRE( sum == Approx(2.609524939005e+01) );
@@ -151,23 +151,23 @@ TEST_CASE("Fock Matrices") {
     size_t na2 = nact.get() * nact.get();
     size_t na4 = na2 * na2;
     std::vector<double> active_1rdm(na2), active_2rdm(na4);
-    asci::read_rdms_binary(water_ccpvdz_rdms_fname, nact.get(), active_1rdm.data(), nact.get(),
+    macis::read_rdms_binary(water_ccpvdz_rdms_fname, nact.get(), active_1rdm.data(), nact.get(),
       active_2rdm.data(), nact.get());
 
     // Compute Intermediates
     std::vector<double> Fi(norb2,0.0), Fa(norb2,0.0), Q(nact.get() * norb);
-    asci::inactive_fock_matrix(NumOrbital(norb), ninact,
+    macis::inactive_fock_matrix(NumOrbital(norb), ninact,
       T.data(), norb, V.data(), norb, Fi.data(), norb);
-    asci::active_fock_matrix(NumOrbital(norb), ninact, nact,
+    macis::active_fock_matrix(NumOrbital(norb), ninact, nact,
       V.data(), norb, active_1rdm.data(), nact.get(),
       Fa.data(), norb);
-    asci::aux_q_matrix(nact, NumOrbital(norb), ninact, V.data(), norb, 
+    macis::aux_q_matrix(nact, NumOrbital(norb), ninact, V.data(), norb, 
       active_2rdm.data(), nact.get(), Q.data(), nact.get());
 
     std::vector<double> F(norb2,0.0);
     const double ref_sum = -4.7465630072124384e+01;
     SECTION("From All Intermediates") {
-      asci::generalized_fock_matrix(NumOrbital(norb),ninact, nact,
+      macis::generalized_fock_matrix(NumOrbital(norb),ninact, nact,
         Fi.data(), norb, Fa.data(), norb, active_1rdm.data(), nact.get(),
         Q.data(), nact.get(), F.data(), norb);
       auto sum = std::accumulate(F.begin(),F.end(),0.0);
@@ -175,7 +175,7 @@ TEST_CASE("Fock Matrices") {
     }
 
     SECTION("From Inactive Intermediates") {
-      asci::generalized_fock_matrix_comp_mat1(NumOrbital(norb),ninact, nact,
+      macis::generalized_fock_matrix_comp_mat1(NumOrbital(norb),ninact, nact,
         Fi.data(), norb, V.data(), norb, active_1rdm.data(), nact.get(), 
         active_2rdm.data(), nact.get(), F.data(), norb);
       auto sum = std::accumulate(F.begin(),F.end(),0.0);
@@ -183,7 +183,7 @@ TEST_CASE("Fock Matrices") {
     }
 
     SECTION("From No Intermediates") {
-      asci::generalized_fock_matrix_comp_mat2(NumOrbital(norb),ninact, nact,
+      macis::generalized_fock_matrix_comp_mat2(NumOrbital(norb),ninact, nact,
         T.data(), norb, V.data(), norb, active_1rdm.data(), nact.get(), 
         active_2rdm.data(), nact.get(), F.data(), norb);
       auto sum = std::accumulate(F.begin(),F.end(),0.0);
@@ -199,17 +199,17 @@ TEST_CASE("Fock Matrices") {
     size_t na2 = nact.get() * nact.get();
     size_t na4 = na2 * na2;
     std::vector<double> active_1rdm(na2), active_2rdm(na4);
-    asci::read_rdms_binary(water_ccpvdz_rdms_fname, nact.get(), active_1rdm.data(), nact.get(),
+    macis::read_rdms_binary(water_ccpvdz_rdms_fname, nact.get(), active_1rdm.data(), nact.get(),
       active_2rdm.data(), nact.get());
 
     // Compute Fock
     std::vector<double> F(norb2,0.0);
-    asci::generalized_fock_matrix_comp_mat2(NumOrbital(norb),ninact, nact,
+    macis::generalized_fock_matrix_comp_mat2(NumOrbital(norb),ninact, nact,
       T.data(), norb, V.data(), norb, active_1rdm.data(), nact.get(), 
       active_2rdm.data(), nact.get(), F.data(), norb);
 
     // Compute energy
-    auto E = asci::energy_from_generalized_fock(ninact, nact, T.data(), norb,
+    auto E = macis::energy_from_generalized_fock(ninact, nact, T.data(), norb,
       active_1rdm.data(), nact.get(), F.data(), norb);
     REQUIRE(E == Approx(-8.5250440649419417e+01));
   }

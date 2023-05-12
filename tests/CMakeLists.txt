@@ -1,6 +1,6 @@
-include(asci-catch2)
+include(macis-catch2)
 
-add_executable( asci_test 
+add_executable( macis_test 
   ut_main.cxx 
   bitset_operations.cxx 
   sd_operations.cxx 
@@ -15,11 +15,11 @@ add_executable( asci_test
   asci.cxx
   dist_quickselect.cxx
 )
-target_link_libraries( asci_test PUBLIC asci Catch2::Catch2 )
-target_include_directories( asci_test PUBLIC ${PROJECT_BINARY_DIR}/tests )
+target_link_libraries( macis_test PUBLIC macis Catch2::Catch2 )
+target_include_directories( macis_test PUBLIC ${PROJECT_BINARY_DIR}/tests )
 
 add_executable( standalone_driver standalone_driver.cxx ini_input.cxx )
-target_link_libraries( standalone_driver PUBLIC asci )
+target_link_libraries( standalone_driver PUBLIC macis )
 
 set(REF_DATA_PREFIX "${PROJECT_SOURCE_DIR}/tests/ref_data")
 configure_file( ut_common.hpp.in ${PROJECT_BINARY_DIR}/tests/ut_common.hpp)
@@ -29,7 +29,7 @@ configure_file( ut_common.hpp.in ${PROJECT_BINARY_DIR}/tests/ut_common.hpp)
 #  GIT_REPOSITORY https://github.com/pybind/pybind11.git
 #)
 #FetchContent_MakeAvailable(pybind11)
-#pybind11_add_module(pyasci pymod.cxx)
-#target_link_libraries(pyasci PUBLIC asci)
+#pybind11_add_module(pymacis pymod.cxx)
+#target_link_libraries(pymacis PUBLIC macis)
 
-add_test( NAME ASCI_SERIAL_TEST COMMAND $<TARGET_FILE:asci_test> )
+add_test( NAME ASCI_SERIAL_TEST COMMAND $<TARGET_FILE:macis_test> )

@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 3.14)
-project(asci VERSION 0.1 LANGUAGES C CXX)
+project(MACIS VERSION 0.1 LANGUAGES C CXX)
 
 
-option( ASCI_ENABLE_OPENMP "Enable OpenMP Bindings" ON )
-option( ASCI_ENABLE_BOOST  "Enable Boost" ON )
+option( MACIS_ENABLE_OPENMP "Enable OpenMP Bindings" ON )
+option( MACIS_ENABLE_BOOST  "Enable Boost" ON )
 
 # CMake Modules
 list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )
-include( asci-cmake-modules )
+include( macis-cmake-modules )
 find_package( OpenMP )
 
 add_subdirectory(src)

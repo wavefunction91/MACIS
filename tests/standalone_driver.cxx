@@ -1,16 +1,14 @@
-#include <asci/fcidump.hpp>
-#include <asci/util/cas.hpp>
-//#include <asci/util/asci_search.hpp>
-//#include <asci/util/asci_iter.hpp>
-#include <asci/util/asci_grow.hpp>
-#include <asci/util/asci_refine.hpp>
-#include <asci/hamiltonian_generator/double_loop.hpp>
-#include <asci/util/fock_matrices.hpp>
-#include <asci/util/moller_plesset.hpp>
-#include <asci/util/transform.hpp>
-#include <asci/util/memory.hpp>
-#include <asci/util/mpi.hpp>
-#include <asci/wavefunction_io.hpp>
+#include <macis/fcidump.hpp>
+#include <macis/util/cas.hpp>
+#include <macis/util/asci_grow.hpp>
+#include <macis/util/asci_refine.hpp>
+#include <macis/hamiltonian_generator/double_loop.hpp>
+#include <macis/util/fock_matrices.hpp>
+#include <macis/util/moller_plesset.hpp>
+#include <macis/util/transform.hpp>
+#include <macis/util/memory.hpp>
+#include <macis/util/mpi.hpp>
+#include <macis/wavefunction_io.hpp>
 
 #include <sparsexx/io/write_dist_mm.hpp>
 
@@ -27,13 +25,13 @@
 #include <spdlog/stopwatch.h>
 #include <spdlog/cfg/env.h>
 
-using asci::NumElectron;
-using asci::NumOrbital;
-using asci::NumInactive;
-using asci::NumActive;
-using asci::NumVirtual;
-using asci::NumCanonicalOccupied;
-using asci::NumCanonicalVirtual;
+using macis::NumElectron;
+using macis::NumOrbital;
+using macis::NumInactive;
+using macis::NumActive;
+using macis::NumVirtual;
+using macis::NumCanonicalOccupied;
+using macis::NumCanonicalVirtual;
 
 enum class Job {
   CI,
@@ -78,8 +76,8 @@ int main(int argc, char** argv) {
 
   MPI_Init(&argc, &argv);
 
-  auto world_rank = asci::comm_rank(MPI_COMM_WORLD);
-  auto world_size = asci::comm_size(MPI_COMM_WORLD);
+  auto world_rank = macis::comm_rank(MPI_COMM_WORLD);
+  auto world_size = macis::comm_size(MPI_COMM_WORLD);
   {
   // Create Logger
   auto console = world_rank ? 
@@ -101,16 +99,16 @@ int main(int argc, char** argv) {
   if( nalpha != nbeta ) throw std::runtime_error("NALPHA != NBETA");
 
   // Read FCIDUMP File
-  size_t norb  = asci::read_fcidump_norb(fcidump_fname);
+  size_t norb  = macis::read_fcidump_norb(fcidump_fname);
   size_t norb2 = norb  * norb;
   size_t norb3 = norb2 * norb;
   size_t norb4 = norb2 * norb2;
 
   // XXX: Consider reading this into shared memory to avoid replication
   std::vector<double> T(norb2), V(norb4);
-  auto E_core = asci::read_fcidump_core(fcidump_fname);
-  asci::read_fcidump_1body(fcidump_fname, T.data(), norb);
-  asci::read_fcidump_2body(fcidump_fname, V.data(), norb);
+  auto E_core = macis::read_fcidump_core(fcidump_fname);
+  macis::read_fcidump_1body(fcidump_fname, T.data(), norb);
+  macis::read_fcidump_2body(fcidump_fname, V.data(), norb);
 
   #define OPT_KEYWORD(STR, RES, DTYPE) \
   if(input.containsData(STR)) {        \
@@ -155,7 +153,7 @@ int main(int argc, char** argv) {
   if( n_active > nwfn_bits/2 ) throw std::runtime_error("Not Enough Bits");
 
   // MCSCF Settings
-  asci::MCSCFSettings mcscf_settings;
+  macis::MCSCFSettings mcscf_settings;
   OPT_KEYWORD("MCSCF.MAX_MACRO_ITER", mcscf_settings.max_macro_iter,     size_t);
   OPT_KEYWORD("MCSCF.MAX_ORB_STEP",   mcscf_settings.max_orbital_step,   double);
   OPT_KEYWORD("MCSCF.MCSCF_ORB_TOL" , mcscf_settings.orb_grad_tol_mcscf, double);
@@ -169,7 +167,7 @@ int main(int argc, char** argv) {
   OPT_KEYWORD("MCSCF.CI_MATEL_TOL",   mcscf_settings.ci_matel_tol,       double);
 
   // ASCI Settings
-  asci::ASCISettings asci_settings;
+  macis::ASCISettings asci_settings;
   std::string asci_wfn_fname, asci_wfn_out_fname;
   double asci_E0 = 0.0; bool compute_asci_E0 = true;
   OPT_KEYWORD("ASCI.NTDETS_MAX",   asci_settings.ntdets_max,    size_t      );
@@ -209,8 +207,8 @@ int main(int argc, char** argv) {
     console->info("ECORE = {:.12f}", E_core); 
     console->debug("TSUM  = {:.12f}", vec_sum(T));
     console->debug("VSUM  = {:.12f}", vec_sum(V));
-    console->info("TMEM   = {:.2e} GiB", asci::to_gib(T));
-    console->info("VMEM   = {:.2e} GiB", asci::to_gib(V));
+    console->info("TMEM   = {:.2e} GiB", macis::to_gib(T));
+    console->info("VMEM   = {:.2e} GiB", macis::to_gib(V));
   }
 
 
@@ -238,14 +236,14 @@ int main(int argc, char** argv) {
     // Compute MP2 Natural Orbitals
     std::vector<double> MP2_RDM(norb*norb,0.0);
     std::vector<double> W_occ(norb);
-    asci::mp2_natural_orbitals(NumOrbital(norb), 
+    macis::mp2_natural_orbitals(NumOrbital(norb), 
       NumCanonicalOccupied(nocc_canon), NumCanonicalVirtual(nvir_canon),
       T.data(), norb, V.data(), norb, W_occ.data(), MP2_RDM.data(), norb);
 
     // Transform Hamiltonian
-    asci::two_index_transform(norb,norb,T.data(),norb,MP2_RDM.data(),
+    macis::two_index_transform(norb,norb,T.data(),norb,MP2_RDM.data(),
       norb,T.data(),norb);
-    asci::four_index_transform(norb,norb,0,V.data(),norb,MP2_RDM.data(),
+    macis::four_index_transform(norb,norb,0,V.data(),norb,MP2_RDM.data(),
       norb,V.data(),norb);
   }
 
@@ -257,7 +255,7 @@ int main(int argc, char** argv) {
 
   // Compute active-space Hamiltonian and inactive Fock matrix
   std::vector<double> F_inactive(norb2);
-  asci::active_hamiltonian(NumOrbital(norb), NumActive(n_active),
+  macis::active_hamiltonian(NumOrbital(norb), NumActive(n_active),
     NumInactive(n_inactive), T.data(), norb, V.data(), norb,
     F_inactive.data(), norb, T_active.data(), n_active,
     V_active.data(), n_active);
@@ -267,7 +265,7 @@ int main(int argc, char** argv) {
   console->debug("TACTIVE_SUM   = {:.12f}", vec_sum(T_active)  ); 
 
   // Compute Inactive energy
-  auto E_inactive = asci::inactive_energy(NumInactive(n_inactive), 
+  auto E_inactive = macis::inactive_energy(NumInactive(n_inactive), 
     T.data(), norb, F_inactive.data(), norb);
   console->info("E(inactive) = {:.12f}", E_inactive);
   
@@ -281,29 +279,29 @@ int main(int argc, char** argv) {
   // CI
   if( job == Job::CI ) {
 
-    using generator_t = asci::DoubleLoopHamiltonianGenerator<nwfn_bits>;
+    using generator_t = macis::DoubleLoopHamiltonianGenerator<nwfn_bits>;
     if( ci_exp == CIExpansion::CAS ) {
       std::vector<double> C_local;
       // TODO: VERIFY MPI + CAS
       E0 = 
-      asci::CASRDMFunctor<generator_t>::rdms(mcscf_settings, NumOrbital(n_active), 
+      macis::CASRDMFunctor<generator_t>::rdms(mcscf_settings, NumOrbital(n_active), 
         nalpha, nbeta, T_active.data(), V_active.data(), active_ordm.data(), 
         active_trdm.data(), C_local, MPI_COMM_WORLD);
       E0 += E_inactive + E_core;
     } else {
 
       generator_t ham_gen( 
-        asci::matrix_span<double>(T_active.data(),n_active,n_active),
-        asci::rank4_span<double>(V_active.data(),n_active,n_active,n_active,
+        macis::matrix_span<double>(T_active.data(),n_active,n_active),
+        macis::rank4_span<double>(V_active.data(),n_active,n_active,n_active,
           n_active)
       );
 
-      std::vector<asci::wfn_t<nwfn_bits>> dets;
+      std::vector<macis::wfn_t<nwfn_bits>> dets;
       std::vector<double> C;
       if( asci_wfn_fname.size() ) {
         // Read wave function from standard file
         console->info("Reading Guess Wavefunction From {}", asci_wfn_fname );
-        asci::read_wavefunction( asci_wfn_fname, dets, C );
+        macis::read_wavefunction( asci_wfn_fname, dets, C );
         //std::cout << dets[0].to_ullong() << std::endl;
         if(compute_asci_E0) {
           console->info("*  Calculating E0");
@@ -322,7 +320,7 @@ int main(int argc, char** argv) {
       } else {
         // HF Guess
         console->info("Generating HF Guess for ASCI");
-        dets = { asci::canonical_hf_determinant<nwfn_bits>(nalpha, nalpha) };
+        dets = { macis::canonical_hf_determinant<nwfn_bits>(nalpha, nalpha) };
         //std::cout << dets[0].to_ullong() << std::endl;
         E0 = ham_gen.matrix_element(dets[0], dets[0]);
         C = {1.0};
@@ -331,11 +329,11 @@ int main(int argc, char** argv) {
       console->info("ASCI E0 = {:.10e}", E0 + E_core + E_inactive);
 
       auto asci_st = hrt_t::now();
-      std::tie(E0, dets, C) = asci::asci_grow( asci_settings, 
+      std::tie(E0, dets, C) = macis::asci_grow( asci_settings, 
         mcscf_settings, E0, std::move(dets), std::move(C), ham_gen, 
         n_active, MPI_COMM_WORLD );
       if(asci_settings.max_refine_iter) {
-        std::tie(E0, dets, C) = asci::asci_refine( asci_settings, 
+        std::tie(E0, dets, C) = macis::asci_refine( asci_settings, 
           mcscf_settings, E0, std::move(dets), std::move(C), ham_gen, 
           n_active, MPI_COMM_WORLD );
       }
@@ -346,13 +344,13 @@ int main(int argc, char** argv) {
         
       if( asci_wfn_out_fname.size() and !world_rank ) {
         console->info("Writing ASCI Wavefunction to {}", asci_wfn_out_fname);
-        asci::write_wavefunction( asci_wfn_out_fname, n_active, dets, C );
+        macis::write_wavefunction( asci_wfn_out_fname, n_active, dets, C );
       }
 
 
       // Dump Hamiltonian
       if(0){
-        auto H = asci::make_dist_csr_hamiltonian<int64_t>( MPI_COMM_WORLD,
+        auto H = macis::make_dist_csr_hamiltonian<int64_t>( MPI_COMM_WORLD,
           dets.begin(), dets.end(), ham_gen, 1e-16);
         sparsexx::write_dist_mm("ham.mtx", H, 1);
       }
@@ -368,11 +366,11 @@ int main(int argc, char** argv) {
     if(rdm_fname.size()) {
       console->info("  * RDMFILE = {}", rdm_fname );
       std::vector<double> full_ordm(norb2), full_trdm(norb4);
-      asci::read_rdms_binary(rdm_fname, norb, full_ordm.data(), norb,
+      macis::read_rdms_binary(rdm_fname, norb, full_ordm.data(), norb,
         full_trdm.data(), norb );
-      asci::active_submatrix_1body(NumActive(n_active), NumInactive(n_inactive),
+      macis::active_submatrix_1body(NumActive(n_active), NumInactive(n_inactive),
         full_ordm.data(), norb, active_ordm.data(), n_active);
-      asci::active_subtensor_2body(NumActive(n_active), NumInactive(n_inactive),
+      macis::active_subtensor_2body(NumActive(n_active), NumInactive(n_inactive),
         full_trdm.data(), norb, active_trdm.data(), n_active);
 
       // Compute CI energy from RDMs
@@ -386,7 +384,7 @@ int main(int argc, char** argv) {
 
     // CASSCF
     E0 =
-    asci::casscf_diis( mcscf_settings, NumElectron(nalpha), NumElectron(nbeta),
+    macis::casscf_diis( mcscf_settings, NumElectron(nalpha), NumElectron(nbeta),
       NumOrbital(norb), NumInactive(n_inactive), NumActive(n_active),
       NumVirtual(n_virtual), E_core, T.data(), norb, V.data(), norb, 
       active_ordm.data(), n_active, active_trdm.data(), n_active,
@@ -396,7 +394,7 @@ int main(int argc, char** argv) {
   console->info("E(CI)  = {:.12f} Eh", E0);
 
   if(fci_out_fname.size())
-    asci::write_fcidump(fci_out_fname,norb, T.data(), norb, V.data(), norb, E_core);
+    macis::write_fcidump(fci_out_fname,norb, T.data(), norb, V.data(), norb, E_core);
 
   } // MPI Scope
 

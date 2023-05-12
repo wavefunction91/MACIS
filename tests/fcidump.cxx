@@ -1,6 +1,6 @@
 #include "ut_common.hpp"
-#include <asci/fcidump.hpp>
-#include <asci/util/orbital_energies.hpp>
+#include <macis/fcidump.hpp>
+#include <macis/util/orbital_energies.hpp>
 #include <iostream>
 #include <iomanip>
 
@@ -12,25 +12,25 @@ TEST_CASE("FCIDUMP") {
 
     size_t norb_ref = 24;
     SECTION("NORB") {
-      auto norb = asci::read_fcidump_norb(water_ccpvdz_fcidump);
+      auto norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
       REQUIRE( norb == norb_ref );
     }
 
     SECTION("Core") {
-      auto coreE = asci::read_fcidump_core(water_ccpvdz_fcidump);
+      auto coreE = macis::read_fcidump_core(water_ccpvdz_fcidump);
       REQUIRE(coreE == Approx(9.191200742618042));
     }
 
     SECTION("OneBody") {
       std::vector<double> T(norb_ref*norb_ref);
-      asci::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb_ref);
+      macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb_ref);
       double sum = std::accumulate(T.begin(), T.end(), 0.0);
       REQUIRE( sum == Approx(-1.095432762653e+02) );
     }
 
     SECTION("TwoBody") {
       std::vector<double> V(norb_ref*norb_ref*norb_ref*norb_ref);
-      asci::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb_ref);
+      macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb_ref);
       double sum = std::accumulate(V.begin(), V.end(), 0.0);
       REQUIRE( sum == Approx(2.701609068389e+02) );
     }
@@ -42,12 +42,12 @@ TEST_CASE("FCIDUMP") {
       const auto norb3 = norb2 * norb;
       std::vector<double> T(norb*norb);
       std::vector<double> V(norb*norb*norb*norb);
-      asci::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
-      asci::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
+      macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
+      macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
       std::vector<double> eps(norb);
-      asci::canonical_orbital_energies(asci::NumOrbital(norb),
-        asci::NumInactive(nocc), T.data(), norb, V.data(), norb,
+      macis::canonical_orbital_energies(macis::NumOrbital(norb),
+        macis::NumInactive(nocc), T.data(), norb, V.data(), norb,
         eps.data());
 
       // Check orbital energies
