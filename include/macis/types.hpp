@@ -3,16 +3,16 @@
 #include <bit>
 #include <vector>
 #include <strings.h>
-#include <experimental/mdspan>
+#include <mdspan/mdspan.hpp>
 
 namespace macis {
 
-namespace stdex = std::experimental;
+namespace KokkosEx = MDSPAN_IMPL_STANDARD_NAMESPACE::MDSPAN_IMPL_PROPOSED_NAMESPACE;
 
 template <typename T, size_t rank>
 using col_major_span = 
-  stdex::mdspan<T, stdex::dextents<size_t,rank>, 
-    stdex::layout_left>;
+  Kokkos::mdspan<T, Kokkos::dextents<size_t,rank>, 
+    Kokkos::layout_left>;
 
 template <typename T>
 using matrix_span = col_major_span<T,2>;

@@ -7,6 +7,11 @@ find_package( LAPACK REQUIRED )
 find_package( BLAS REQUIRED )
 
 # BLAS++/LAPACK++
+set(use_openmp OFF)
+if(MACIS_ENABLE_OPENMP)
+  set(use_openmp ON)
+endif()
+
 find_package(lapackpp CONFIG QUIET)
 if(NOT lapackpp_FOUND )
 include( FetchContent )

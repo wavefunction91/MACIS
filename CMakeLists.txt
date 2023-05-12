@@ -8,7 +8,9 @@ option( MACIS_ENABLE_BOOST  "Enable Boost" ON )
 # CMake Modules
 list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )
 include( macis-cmake-modules )
-find_package( OpenMP )
+if( MACIS_ENABLE_OPENMP )
+  find_package(OpenMP)
+endif()
 
 add_subdirectory(src)
 
