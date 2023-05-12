@@ -1,11 +1,12 @@
 #pragma once
 #include <macis/types.hpp>
 #include <macis/sd_operations.hpp>
-#include <macis/util/asci_contributions.hpp>
-#include <macis/util/asci_sort.hpp>
 #include <macis/util/memory.hpp>
 #include <macis/util/mpi.hpp>
 #include <macis/util/dist_quickselect.hpp>
+
+#include <macis/asci/determinant_contributions.hpp>
+#include <macis/asci/determinant_sort.hpp>
 
 #include <chrono>
 #include <fstream>

@@ -1,5 +1,5 @@
 #pragma once
-#include <macis/util/asci_search.hpp>
+#include <macis/asci/determinant_search.hpp>
 #include <macis/util/selected_ci_diag.hpp>
 #include <macis/util/mcscf.hpp>
 

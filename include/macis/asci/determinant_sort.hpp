@@ -1,5 +1,5 @@
 #pragma once
-#include <macis/util/asci_contributions.hpp>
+#include <macis/asci/determinant_contributions.hpp>
 #if __has_include(<boost/sort/pdqsort/pdqsort.hpp>)
   #define MACIS_USE_BOOST_SORT
   #include <boost/sort/pdqsort/pdqsort.hpp>

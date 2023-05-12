@@ -217,4 +217,4 @@ void generate_pairs( const IndContainer& inds, std::vector<wfn_t<N>>& w ) {
 
 }
 
-#include <macis/util/asci_triplet_constraints.hpp>
+#include <macis/asci/mask_constraints.hpp>

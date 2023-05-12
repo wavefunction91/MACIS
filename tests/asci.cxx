@@ -2,7 +2,7 @@
 #include <macis/types.hpp>
 #include <macis/bitset_operations.hpp>
 #include <macis/sd_operations.hpp>
-#include <macis/util/asci_contributions.hpp>
+#include <macis/asci/determinant_contributions.hpp>
 #include <iostream>
 
 template <size_t NRadix, size_t NBits>

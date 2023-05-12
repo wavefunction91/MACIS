@@ -1,7 +1,7 @@
 #include <macis/fcidump.hpp>
 #include <macis/util/cas.hpp>
-#include <macis/util/asci_grow.hpp>
-#include <macis/util/asci_refine.hpp>
+#include <macis/asci/grow.hpp>
+#include <macis/asci/refine.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/util/fock_matrices.hpp>
 #include <macis/util/moller_plesset.hpp>
