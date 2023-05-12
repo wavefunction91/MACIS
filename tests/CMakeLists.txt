@@ -32,4 +32,4 @@ configure_file( ut_common.hpp.in ${PROJECT_BINARY_DIR}/tests/ut_common.hpp)
 #pybind11_add_module(pymacis pymod.cxx)
 #target_link_libraries(pymacis PUBLIC macis)
 
-add_test( NAME ASCI_SERIAL_TEST COMMAND $<TARGET_FILE:macis_test> )
+add_test( NAME MACIS_SERIAL_TEST COMMAND $<TARGET_FILE:macis_test> )

@@ -1,6 +1,6 @@
 cmake_minimum_required( VERSION 3.18 FATAL_ERROR )
-project( asci_cmake_discovery LANGUAGES C CXX )
+project( macis_cmake_discovery LANGUAGES C CXX )
 
-find_package( asci REQUIRED )
-add_executable( asci_link_tester asci_link_tester.cxx )
-target_link_libraries( asci_link_tester PUBLIC asci::asci )
+find_package( macis REQUIRED )
+add_executable( macis_link_tester macis_link_tester.cxx )
+target_link_libraries( macis_link_tester PUBLIC macis::macis )
