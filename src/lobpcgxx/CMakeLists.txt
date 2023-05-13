@@ -12,6 +12,9 @@ if(MACIS_ENABLE_OPENMP)
   set(use_openmp ON)
 endif()
 
+# blaspp auto-detects cuda,hip modules and enables device backends
+set( gpu_backend "none" CACHE STRING "GPU backend to use" FORCE)
+
 find_package(lapackpp CONFIG QUIET)
 if(NOT lapackpp_FOUND )
 include( FetchContent )
