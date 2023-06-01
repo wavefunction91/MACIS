@@ -1,3 +1,11 @@
+/*
+ * MACIS Copyright (c) 2023, The Regents of the University of California,
+ * through Lawrence Berkeley National Laboratory (subject to receipt of
+ * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ *
+ * See LICENSE.txt for details
+ */
+
 #include <sparsexx/matrix_types/csr_matrix.hpp>
 #include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
 #include <sparsexx/matrix_types/type_traits.hpp>

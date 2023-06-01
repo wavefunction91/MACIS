@@ -1,3 +1,9 @@
+# MACIS Copyright (c) 2023, The Regents of the University of California,
+# through Lawrence Berkeley National Laboratory (subject to receipt of
+# any required approvals from the U.S. Dept. of Energy). All rights reserved.
+#
+# See LICENSE.txt for details
+
 cmake_minimum_required( VERSION 3.11 ) # Require CMake 3.11+
 
 include( CMakePushCheckState )
