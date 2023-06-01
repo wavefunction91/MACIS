@@ -1,0 +1,28 @@
+name: Add Licenses
+
+on:
+  pull_request:
+    branches:
+      - master
+
+
+jobs:
+  license_files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          token: ${{ github.token }}
+      - name: Apply Licenses
+        uses: wavefunction91/skywalking-eyes@feature/bsd3-lbl
+        with:
+          config: .github/.licenserc.yaml
+          mode: fix
+      - name: Push Licensed Files
+        uses: EndBug/add-and-commit@v4
+        with:
+          author_name: license[bot]
+          author_email: license[bot]@github.com
+          message: 'Committing license headers'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
