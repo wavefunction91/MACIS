@@ -50,7 +50,35 @@ Phenomena [(SPEC)](https://spec.labworks.org/home) Center.
 
 # Publications
 
+Please cite the following publications if MACIS was used in your publication or
+software:
+```
+% Distributed Memory ASCI Implementation
+@article{williams23_distributed_asci,
+    title={A parallel, distributed memory implementation of the adaptive
+           sampling configuration interaction method},
+    author={David B. Williams-Young and Norm M. Tubman and Carlos Mejuto-Zaera 
+            and Wibe A. de Jong}, 
+    journal={The Journal of Chemical Physics},
+    volume={158},
+    pages={214109},
+    year={2023},
+    doi={10.1063/5.0148650},
+    preprint={https://arxiv.org/abs/2303.05688},
+    url={https://pubs.aip.org/aip/jcp/article/158/21/214109/2893713/A-parallel-distributed-memory-implementation-of}
+}
+    
+```
+
 # Build Instructions
+
+
+MACIS provides a CMake build system with automatic dependency management (through [FetchContent](https://cmake.org/cmake/help/latest/module/FetchContent.html)).
+As such, a simple CMake invocation will often suffice for most purposes
+```
+cmake -S /path/to/macis -B /path/to/build [MACIS configure options]
+cmake --build /path/to/build
+```
 
 ## Influential CMake Variables
 
@@ -64,7 +92,7 @@ Phenomena [(SPEC)](https://spec.labworks.org/home) Center.
 
 # Example Usage
 
-Coming Soon.... See `test/standalone_driver.cxx` for an example end-to-end
+Coming Soon.... See `tests/standalone_driver.cxx` for an example end-to-end
 invocation of MACIS for various integrands.
 
 # License
