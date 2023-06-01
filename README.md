@@ -1,3 +1,11 @@
+<!--
+  ~ MACIS Copyright (c) 2023, The Regents of the University of California,
+  ~ through Lawrence Berkeley National Laboratory (subject to receipt of
+  ~ any required approvals from the U.S. Dept. of Energy). All rights reserved.
+  ~
+  ~ See LICENSE.txt for details
+-->
+
 # About
 
 Many-Body Adaptive Configuration Interaction Suite (MACIS) Copyright (c) 2023,
@@ -71,7 +79,6 @@ software:
 ```
 
 # Build Instructions
-
 
 MACIS provides a CMake build system with automatic dependency management (through [FetchContent](https://cmake.org/cmake/help/latest/module/FetchContent.html)).
 As such, a simple CMake invocation will often suffice for most purposes
