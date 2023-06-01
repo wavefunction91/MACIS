@@ -72,7 +72,6 @@ software:
 
 # Build Instructions
 
-
 MACIS provides a CMake build system with automatic dependency management (through [FetchContent](https://cmake.org/cmake/help/latest/module/FetchContent.html)).
 As such, a simple CMake invocation will often suffice for most purposes
 ```
