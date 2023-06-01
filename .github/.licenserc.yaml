@@ -9,5 +9,7 @@ header:
     - attic/
     - tests/ref_data/
     - LICENSE.txt
+    - src/lobpcgxx/
+    - src/sparsexx/tests/*.{mtx,rb}
 
   comment: never
