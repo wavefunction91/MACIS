@@ -6,6 +6,8 @@ header:
 
   paths-ignore:
     - .github/
+    - attic/
+    - tests/ref_data/
     - LICENSE.txt
 
   comment: never
