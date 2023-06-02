@@ -102,6 +102,9 @@ cmake --build /path/to/build
 Coming Soon.... See `tests/standalone_driver.cxx` for an example end-to-end
 invocation of MACIS for CAS-CI, CAS-SCF and ASCI-CI.
 
+Have a question, comment or concern? Open an [Issue](https://github.com/wavefunction91/MACIS/issues) or start a
+[Discussion](https://github.com/wavefunction91/MACIS/discussions).
+
 # License
 
 MACIS is made freely available under the terms of a modified 3-Clause BSD
