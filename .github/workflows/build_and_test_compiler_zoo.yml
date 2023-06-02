@@ -9,7 +9,7 @@ env:
 jobs:
   release_build:
     name: Release Build and Test
-    runs-on: cuda
+    runs-on: ubuntu-latest
     container:
         image: dbwy/chemistry
     strategy:
@@ -46,7 +46,7 @@ jobs:
 
   debug_build:
     name: Debug Build and Test
-    runs-on: cuda
+    runs-on: ubuntu-latest
     container:
         image: dbwy/chemistry
 
@@ -79,7 +79,7 @@ jobs:
   subproject_build:
     name: Build as Subproject
     needs: release_build
-    runs-on: cuda
+    runs-on: ubuntu-latest
     container:
         image: dbwy/chemistry
     
@@ -107,7 +107,7 @@ jobs:
   cmake_discovery:
     name: CMake Discovery
     needs: release_build
-    runs-on: cuda
+    runs-on: ubuntu-latest
     container:
         image: dbwy/chemistry
 
