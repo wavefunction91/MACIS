@@ -7,8 +7,8 @@
  */
 
 #pragma once
-#include <string>
 #include <macis/types.hpp>
+#include <string>
 
 namespace macis {
 
@@ -18,7 +18,7 @@ namespace macis {
  *  @param[in] fname Filename of FCIDUMP file
  *  @returns The number of orbitals represented in `fname`
  */
-uint32_t read_fcidump_norb( std::string fname );
+uint32_t read_fcidump_norb(std::string fname);
 
 /**
  *  @brief Extract the "core" energy from a FCIDUMP file
@@ -26,7 +26,7 @@ uint32_t read_fcidump_norb( std::string fname );
  *  @param[in] fname Filename of FCIDUMP file
  *  @returns The "core" energy of the Hamiltonian in `fname`
  */
-double read_fcidump_core( std::string fname );
+double read_fcidump_core(std::string fname);
 
 /**
  *  @brief Extract the one-body Hamiltonian from a FCIDUMP file
@@ -37,7 +37,7 @@ double read_fcidump_core( std::string fname );
  *  @param[out] T The one-body Hamiltonian contained in `filename` (col major)
  *  @param[in]  LDT The leading dimension of `T`
  */
-void read_fcidump_1body( std::string fname, double* T, size_t LDT );
+void read_fcidump_1body(std::string fname, double* T, size_t LDT);
 
 /**
  *  @brief Extract the two-body Hamiltonian from a FCIDUMP file
@@ -48,7 +48,7 @@ void read_fcidump_1body( std::string fname, double* T, size_t LDT );
  *  @param[out] V The two-body Hamiltonian contained in `filename` (col major)
  *  @param[in]  LDV The leading dimension of `V`
  */
-void read_fcidump_2body( std::string fname, double* V, size_t LDV );
+void read_fcidump_2body(std::string fname, double* V, size_t LDV);
 
 /**
  *  @brief Extract the one-body Hamiltonian from a FCIDUMP file
@@ -58,7 +58,7 @@ void read_fcidump_2body( std::string fname, double* V, size_t LDV );
  *  @param[in]  fname Filename of FCIDUMP file
  *  @param[out] T The one-body Hamiltonian contained in `filename` (col major)
  */
-void read_fcidump_1body( std::string fname, col_major_span<double,2> T);
+void read_fcidump_1body(std::string fname, col_major_span<double, 2> T);
 
 /**
  *  @brief Extract the two-body Hamiltonian from a FCIDUMP file
@@ -68,7 +68,7 @@ void read_fcidump_1body( std::string fname, col_major_span<double,2> T);
  *  @param[in]  fname Filename of FCIDUMP file
  *  @param[out] V The two-body Hamiltonian contained in `filename` (col major)
  */
-void read_fcidump_2body( std::string fname, col_major_span<double,4> V);
+void read_fcidump_2body(std::string fname, col_major_span<double, 4> V);
 
 /**
  *  @brief Write an FCIDUMP file from a 2-body hamiltonian
@@ -81,7 +81,7 @@ void read_fcidump_2body( std::string fname, col_major_span<double,4> V);
  *  @param[in] LDV   Vhe leading dimension of `V`
  *  @param[in] E_core The "core" energy of the Hamiltonian
  */
-void write_fcidump( std::string fname, size_t norb, const double *T, size_t LDT, 
-  const double* V, size_t LDV, double E_core);
+void write_fcidump(std::string fname, size_t norb, const double* T, size_t LDT,
+                   const double* V, size_t LDV, double E_core);
 
-}
+}  // namespace macis

@@ -6,34 +6,31 @@
  * See LICENSE.txt for details
  */
 
-#include <macis/util/orbital_steps.hpp>
 #include <macis/util/orbital_hessian.hpp>
+#include <macis/util/orbital_steps.hpp>
 
 namespace macis {
 
-void precond_cg_orbital_step(NumOrbital norb, NumInactive ninact, NumActive nact,
-  NumVirtual nvirt, const double* Fi, size_t LDFi, const double* Fa, size_t LDFa,
-  const double* F, size_t LDF, const double* A1RDM, size_t LDD, const double* OG,
-  double* K_lin) {
-
-  const size_t no = norb.get(), ni = ninact.get(), na = nact.get(), 
-               nv = nvirt.get(), orb_rot_sz = nv*(na+ni) + na*ni;
+void precond_cg_orbital_step(NumOrbital norb, NumInactive ninact,
+                             NumActive nact, NumVirtual nvirt, const double* Fi,
+                             size_t LDFi, const double* Fa, size_t LDFa,
+                             const double* F, size_t LDF, const double* A1RDM,
+                             size_t LDD, const double* OG, double* K_lin) {
+  const size_t no = norb.get(), ni = ninact.get(), na = nact.get(),
+               nv = nvirt.get(), orb_rot_sz = nv * (na + ni) + na * ni;
   std::vector<double> DH(orb_rot_sz);
 
   // Compute approximate diagonal hessian
-  approx_diag_hessian(ninact, nact, nvirt, Fi, LDFi, Fa, LDFa, A1RDM, LDD, 
-    F, LDF, DH.data() );
-
+  approx_diag_hessian(ninact, nact, nvirt, Fi, LDFi, Fa, LDFa, A1RDM, LDD, F,
+                      LDF, DH.data());
 
   // Precondition the gradient
   for(size_t p = 0; p < orb_rot_sz; ++p) {
     K_lin[p] = -OG[p] / DH[p];
   }
-
 }
 
-}
-
+}  // namespace macis
 
 #if 0
 /******* THIS IS OLD CODE TO BE REVISITED *******/
