@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   linter:
-    runs-run: ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
     - uses: DoozyX/clang-format-lint-action@v0.12
