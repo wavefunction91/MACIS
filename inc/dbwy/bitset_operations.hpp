@@ -37,7 +37,12 @@ uint32_t ffs( std::bitset<N> bits ) {
 
   if constexpr (N <= 32)      return ffsl( bits.to_ulong() );
   else if constexpr (N <= 64) return ffsll( bits.to_ullong() );
-  else if constexpr (N <= 128) return std::countr_zero( to_uint128(bits) );
+  //else if constexpr (N <= 128) return std::countr_zero( to_uint128(bits) );
+  else if constexpr (N <= 128) {
+    auto as_words = reinterpret_cast<uint64_t*>(&bits);
+    if(as_words[0]) return ffsll(as_words[0]);
+    else            return ffsll(as_words[1]) + 64;
+  }
   else {
     uint32_t ind = 0;
     for( ind = 0; ind < N; ++ind )
