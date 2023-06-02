@@ -13,6 +13,22 @@
 
 namespace macis {
 
+/**
+ *  @brief Compute the CAS-CI 1- and 2-RDMs
+ *
+ *  @tparam HamGen Type of the Hamiltonian Generator
+ *
+ *  @param[in] settings Settings for the CI calculation
+ *  @param[in] norb     Number of orbitals
+ *  @param[in] nalpha   Number of alpha electrons
+ *  @param[in] nbeta    Number of beta electrons
+ *  @param[in] T        The one-body Hamiltonian
+ *  @param[in] V        The two-body Hamiltonian
+ *  @param[out] ORDM    The CAS-CI 1-RDM
+ *  @param[out] TRDM    The CAS-CI 2-RDM 
+ *  @param[out] C       The CAS-CI CI vector
+ *  @param[in]  comm    MPI Communicator on which to solve the EVP.
+ */
 template <typename HamGen>
 double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb, 
   size_t nalpha, size_t nbeta, double* T, double* V, double* ORDM, 
@@ -44,6 +60,7 @@ double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb,
 }
 
 
+/// Functor wraper around `compute_casci_rdms`
 template <typename HamGen>
 struct CASRDMFunctor {
   template <typename... Args>

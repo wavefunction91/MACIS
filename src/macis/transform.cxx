@@ -55,8 +55,8 @@ void two_index_transform( size_t norb_old, size_t norb_new,
 }
 
 void four_index_transform( size_t norb_old, size_t norb_new,
-  size_t ncontract, const double* X, size_t LDX, 
-  const double* C, size_t LDC, double* Y, size_t LDY ) {
+  const double* X, size_t LDX, const double* C, size_t LDC, 
+  double* Y, size_t LDY ) {
 
 
 #if 1

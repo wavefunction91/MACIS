@@ -138,7 +138,7 @@ TEST_CASE("Four Index Transform") {
       0.0, 0.0, 0.0, 1.0
     };
     std::vector<double> B(n4);
-    macis::four_index_transform( n, n, 10000,
+    macis::four_index_transform( n, n, 
       A.data(), n, C.data(), n, B.data(), n);
 
     for( size_t i = 0; i < n4; ++i )
@@ -158,7 +158,7 @@ TEST_CASE("Four Index Transform") {
       0.0, 1.0, 0.0, 0.0
     };
     std::vector<double> B(n4);
-    macis::four_index_transform( n, n, 10000,
+    macis::four_index_transform( n, n, 
       A.data(), n, C.data(), n, B.data(), n);
 
     std::vector<double> refB(n4);
@@ -194,7 +194,7 @@ TEST_CASE("Four Index Transform") {
     size_t m3 = m2 * m;
     size_t m4 = m2 * m2;
     std::vector<double> B(m4);
-    macis::four_index_transform(n, m, 10000,
+    macis::four_index_transform(n, m, 
       A.data(), n, C.data(), n, B.data(), m);
 
     std::vector<double> refB(m4);
@@ -237,7 +237,7 @@ TEST_CASE("Four Index Transform") {
     size_t m3 = m2 * m;
     size_t m4 = m2 * m2;
     std::vector<double> B(m4);
-    macis::four_index_transform(n, m, 10000,
+    macis::four_index_transform(n, m,
       A.data(), n, C.data(), n, B.data(), m);
 
 

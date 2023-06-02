@@ -83,7 +83,7 @@ void orbital_rotated_generalized_fock(NumOrbital _norb, NumInactive _ninact,
   // Transform Integrals
   two_index_transform( norb, norb, T, LDT, U, LDU,
     T_trans, LDTT);
-  four_index_transform( norb, norb, 0, V, LDV, U ,LDU,
+  four_index_transform( norb, norb, V, LDV, U ,LDU,
     V_trans, LDVT);
 
   // Compute Fock Matrix

@@ -255,7 +255,7 @@ int main(int argc, char** argv) {
     // Transform Hamiltonian
     macis::two_index_transform(norb,norb,T.data(),norb,MP2_RDM.data(),
       norb,T.data(),norb);
-    macis::four_index_transform(norb,norb,0,V.data(),norb,MP2_RDM.data(),
+    macis::four_index_transform(norb,norb,V.data(),norb,MP2_RDM.data(),
       norb,V.data(),norb);
   }
 
@@ -316,6 +316,7 @@ int main(int argc, char** argv) {
 
     } else {
 
+      // Generate the Hamiltonian Generator
       generator_t ham_gen( 
         macis::matrix_span<double>(T_active.data(),n_active,n_active),
         macis::rank4_span<double>(V_active.data(),n_active,n_active,n_active,
@@ -354,10 +355,16 @@ int main(int argc, char** argv) {
       console->info("ASCI Guess Size = {}", dets.size());
       console->info("ASCI E0 = {:.10e}", E0 + E_core + E_inactive);
 
+
+      // Perform the ASCI calculation
       auto asci_st = hrt_t::now();
+
+      // Growth phase
       std::tie(E0, dets, C) = macis::asci_grow( asci_settings, 
         mcscf_settings, E0, std::move(dets), std::move(C), ham_gen, 
         n_active, MPI_COMM_WORLD );
+
+      // Refinement phase
       if(asci_settings.max_refine_iter) {
         std::tie(E0, dets, C) = macis::asci_refine( asci_settings, 
           mcscf_settings, E0, std::move(dets), std::move(C), ham_gen, 
@@ -419,6 +426,7 @@ int main(int argc, char** argv) {
 
   console->info("E(CI)  = {:.12f} Eh", E0);
 
+  // Write FCIDUMP file if requested
   if(fci_out_fname.size())
     macis::write_fcidump(fci_out_fname,norb, T.data(), norb, V.data(), norb, E_core);
 

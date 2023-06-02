@@ -96,7 +96,7 @@ auto asci_grow( ASCISettings asci_settings, MCSCFSettings mcscf_settings,
         auto rot_st = hrt_t::now();
         macis::two_index_transform(norb,norb, ham_gen.T(), norb,
           ordm.data(), norb, ham_gen.T(), norb);
-        macis::four_index_transform(norb, norb, 0, 
+        macis::four_index_transform(norb, norb, 
           ham_gen.V(), norb, ordm.data(), norb, ham_gen.V(),
           norb);
         auto rot_en = hrt_t::now();

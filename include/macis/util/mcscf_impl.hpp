@@ -320,7 +320,7 @@ double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings, NumElectron nal
      ************************************************************/
      two_index_transform(no, no, T, LDT, U_total.data(), no, 
        transT.data(), no);
-     four_index_transform(no, no, 0, V, LDV, U_total.data(), no, 
+     four_index_transform(no, no, V, LDV, U_total.data(), no, 
        transV.data(), no);
 
      
@@ -667,7 +667,7 @@ double mcscf_ceres_impl(const Functor& rdm_op, MCSCFSettings settings, NumElectr
 
     two_index_transform(no, no, T, LDT, U_total.data(), no, 
       transT.data(), no);
-    four_index_transform(no, no, 0, V, LDV, U_total.data(), no, 
+    four_index_transform(no, no, V, LDV, U_total.data(), no, 
       transV.data(), no);
 
     // Compute Active Space Hamiltonian + inactive Fock
