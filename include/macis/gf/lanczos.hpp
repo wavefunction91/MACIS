@@ -15,7 +15,6 @@
  * @date 05/04/2021
  */
 #pragma once
-#include <omp.h>
 
 #include <iomanip>
 #include <sparsexx/matrix_types/csr_matrix.hpp>
