@@ -6,10 +6,10 @@
  * See LICENSE.txt for details
  */
 
-#include <macis/fcidump.hpp>
-#include <macis/davidson.hpp>
+#include <macis/util/fcidump.hpp>
+#include <macis/solvers/davidson.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
-#include <macis/util/selected_ci_diag.hpp>
+#include <macis/solvers/selected_ci_diag.hpp>
 #include <macis/util/mcscf.hpp>
 int main() {
   return 0;
