@@ -11,6 +11,7 @@
 
 #include <bitset>
 #include <iostream>
+#include <limits>
 #include <memory>
 
 namespace macis {
