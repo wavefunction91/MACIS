@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include <macis/fcidump.hpp>
+#include <macis/util/fcidump.hpp>
 #include <fstream>
 #include <string>
 #include <regex>

@@ -6,7 +6,8 @@
  * See LICENSE.txt for details
  */
 
-#include <macis/fcidump.hpp>
+#include <macis/util/fcidump.hpp>
+#include <macis/util/detail/rdm_files.hpp>
 #include <macis/util/cas.hpp>
 #include <macis/asci/grow.hpp>
 #include <macis/asci/refine.hpp>

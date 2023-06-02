@@ -7,9 +7,9 @@
  */
 
 #include "ut_common.hpp"
-#include <macis/fcidump.hpp>
+#include <macis/util/fcidump.hpp>
 #include <macis/csr_hamiltonian.hpp>
-#include <macis/davidson.hpp>
+#include <macis/solvers/davidson.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <iostream>
 #include <iomanip>

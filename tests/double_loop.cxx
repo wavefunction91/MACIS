@@ -7,7 +7,7 @@
  */
 
 #include "ut_common.hpp"
-#include <macis/fcidump.hpp>
+#include <macis/util/fcidump.hpp>
 #include <macis/wavefunction_io.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <iostream>

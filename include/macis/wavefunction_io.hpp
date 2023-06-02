@@ -18,6 +18,24 @@
 
 namespace macis {
 
+/**
+ *  @brief Read an ASCII CI wavefunction file 
+ *
+ *  Format:
+ *
+ *    <NSTATE> <NORB> <NALPHA> <NBETA>
+ *    <COEFF_1> <STR_1>
+ *    <COEFF_2> <STR_2>
+ *    ...
+ *    <COEFF_NSTATE> <STR_NSTATE>
+ *    [EOF]
+ *  
+ *  @tparam N Bitset width of the determinant bitstring
+ *
+ *  @param[in] fname Name of file to read
+ *  @param[out] states The determinants of the wave function
+ *  @param[out] coeffs The coefficients of the wave function
+ */ 
 template <size_t N>
 void read_wavefunction( std::string fname, std::vector<std::bitset<N>>& states,
   std::vector<double>& coeffs) {
@@ -56,6 +74,25 @@ void read_wavefunction( std::string fname, std::vector<std::bitset<N>>& states,
 
 }
 
+/**
+ *  @brief Write an ASCII CI wavefunction file 
+ *
+ *  Format:
+ *
+ *    <NSTATE> <NORB> <NALPHA> <NBETA>
+ *    <COEFF_1> <STR_1>
+ *    <COEFF_2> <STR_2>
+ *    ...
+ *    <COEFF_NSTATE> <STR_NSTATE>
+ *    [EOF]
+ *  
+ *  @tparam N Bitset width of the determinant bitstring
+ *
+ *  @param[in] fname Name of file to read
+ *  @param[in] norb  Number of orbitals
+ *  @param[in] states The determinants of the wave function
+ *  @param[in] coeffs The coefficients of the wave function
+ */ 
 template <size_t N>
 void write_wavefunction( std::string fname, size_t norb, const std::vector<std::bitset<N>>& states,
   const std::vector<double>& coeffs) {

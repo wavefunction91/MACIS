@@ -11,7 +11,7 @@
 #include <macis/util/orbital_gradient.hpp>
 #include <macis/util/fock_matrices.hpp>
 #include <macis/util/transform.hpp>
-#include <macis/fcidump.hpp>
+#include <macis/util/fcidump.hpp>
 
 #include <macis/util/orbital_rotation_utilities.hpp>
 #include <macis/util/orbital_hessian.hpp>

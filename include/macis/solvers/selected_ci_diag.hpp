@@ -10,7 +10,7 @@
 #include <macis/types.hpp>
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/csr_hamiltonian.hpp>
-#include <macis/davidson.hpp>
+#include <macis/solvers/davidson.hpp>
 #include <macis/util/mpi.hpp>
 #include <sparsexx/matrix_types/dense_conversions.hpp>
 #include <chrono>

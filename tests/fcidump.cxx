@@ -7,7 +7,7 @@
  */
 
 #include "ut_common.hpp"
-#include <macis/fcidump.hpp>
+#include <macis/util/fcidump.hpp>
 #include <macis/util/orbital_energies.hpp>
 #include <iostream>
 #include <iomanip>

@@ -7,7 +7,8 @@
  */
 
 #include "ut_common.hpp"
-#include <macis/fcidump.hpp>
+#include <macis/util/fcidump.hpp>
+#include <macis/util/detail/rdm_files.hpp>
 #include <macis/util/fock_matrices.hpp>
 #include <iomanip>
 
