@@ -6,81 +6,74 @@
  * See LICENSE.txt for details
  */
 
-#include <sparsexx/matrix_types/csr_matrix.hpp>
-#include <sparsexx/wrappers/mkl_sparse_matrix.hpp>
-#include <sparsexx/matrix_types/type_traits.hpp>
-#include <sparsexx/matrix_types/dense_conversions.hpp>
-#include <sparsexx/spblas/spmbv.hpp>
-#include <sparsexx/io/read_rb.hpp>
+#include <algorithm>
+#include <chrono>
+#include <iomanip>
+#include <iostream>
+#include <random>
 #include <sparsexx/io/read_mm.hpp>
-
+#include <sparsexx/io/read_rb.hpp>
+#include <sparsexx/matrix_types/csr_matrix.hpp>
+#include <sparsexx/matrix_types/dense_conversions.hpp>
+#include <sparsexx/matrix_types/type_traits.hpp>
+#include <sparsexx/spblas/spmbv.hpp>
 #include <sparsexx/wrappers/mkl_dss_solver.hpp>
+#include <sparsexx/wrappers/mkl_sparse_matrix.hpp>
 
 #include "mkl.h"
 
-#include <iostream>
-#include <iomanip>
-#include <random>
-#include <algorithm>
-#include <chrono>
-
-std::string get_mkl_error_string( sparse_status_t s ) {
-
-  switch( s ) {
+std::string get_mkl_error_string(sparse_status_t s) {
+  switch(s) {
     case SPARSE_STATUS_SUCCESS:
-    return "The operation was successful.";
-    
+      return "The operation was successful.";
+
     case SPARSE_STATUS_NOT_INITIALIZED:
-    return "The routine encountered an empty handle or matrix array.";
-    
+      return "The routine encountered an empty handle or matrix array.";
+
     case SPARSE_STATUS_ALLOC_FAILED:
-    return "Internal memory allocation failed.";
-    
+      return "Internal memory allocation failed.";
+
     case SPARSE_STATUS_INVALID_VALUE:
-    return "The input parameters contain an invalid value.";
-    
+      return "The input parameters contain an invalid value.";
+
     case SPARSE_STATUS_EXECUTION_FAILED:
-    return "Execution failed.";
-    
+      return "Execution failed.";
+
     case SPARSE_STATUS_INTERNAL_ERROR:
-    return "An error in algorithm implementation occurred.";
-    
+      return "An error in algorithm implementation occurred.";
+
     case SPARSE_STATUS_NOT_SUPPORTED:
-    return "NOT SUPPORTED";
+      return "NOT SUPPORTED";
 
     default:
-    return "UNKNOWN";
+      return "UNKNOWN";
   }
 }
 
 template <typename T>
-void comma_sep( std::ostream& out, const T& v) {
-  out << v ;
+void comma_sep(std::ostream& out, const T& v) {
+  out << v;
 }
 
 template <typename T, typename... Args>
-void comma_sep( std::ostream& out, const T& v, Args&&... args ) {
+void comma_sep(std::ostream& out, const T& v, Args&&... args) {
   out << v << ", ";
-  comma_sep( out, std::forward<Args>(args)... );
+  comma_sep(out, std::forward<Args>(args)...);
 }
 
-
 template <typename T>
-MKL_INT cholqr( MKL_INT N, MKL_INT K, T* V, MKL_INT LDV, T* R, MKL_INT LDR ) {
-
+MKL_INT cholqr(MKL_INT N, MKL_INT K, T* V, MKL_INT LDV, T* R, MKL_INT LDR) {
   T one = 1., zero = 0.;
   MKL_INT info;
-  dgemm( "T", "N", &K, &K, &N, &one, V, &LDV, V, &LDV, &zero, R, &LDR );
-  dpotrf( "U", &K, R, &LDR, &info );
-  if( info ) throw std::runtime_error("DEAD");
+  dgemm("T", "N", &K, &K, &N, &one, V, &LDV, V, &LDV, &zero, R, &LDR);
+  dpotrf("U", &K, R, &LDR, &info);
+  if(info) throw std::runtime_error("DEAD");
 
-  dtrsm( "R", "U", "N", "N", &N, &K, &one, R, &LDR, V, &LDV );
+  dtrsm("R", "U", "N", "N", &N, &K, &one, R, &LDR, V, &LDV);
   return info;
 }
 
-
-int main( int argc, char** argv ) {
-
+int main(int argc, char** argv) {
 #if 0
   const int N = 10000000;
   int K = 10;
@@ -110,69 +103,75 @@ int main( int argc, char** argv ) {
   cnt += 2;
   assert( cnt ==  A.nnz() );
 #else
-  assert( argc == 2 );
-  auto A = sparsexx::read_mm<double,sparsexx::detail::mkl::int_type>( std::string( argv[1] ) );
-  sparsexx::mkl_csr_matrix<double, int32_t> A_mkl( A.m(), A.n(), A.nnz(), A.indexing() );
+  assert(argc == 2);
+  auto A = sparsexx::read_mm<double, sparsexx::detail::mkl::int_type>(
+      std::string(argv[1]));
+  sparsexx::mkl_csr_matrix<double, int32_t> A_mkl(A.m(), A.n(), A.nnz(),
+                                                  A.indexing());
 
   const int N = A.m();
   const int K = 10;
 #endif
 
-  //std::vector<double> A_dense(N*N);
-  //sparsexx::convert_to_dense( A, A_dense.data(), N );
+  // std::vector<double> A_dense(N*N);
+  // sparsexx::convert_to_dense( A, A_dense.data(), N );
 
   sparsexx::spsolve::bunch_kaufman<decltype(A)> bk_solver(
-    sparsexx::spsolve::create_mkl_bunch_kaufman_solver<decltype(A)>(A)
-  );
+      sparsexx::spsolve::create_mkl_bunch_kaufman_solver<decltype(A)>(A));
 
-  comma_sep( std::cout, A.m(), A.n(), A.nnz() ); std::cout << std::endl;
-  comma_sep( std::cout, A_mkl.m(), A_mkl.n(), A_mkl.nnz() ); std::cout << std::endl;
+  comma_sep(std::cout, A.m(), A.n(), A.nnz());
+  std::cout << std::endl;
+  comma_sep(std::cout, A_mkl.m(), A_mkl.n(), A_mkl.nnz());
+  std::cout << std::endl;
 
-  std::copy( A.rowptr().begin(), A.rowptr().end(), A_mkl.rowptr().begin() );
-  std::copy( A.colind().begin(), A.colind().end(), A_mkl.colind().begin() );
-  std::copy( A.nzval().begin(), A.nzval().end(), A_mkl.nzval().begin() );
+  std::copy(A.rowptr().begin(), A.rowptr().end(), A_mkl.rowptr().begin());
+  std::copy(A.colind().begin(), A.colind().end(), A_mkl.colind().begin());
+  std::copy(A.nzval().begin(), A.nzval().end(), A_mkl.nzval().begin());
 
   std::default_random_engine gen;
   std::normal_distribution<> dist(0., 1.);
-  auto rand_gen = [&](){ return dist(gen); };
+  auto rand_gen = [&]() { return dist(gen); };
 
-  std::vector<double> V( N * K ), AV( V.size() ), R(K*K);
-  std::generate( V.begin(), V.end(), rand_gen );
+  std::vector<double> V(N * K), AV(V.size()), R(K * K);
+  std::generate(V.begin(), V.end(), rand_gen);
 
-  //A_mkl.optimize();
+  // A_mkl.optimize();
 
   // Power iteration
   auto power_st = std::chrono::high_resolution_clock::now();
-  for( int i = 0; i < 1000; ++i ) {
-    if( i % 100 == 0 ) std::cout << "x " << std::flush;
-    cholqr( N, K, V.data(), N, R.data(), K );
-    sparsexx::spblas::gespmbv( K, 1., A_mkl, V.data(), N, 0., AV.data(), N );
-    std::copy( AV.begin(), AV.end(), V.begin() );
+  for(int i = 0; i < 1000; ++i) {
+    if(i % 100 == 0) std::cout << "x " << std::flush;
+    cholqr(N, K, V.data(), N, R.data(), K);
+    sparsexx::spblas::gespmbv(K, 1., A_mkl, V.data(), N, 0., AV.data(), N);
+    std::copy(AV.begin(), AV.end(), V.begin());
   }
   std::cout << std::endl;
-  cholqr( N, K, V.data(), N, R.data(), K );
+  cholqr(N, K, V.data(), N, R.data(), K);
   auto power_en = std::chrono::high_resolution_clock::now();
 
-  std::cout << "POWER DUR = " << std::chrono::duration<double,std::milli>( power_en - power_st ).count() << std::endl;
+  std::cout
+      << "POWER DUR = "
+      << std::chrono::duration<double, std::milli>(power_en - power_st).count()
+      << std::endl;
 
   // Rayleigh-Ritz
-  sparsexx::spblas::gespmbv( K, 1., A, V.data(), N, 0., AV.data(), N );
+  sparsexx::spblas::gespmbv(K, 1., A, V.data(), N, 0., AV.data(), N);
 
   double one = 1., zero = 0.;
-  dgemm( "T", "N", &K, &K, &N, &one, V.data(), &N, AV.data(), &N, &zero, R.data(), &K );
+  dgemm("T", "N", &K, &K, &N, &one, V.data(), &N, AV.data(), &N, &zero,
+        R.data(), &K);
 
   int LWORK = -1;
   double dummy = 1;
   std::vector<double> W(K);
   int info;
-  dsyev( "V", "L", &K, R.data(), &K, W.data(), &dummy, &LWORK, &info );
+  dsyev("V", "L", &K, R.data(), &K, W.data(), &dummy, &LWORK, &info);
   LWORK = dummy;
   std::vector<double> WORK(LWORK);
-  dsyev( "V", "L", &K, R.data(), &K, W.data(), WORK.data(), &LWORK, &info );
+  dsyev("V", "L", &K, R.data(), &K, W.data(), WORK.data(), &LWORK, &info);
 
   std::cout << std::scientific << std::setprecision(10);
-  for( auto w : W ) std::cout << w << std::endl;
+  for(auto w : W) std::cout << w << std::endl;
 
   return 0;
-
 }

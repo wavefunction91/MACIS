@@ -6,25 +6,25 @@
  * See LICENSE.txt for details
  */
 
-#include "ut_common.hpp"
 #include <macis/util/dist_quickselect.hpp>
 
-TEMPLATE_TEST_CASE("Distributed Quickselect", "[mpi]", 
-  std::less<int>, std::greater<int> ) {
+#include "ut_common.hpp"
 
+TEMPLATE_TEST_CASE("Distributed Quickselect", "[mpi]", std::less<int>,
+                   std::greater<int>) {
   MPI_Barrier(MPI_COMM_WORLD);
 
   // MPI Info
   const auto world_size = macis::comm_size(MPI_COMM_WORLD);
   const auto world_rank = macis::comm_rank(MPI_COMM_WORLD);
-  
+
   std::vector<int> local_data;
   switch(world_rank) {
     case 0:
-      local_data = {0,1,3,5,5,5,7};
+      local_data = {0, 1, 3, 5, 5, 5, 7};
       break;
     case 1:
-      local_data = {17,0,0,16,700};
+      local_data = {17, 0, 0, 16, 700};
       break;
     case 2:
       local_data = {2};
@@ -42,15 +42,14 @@ TEMPLATE_TEST_CASE("Distributed Quickselect", "[mpi]",
   // Gather Global Data
   std::vector<int> local_sizes, displ;
   int local_n = local_data.size();
-  size_t total_n = 
-    macis::total_gather_and_exclusive_scan( local_n, local_sizes, displ, 
-      MPI_COMM_WORLD );
+  size_t total_n = macis::total_gather_and_exclusive_scan(
+      local_n, local_sizes, displ, MPI_COMM_WORLD);
 
   std::vector<int> global_data(total_n);
   auto mpi_dtype = macis::mpi_traits<int>::datatype();
-  MPI_Allgatherv( local_data.data(), local_data.size(), mpi_dtype, 
-    global_data.data(), local_sizes.data(), displ.data(), mpi_dtype, 
-    MPI_COMM_WORLD ); 
+  MPI_Allgatherv(local_data.data(), local_data.size(), mpi_dtype,
+                 global_data.data(), local_sizes.data(), displ.data(),
+                 mpi_dtype, MPI_COMM_WORLD);
 
   // Sort global data
   std::sort(global_data.begin(), global_data.end(), comp);
@@ -58,15 +57,12 @@ TEMPLATE_TEST_CASE("Distributed Quickselect", "[mpi]",
   // Check all possible kth elements
   for(int k = 0; k < total_n; ++k) {
     std::vector<int> data_copy = local_data;
-    auto kth_element = 
-      macis::dist_quickselect( data_copy.begin(), data_copy.end(), k+1, 
-        MPI_COMM_WORLD, comp, std::equal_to<int>{}) ;
-    REQUIRE( global_data[k] == kth_element );
+    auto kth_element =
+        macis::dist_quickselect(data_copy.begin(), data_copy.end(), k + 1,
+                                MPI_COMM_WORLD, comp, std::equal_to<int>{});
+    REQUIRE(global_data[k] == kth_element);
     MPI_Barrier(MPI_COMM_WORLD);
   }
-  
-  
 
   MPI_Barrier(MPI_COMM_WORLD);
 }
-

@@ -1,0 +1,25 @@
+name: Run clang-format
+
+on: [push]
+
+jobs:
+  linter:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: List Contents
+      shell: bash
+      run: ls -lhta ${{ github.workspace }} && git -C ${{ github.workspace }} rev-parse HEAD
+    - uses: DoozyX/clang-format-lint-action@v0.16
+      with:
+        source: 'include src tests'
+        extensions: 'hpp,cxx,hpp.in,h,c'
+        clangFormatVersion: 15
+        inplace: True
+    - uses: EndBug/add-and-commit@v4
+      with:
+        author_name: Clang Robot
+        author_email: robot@example.com
+        message: 'Committing clang-format changes'
+      env:
+        GITHUB_TOKEN: ${{ github.token }}

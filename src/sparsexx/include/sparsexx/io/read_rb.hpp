@@ -8,100 +8,86 @@
 
 #pragma once
 
+#include <cassert>
+#include <fstream>
 #include <sparsexx/matrix_types/type_traits.hpp>
 #include <sparsexx/util/string.hpp>
-#include <fstream>
-#include <cassert>
 #include <string>
-
 
 namespace sparsexx {
 
-
 template <typename T, typename index_t, typename Alloc>
-csc_matrix<T,index_t,Alloc> read_rb_as_csc( std::string fname ) {
-
+csc_matrix<T, index_t, Alloc> read_rb_as_csc(std::string fname) {
   std::ifstream f_in(fname);
 
   std::string line;
 
   // Skip the first two lines
-  std::getline( f_in, line ); // comments
-  std::getline( f_in, line ); // some strange metadata
+  std::getline(f_in, line);  // comments
+  std::getline(f_in, line);  // some strange metadata
 
   // Get useful meta data
   int64_t m, n, nnz;
-  //bool is_sym;
+  // bool is_sym;
   {
-    std::getline( f_in, line );
-    auto tokens = tokenize( line );
-    assert( tokens.size() == 5 );
+    std::getline(f_in, line);
+    auto tokens = tokenize(line);
+    assert(tokens.size() == 5);
 
     auto type = tokens[0];
-    m   = std::stoll( tokens[1] );
-    n   = std::stoll( tokens[2] );
-    nnz = std::stoll( tokens[3] );
+    m = std::stoll(tokens[1]);
+    n = std::stoll(tokens[2]);
+    nnz = std::stoll(tokens[3]);
     // Whats the last one for??
 
-    //is_sym = type[1] == 's' or type[1] == 'S';
-    assert( nnz <= m*n );
+    // is_sym = type[1] == 's' or type[1] == 'S';
+    assert(nnz <= m * n);
   }
 
   // Skip format line
-  std::getline( f_in, line );
+  std::getline(f_in, line);
 
-  csc_matrix<T,index_t,Alloc> A( m, n, nnz );
+  csc_matrix<T, index_t, Alloc> A(m, n, nnz);
 
   int64_t curcount = 0;
-  while( std::getline( f_in, line ) ) {
+  while(std::getline(f_in, line)) {
+    auto tokens = tokenize(line);
+    for(const auto& t : tokens) A.colptr()[curcount++] = std::stoi(t);
 
-    auto tokens = tokenize( line );
-    for( const auto& t : tokens )
-      A.colptr()[curcount++] = std::stoi(t);
-
-    if( curcount == (n+1) ) break;
-
+    if(curcount == (n + 1)) break;
   }
 
   curcount = 0;
-  while( std::getline( f_in, line ) ) {
+  while(std::getline(f_in, line)) {
+    auto tokens = tokenize(line);
+    for(const auto& t : tokens) A.rowind()[curcount++] = std::stoi(t);
 
-    auto tokens = tokenize( line );
-    for( const auto& t : tokens )
-      A.rowind()[curcount++] = std::stoi(t);
-
-    if( curcount == nnz ) break;
-
+    if(curcount == nnz) break;
   }
 
   curcount = 0;
-  while( std::getline( f_in, line ) ) {
+  while(std::getline(f_in, line)) {
+    auto tokens = tokenize(line);
+    for(const auto& t : tokens) A.nzval()[curcount++] = std::stod(t);
 
-    auto tokens = tokenize( line );
-    for( const auto& t : tokens )
-      A.nzval()[curcount++] = std::stod(t);
-
-    if( curcount == nnz ) break;
-
+    if(curcount == nnz) break;
   }
 
-  assert( !std::getline(f_in,line) );
+  assert(!std::getline(f_in, line));
   return A;
-
 }
 
 template <typename SpMatType>
-SpMatType read_rb( std::string fname ) {
-
+SpMatType read_rb(std::string fname) {
   using value_t = detail::value_type_t<SpMatType>;
   using index_t = detail::index_type_t<SpMatType>;
   using allocator_t = detail::allocator_type_t<SpMatType>;
 
-  if constexpr ( detail::is_csc_matrix_v<SpMatType> )
-    return read_rb_as_csc<value_t,index_t,allocator_t>( fname );
+  if constexpr(detail::is_csc_matrix_v<SpMatType>)
+    return read_rb_as_csc<value_t, index_t, allocator_t>(fname);
   else
-    return SpMatType( read_rb_as_csc<value_t,index_t,allocator_t>( fname ) );
+    return SpMatType(read_rb_as_csc<value_t, index_t, allocator_t>(fname));
   abort();
 }
 
-}
+}  // namespace sparsexx
