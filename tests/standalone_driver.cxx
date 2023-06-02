@@ -17,8 +17,8 @@
 #include <iostream>
 #include <macis/asci/grow.hpp>
 #include <macis/asci/refine.hpp>
-#include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/gf/gf.hpp>
+#include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/util/cas.hpp>
 #include <macis/util/detail/rdm_files.hpp>
 #include <macis/util/fcidump.hpp>
@@ -304,71 +304,70 @@ int main(int argc, char** argv) {
           }
         }
 
+        // Testing GF
+        bool testGF = false;
+        OPT_KEYWORD("CI.GF", testGF, bool);
+        if(testGF) {
+          // Generate determinant list
+          auto dets = macis::generate_hilbert_space<generator_t::nbits>(
+              n_active, nalpha, nbeta);
+          // Generate the Hamiltonian Generator
+          generator_t ham_gen(
+              macis::matrix_span<double>(T_active.data(), n_active, n_active),
+              macis::rank4_span<double>(V_active.data(), n_active, n_active,
+                                        n_active, n_active));
 
-      // Testing GF
-      bool testGF = false;
-      OPT_KEYWORD("CI.GF", testGF, bool);
-      if( testGF )
-      {
-	// Generate determinant list
-        auto dets = macis::generate_hilbert_space<generator_t::nbits>(n_active, nalpha, nbeta);
-        // Generate the Hamiltonian Generator
-        generator_t ham_gen( 
-          macis::matrix_span<double>(T_active.data(),n_active,n_active),
-          macis::rank4_span<double>(V_active.data(),n_active,n_active,n_active,
-            n_active)
-        );
+          // Generate frequency grid
+          double wmin = -8.;
+          double wmax = 8.;
+          size_t nws = 1001;
+          double eta = 0.1;
+          std::complex<double> w0(wmin, eta);
+          std::complex<double> wf(wmax, eta);
+          std::vector<std::complex<double>> ws(nws,
+                                               std::complex<double>(0., 0.));
+          for(int i = 0; i < nws; i++)
+            ws[i] = w0 + (wf - w0) / double(nws - 1) * double(i);
 
-        // Generate frequency grid
-	double wmin = -8.;
-	double wmax =  8.;
-	size_t nws  = 1001;
-	double eta  = 0.1;
-	std::complex<double> w0( wmin, eta );
-	std::complex<double> wf( wmax, eta );
-	std::vector<std::complex<double> > ws( nws, std::complex<double>(0.,0.) );
-	for( int i = 0; i < nws; i++ )
-	  ws[i] = w0 + (wf - w0) / double(nws - 1) * double(i); 
+          // MCSCF Settings
+          macis::GFSettings gf_settings;
+          OPT_KEYWORD("GF.NORBS", gf_settings.norbs, size_t);
+          OPT_KEYWORD("GF.TRUNC_SIZE", gf_settings.trunc_size, size_t);
+          OPT_KEYWORD("GF.TOT_SD", gf_settings.tot_SD, int);
+          OPT_KEYWORD("GF.GFSEEDTHRES", gf_settings.GFseedThres, double);
+          OPT_KEYWORD("GF.ASTHRES", gf_settings.asThres, double);
+          OPT_KEYWORD("GF.USE_BANDLAN", gf_settings.use_bandLan, bool);
+          OPT_KEYWORD("GF.NLANITS", gf_settings.nLanIts, int);
+          OPT_KEYWORD("GF.WRITE", gf_settings.writeGF, bool);
+          OPT_KEYWORD("GF.PRINT", gf_settings.print, bool);
+          OPT_KEYWORD("GF.SAVEGFMATS", gf_settings.saveGFmats, bool);
+          gf_settings.GF_orbs_basis = std::vector<int>(n_active, 0);
+          for(int i = 0; i < n_active; i++) gf_settings.GF_orbs_basis[i] = i;
+          gf_settings.GF_orbs_comp = std::vector<int>(2, 0);
+          for(int i = 0; i < 2; i++) gf_settings.GF_orbs_comp[i] = i;
+          gf_settings.is_up_basis = std::vector<bool>(n_active, true);
+          gf_settings.is_up_comp = std::vector<bool>(2, true);
 
-       // MCSCF Settings
-       macis::GFSettings gf_settings;
-       OPT_KEYWORD("GF.NORBS"      , gf_settings.norbs,       size_t);
-       OPT_KEYWORD("GF.TRUNC_SIZE" , gf_settings.trunc_size,  size_t);
-       OPT_KEYWORD("GF.TOT_SD"     , gf_settings.tot_SD,      int);
-       OPT_KEYWORD("GF.GFSEEDTHRES", gf_settings.GFseedThres, double  );
-       OPT_KEYWORD("GF.ASTHRES"    , gf_settings.asThres,     double);
-       OPT_KEYWORD("GF.USE_BANDLAN", gf_settings.use_bandLan, bool);
-       OPT_KEYWORD("GF.NLANITS"    , gf_settings.nLanIts,     int);
-       OPT_KEYWORD("GF.WRITE"      , gf_settings.writeGF,     bool);
-       OPT_KEYWORD("GF.PRINT"      , gf_settings.print,       bool);
-       OPT_KEYWORD("GF.SAVEGFMATS" , gf_settings.saveGFmats,  bool);
-       gf_settings.GF_orbs_basis = std::vector<int>(n_active,0);
-       for( int i = 0; i < n_active; i++ )
-	 gf_settings.GF_orbs_basis[i] = i;
-       gf_settings.GF_orbs_comp  = std::vector<int>(2,0);
-       for( int i = 0; i < 2; i++ )
-	 gf_settings.GF_orbs_comp[i] = i;
-       gf_settings.is_up_basis   = std::vector<bool>(n_active, true);
-       gf_settings.is_up_comp    = std::vector<bool>(2, true);
+          // GF vector
+          std::vector<std::vector<std::vector<std::complex<double>>>> GF(
+              1, std::vector<std::vector<std::complex<double>>>(
+                     1, std::vector<std::complex<double>>(
+                            nws, std::complex<double>(0., 0.))));
 
-       // GF vector
-       std::vector<std::vector<std::vector<std::complex<double> > > > GF( 1, std::vector<std::vector<std::complex<double> > >(1, std::vector<std::complex<double> >(nws, std::complex<double>(0.,0.) ) ) );
+          // Occupation numbers
+          std::vector<double> occs(n_active, 1.);
 
-       // Occupation numbers
-       std::vector<double> occs( n_active, 1. );
+          // GS vector
+          Eigen::VectorXd psi0 = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(
+              C_local.data(), C_local.size());
 
-       // GS vector
-       Eigen::VectorXd psi0  = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>( C_local.data(), C_local.size() );
-
-       // Evaluate particle GF
-       macis::RunGFCalc<nwfn_bits>( GF, psi0, ham_gen, dets, E0, true, ws, occs, gf_settings );
-       // Evaluate hole GF
-       macis::RunGFCalc<nwfn_bits>( GF, psi0, ham_gen, dets, E0, false, ws, occs, gf_settings );
-      }
-
-
-
-
+          // Evaluate particle GF
+          macis::RunGFCalc<nwfn_bits>(GF, psi0, ham_gen, dets, E0, true, ws,
+                                      occs, gf_settings);
+          // Evaluate hole GF
+          macis::RunGFCalc<nwfn_bits>(GF, psi0, ham_gen, dets, E0, false, ws,
+                                      occs, gf_settings);
+        }
 
       } else {
         // Generate the Hamiltonian Generator

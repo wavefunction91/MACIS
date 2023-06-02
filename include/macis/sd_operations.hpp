@@ -199,21 +199,20 @@ void generate_singles_doubles(size_t norb, std::bitset<N> state,
   append_doubles(state, occ_orbs, vir_orbs, doubles);
 }
 
-
-
 /**
- * @brief Generates single excitations for a given spin involving only the orbitals
- *        defined in the active space as_orbs.
+ * @brief Generates single excitations for a given spin involving only the
+ * orbitals defined in the active space as_orbs.
  *
  * TODO: Test this function
  *
  * @param[in] size_t norb: Nr. of orbitals in the system.
- * @param[in] std::bitset<N>state : Half Slater determinant for which to compute the excitations,
- *            includes only one of the spin species.
+ * @param[in] std::bitset<N>state : Half Slater determinant for which to compute
+ * the excitations, includes only one of the spin species.
  * @param[out] std::vector<std::bitset<N> >& singles: Vector storing the singly
  *             excited determinants from state, considering the active space.
- * @param[in] const std::vector<uint32_t> as_orbs: Vector with the indices of the active
- *            orbitals. Only excitations involving these orbitals will be formed.
+ * @param[in] const std::vector<uint32_t> as_orbs: Vector with the indices of
+ * the active orbitals. Only excitations involving these orbitals will be
+ * formed.
  *
  * @author Carlos Mejuto Zaera
  * @date 28/01/2022
@@ -230,20 +229,21 @@ void generate_singles_as(size_t norb, std::bitset<N> state,
 }
 
 /**
- * @brief Generates single and double excitations for a given spin involving only the orbitals
- *        defined in the active space as_orbs.
+ * @brief Generates single and double excitations for a given spin involving
+ * only the orbitals defined in the active space as_orbs.
  *
  * TODO: Test this function
  *
  * @param[in] size_t norb: Nr. of orbitals in the system.
- * @param[in] std::bitset<N>state : Half Slater determinant for which to compute the excitations,
- *            includes only one of the spin species.
+ * @param[in] std::bitset<N>state : Half Slater determinant for which to compute
+ * the excitations, includes only one of the spin species.
  * @param[out] std::vector<std::bitset<N> >& singles: Vector storing the singly
  *             excited determinants from state, considering the active space.
  * @param[out] std::vector<std::bitset<N> >& doubles: Vector storing the doubly
  *             excited determinants from state, considering the active space.
- * @param[in] const std::vector<uint32_t> as_orbs: Vector with the indices of the active
- *            orbitals. Only excitations involving these orbitals will be formed.
+ * @param[in] const std::vector<uint32_t> as_orbs: Vector with the indices of
+ * the active orbitals. Only excitations involving these orbitals will be
+ * formed.
  *
  * @author Carlos Mejuto Zaera
  * @date 28/01/2022
@@ -263,17 +263,19 @@ void generate_singles_doubles_as(size_t norb, std::bitset<N> state,
 }
 
 /**
- * @brief Generates single excitations for both spins involving only the orbitals
- *        defined in the active space as_orbs.
+ * @brief Generates single excitations for both spins involving only the
+ * orbitals defined in the active space as_orbs.
  *
  * TODO: Test this function
  *
  * @param[in] size_t norb: Nr. of orbitals in the system.
- * @param[in] std::bitset<N>state : Slater determinant for which to compute the excitations.
+ * @param[in] std::bitset<N>state : Slater determinant for which to compute the
+ * excitations.
  * @param[out] std::vector<std::bitset<N> >& singles: Vector storing the singly
  *             excited determinants from state, considering the active space.
- * @param[in] const std::vector<uint32_t> as_orbs: Vector with the indices of the active
- *            orbitals. Only excitations involving these orbitals will be formed.
+ * @param[in] const std::vector<uint32_t> as_orbs: Vector with the indices of
+ * the active orbitals. Only excitations involving these orbitals will be
+ * formed.
  *
  * @author Carlos Mejuto Zaera
  * @date 28/01/2022
@@ -313,20 +315,21 @@ void generate_singles_spin_as(size_t norb, std::bitset<N> state,
 }
 
 /**
- * @brief Generates single and double excitations for both spins involving only the orbitals
- *        defined in the active space as_orbs.
+ * @brief Generates single and double excitations for both spins involving only
+ * the orbitals defined in the active space as_orbs.
  *
  * TODO: Test this function
  *
  * @param[in] size_t norb: Nr. of orbitals in the system.
- * @param[in] std::bitset<N>state : Half Slater determinant for which to compute the excitations,
- *            includes only one of the spin species.
+ * @param[in] std::bitset<N>state : Half Slater determinant for which to compute
+ * the excitations, includes only one of the spin species.
  * @param[out] std::vector<std::bitset<N> >& singles: Vector storing the singly
  *             excited determinants from state, considering the active space.
  * @param[out] std::vector<std::bitset<N> >& doubles: Vector storing the doubly
  *             excited determinants from state, considering the active space.
- * @param[in] const std::vector<uint32_t> as_orbs: Vector with the indices of the active
- *            orbitals. Only excitations involving these orbitals will be formed.
+ * @param[in] const std::vector<uint32_t> as_orbs: Vector with the indices of
+ * the active orbitals. Only excitations involving these orbitals will be
+ * formed.
  *
  * @author Carlos Mejuto Zaera
  * @date 28/01/2022
