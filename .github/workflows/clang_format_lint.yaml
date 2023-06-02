@@ -11,7 +11,8 @@ jobs:
       with:
         source: 'include src tests'
         extensions: 'hpp,cxx,hpp.in,h,c'
-        clangFormatVersion: 12
+        clangFormatVersion: 16
+        style: file:$GITHUB_WORKSPACE/.clang-format
         inplace: True
     - uses: EndBug/add-and-commit@v4
       with:
