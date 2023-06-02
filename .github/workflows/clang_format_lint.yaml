@@ -1,0 +1,22 @@
+name: Run clang-format
+
+on: [push]
+
+jobs:
+  linter:
+    runs-run: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: DoozyX/clang-format-lint-action@v0.12
+      with:
+        source: 'include src tests'
+        extensions: 'hpp,cxx,hpp.in,h,c'
+        clangFormatVersion: 12
+        inplace: True
+    - uses: EndBug/add-and-commit@v4
+      with:
+        author_name: Clang Robot
+        author_email: robot@example.com
+        message: 'Committing clang-format changes'
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
