@@ -1,3 +1,9 @@
+# MACIS Copyright (c) 2023, The Regents of the University of California,
+# through Lawrence Berkeley National Laboratory (subject to receipt of
+# any required approvals from the U.S. Dept. of Energy). All rights reserved.
+#
+# See LICENSE.txt for details
+
 if( "ilp64" IN_LIST IBMESSL_FIND_COMPONENTS AND "lp64" IN_LIST IBMESSL_FIND_COMPONENTS )
   message( FATAL_ERROR "IBMESSL cannot link to both ILP64 and LP64 iterfaces" )
 endif()

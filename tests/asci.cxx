@@ -1,15 +1,23 @@
+/*
+ * MACIS Copyright (c) 2023, The Regents of the University of California,
+ * through Lawrence Berkeley National Laboratory (subject to receipt of
+ * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ *
+ * See LICENSE.txt for details
+ */
+
 #include "ut_common.hpp"
-#include <asci/types.hpp>
-#include <asci/bitset_operations.hpp>
-#include <asci/sd_operations.hpp>
-#include <asci/util/asci_contributions.hpp>
+#include <macis/types.hpp>
+#include <macis/bitset_operations.hpp>
+#include <macis/sd_operations.hpp>
+#include <macis/asci/determinant_contributions.hpp>
 #include <iostream>
 
 template <size_t NRadix, size_t NBits>
 std::array<unsigned, NRadix> top_set_indices( std::bitset<NBits> word ) {
   std::array<unsigned, NRadix> top_set_indices;
   for(size_t i = 0; i < NRadix; ++i) {
-    auto r = asci::fls(word);
+    auto r = macis::fls(word);
     top_set_indices[i] = r;
     word.flip(r);
   }
@@ -27,31 +35,27 @@ size_t top_set_ordinal( std::bitset<NBits> word, size_t NSet ) {
   return ord;
 }
 
-namespace asci {
-
-
-}
 
 TEST_CASE("Triplets") {
 
   constexpr size_t num_bits = 64;
   size_t norb = 32;
 
-  using wfn_less_comparator = asci::bitset_less_comparator<num_bits>;
+  using wfn_less_comparator = macis::bitset_less_comparator<num_bits>;
 
   // Generate ficticious wfns
-  std::vector<asci::wfn_t<num_bits>> wfn_a = {
+  std::vector<macis::wfn_t<num_bits>> wfn_a = {
     15//, 30, 15, 29
   }; 
 
-  std::vector<asci::wfn_t<num_bits>> wfn_b = {
+  std::vector<macis::wfn_t<num_bits>> wfn_b = {
     15//, 15, 30, 15
   }; 
 
   const size_t ndet = wfn_a.size();
 
   // Combine the alpha/beta strings
-  std::vector<asci::wfn_t<num_bits>> wfns(ndet);
+  std::vector<macis::wfn_t<num_bits>> wfns(ndet);
   for(int i = 0; i < ndet; ++i) {
     wfns[i] = (wfn_a[i] << num_bits/2) | wfn_b[i];
   }
@@ -60,7 +64,7 @@ TEST_CASE("Triplets") {
   std::sort( wfns.begin(), wfns.end(), wfn_less_comparator{} );
 
   // Extract unique alphas
-  std::vector<asci::wfn_t<num_bits>> wfn_a_uniq(wfns);
+  std::vector<macis::wfn_t<num_bits>> wfn_a_uniq(wfns);
   {
     // Extract alpha strings
     std::transform( wfn_a_uniq.begin(), wfn_a_uniq.end(), wfn_a_uniq.begin(),
@@ -102,8 +106,8 @@ TEST_CASE("Triplets") {
       (n_singles * (n_singles - nocc - nvir + 1))/4;
 
     // Generate singles and doubles
-    std::vector<asci::wfn_t<num_bits>> s_a, d_a;
-    asci::generate_singles_doubles( norb, wfn_a_uniq[i], s_a, d_a );
+    std::vector<macis::wfn_t<num_bits>> s_a, d_a;
+    macis::generate_singles_doubles( norb, wfn_a_uniq[i], s_a, d_a );
 
     // Histogram contribution from root determinant
     {
@@ -155,13 +159,13 @@ TEST_CASE("Triplets") {
     triplets.emplace_back(i,j,k);
   }
 
-  const auto overfill = asci::full_mask<num_bits>(norb);
+  const auto overfill = macis::full_mask<num_bits>(norb);
 
   std::vector<size_t> new_triplet_hist(triplet_hist.size(), 0);
   for( auto [i,j,k] : triplets ) {
     const auto label = i*32*32 + j*32 + k;
     auto [T, B, T_min] = 
-      asci::make_triplet<num_bits>(i,j,k);
+      macis::make_triplet<num_bits>(i,j,k);
 
     for( auto det : wfn_a_uniq ) {
       const size_t nocc = det.count();
@@ -171,7 +175,7 @@ TEST_CASE("Triplets") {
         (n_singles * (n_singles - nocc - nvir + 1))/4;
 
       new_triplet_hist[label] += 
-        asci::constraint_histogram( det, n_singles, n_doubles, T, overfill, B );
+        macis::constraint_histogram( det, n_singles, n_doubles, T, overfill, B );
     }
   }
 
@@ -193,7 +197,7 @@ TEST_CASE("Triplets") {
      
   for( auto [i,j,k,l] : quads ) {
     const size_t label = i*32ul*32ul*32ul + j*32ul*32ul + k*32ul + l;
-    auto [Q, B, Q_min] = asci::make_quad<num_bits>(i,j,k,l);
+    auto [Q, B, Q_min] = macis::make_quad<num_bits>(i,j,k,l);
 
     for( auto det : wfn_a_uniq ) {
       const size_t nocc = det.count();
@@ -203,7 +207,7 @@ TEST_CASE("Triplets") {
         (n_singles * (n_singles - nocc - nvir + 1))/4;
 
       new_quad_hist[label] += 
-        asci::constraint_histogram( det, n_singles, n_doubles, Q, overfill, B );
+        macis::constraint_histogram( det, n_singles, n_doubles, Q, overfill, B );
     }
   }
 

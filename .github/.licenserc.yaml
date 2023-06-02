@@ -1,0 +1,16 @@
+header:
+  license:
+    spdx-id: BSD-3-Clause-LBNL
+    copyright-year: 2023
+    software-name: MACIS 
+
+  paths-ignore:
+    - .github/
+    - attic/
+    - tests/ref_data/
+    - LICENSE.txt
+    - src/lobpcgxx/
+    - src/sparsexx/tests/b1_ss/
+    - src/sparsexx/tests/mycielskian3/
+
+  comment: never

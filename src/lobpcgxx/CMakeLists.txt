@@ -8,19 +8,22 @@ find_package( BLAS REQUIRED )
 
 # BLAS++/LAPACK++
 set(use_openmp OFF)
-if(ASCI_ENABLE_OPENMP)
+if(MACIS_ENABLE_OPENMP)
   set(use_openmp ON)
 endif()
+
+# blaspp auto-detects cuda,hip modules and enables device backends
+set( gpu_backend "none" CACHE STRING "GPU backend to use" FORCE)
+message( WARNING "Turning off GPU Backend for BLAS++/LAPACK++")
 
 find_package(lapackpp CONFIG QUIET)
 if(NOT lapackpp_FOUND )
 include( FetchContent )
   FetchContent_Declare( blaspp
-    GIT_REPOSITORY https://bitbucket.org/icl/blaspp.git 
-    GIT_TAG 2021.04.01
+    GIT_REPOSITORY https://github.com/icl-utk-edu/blaspp.git
   )
   FetchContent_Declare( lapackpp
-    GIT_REPOSITORY https://bitbucket.org/icl/lapackpp.git 
+    GIT_REPOSITORY https://github.com/icl-utk-edu/lapackpp.git
   )
   
   FetchContent_MakeAvailable( blaspp )

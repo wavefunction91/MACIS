@@ -1,5 +1,13 @@
+/*
+ * MACIS Copyright (c) 2023, The Regents of the University of California,
+ * through Lawrence Berkeley National Laboratory (subject to receipt of
+ * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ *
+ * See LICENSE.txt for details
+ */
+
 #include "ut_common.hpp"
-#include <asci/wavefunction_io.hpp>
+#include <macis/wavefunction_io.hpp>
 #include <iostream>
 #include <iomanip>
 
@@ -9,7 +17,7 @@ TEST_CASE("Read Wavefunction") {
 
   std::vector<std::bitset<64>> states;
   std::vector<double>          coeffs;
-  asci::read_wavefunction( ch4_wfn_fname, states, coeffs );
+  macis::read_wavefunction( ch4_wfn_fname, states, coeffs );
 
   std::vector<std::bitset<64>> ref_states = {
     0x1f0000001f,0x100f0000100f,0x401b0000401b,0x201700002017,0x4f0000004f,

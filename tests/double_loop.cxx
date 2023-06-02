@@ -1,7 +1,15 @@
+/*
+ * MACIS Copyright (c) 2023, The Regents of the University of California,
+ * through Lawrence Berkeley National Laboratory (subject to receipt of
+ * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ *
+ * See LICENSE.txt for details
+ */
+
 #include "ut_common.hpp"
-#include <asci/fcidump.hpp>
-#include <asci/wavefunction_io.hpp>
-#include <asci/hamiltonian_generator/double_loop.hpp>
+#include <macis/util/fcidump.hpp>
+#include <macis/wavefunction_io.hpp>
+#include <macis/hamiltonian_generator/double_loop.hpp>
 #include <iostream>
 #include <iomanip>
 
@@ -9,28 +17,28 @@ TEST_CASE("Double Loop") {
 
   ROOT_ONLY(MPI_COMM_WORLD);
 
-  auto norb         = asci::read_fcidump_norb(water_ccpvdz_fcidump);
+  auto norb         = macis::read_fcidump_norb(water_ccpvdz_fcidump);
   const auto norb2  = norb  * norb;
   const auto norb3  = norb2 * norb;
   const size_t nocc = 5;
 
   std::vector<double> T(norb*norb);
   std::vector<double> V(norb*norb*norb*norb);
-  auto E_core = asci::read_fcidump_core(water_ccpvdz_fcidump);
-  asci::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
-  asci::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
+  auto E_core = macis::read_fcidump_core(water_ccpvdz_fcidump);
+  macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
+  macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
-  using generator_type = asci::DoubleLoopHamiltonianGenerator<64>;
+  using generator_type = macis::DoubleLoopHamiltonianGenerator<64>;
 
 #if 0
   generator_type ham_gen(norb, V.data(), T.data());
 #else
   generator_type ham_gen(
-    asci::matrix_span<double>(T.data(),norb,norb),
-    asci::rank4_span<double>(V.data(),norb,norb,norb,norb)
+    macis::matrix_span<double>(T.data(),norb,norb),
+    macis::rank4_span<double>(V.data(),norb,norb,norb,norb)
   );
 #endif
-  const auto hf_det = asci::canonical_hf_determinant<64>(nocc, nocc);
+  const auto hf_det = macis::canonical_hf_determinant<64>(nocc, nocc);
 
   std::vector<double> eps(norb);
   for( auto p = 0ul; p < norb; ++p ) {
@@ -171,14 +179,14 @@ TEST_CASE("Double Loop") {
 
     std::vector<double> ordm(norb*norb,0.0), trdm(norb3 * norb,0.0);
     std::vector<std::bitset<64>> dets = { 
-      asci::canonical_hf_determinant<64>(nocc,nocc) 
+      macis::canonical_hf_determinant<64>(nocc,nocc) 
     };
   
     std::vector<double> C = { 1. };
   
     ham_gen.form_rdms( dets.begin(), dets.end(), dets.begin(), dets.end(), 
-      C.data(), asci::matrix_span<double>(ordm.data(),norb,norb), 
-      asci::rank4_span<double>(trdm.data(),norb,norb,norb,norb) );
+      C.data(), macis::matrix_span<double>(ordm.data(),norb,norb), 
+      macis::rank4_span<double>(trdm.data(),norb,norb,norb,norb) );
 
     auto E_tmp = blas::dot(norb2, ordm.data(),1, T.data(),1) + 
                  blas::dot(norb3*norb, trdm.data(),1, V.data(),1);
@@ -199,19 +207,19 @@ TEST_CASE("RDMS") {
   std::vector<double> V(norb3*norb, 0.0);
   std::vector<double> ordm(norb*norb,0.0), trdm(norb3 * norb,0.0);
 
-  asci::matrix_span<double> T_span(T.data(),norb,norb);
-  asci::matrix_span<double> ordm_span(ordm.data(),norb,norb);
-  asci::rank4_span<double> V_span(V.data(),norb,norb,norb,norb);
-  asci::rank4_span<double> trdm_span(trdm.data(),norb,norb,norb,norb);
+  macis::matrix_span<double> T_span(T.data(),norb,norb);
+  macis::matrix_span<double> ordm_span(ordm.data(),norb,norb);
+  macis::rank4_span<double> V_span(V.data(),norb,norb,norb,norb);
+  macis::rank4_span<double> trdm_span(trdm.data(),norb,norb,norb,norb);
 
-  using generator_type = asci::DoubleLoopHamiltonianGenerator<128>;
+  using generator_type = macis::DoubleLoopHamiltonianGenerator<128>;
   generator_type ham_gen( T_span, V_span );
       
   auto abs_sum = [](auto a, auto b){ return a + std::abs(b); };
 
   SECTION("HF") {
     std::vector<std::bitset<128>> dets = { 
-      asci::canonical_hf_determinant<128>(nocc,nocc) 
+      macis::canonical_hf_determinant<128>(nocc,nocc) 
     };
   
     std::vector<double> C = { 1. };
@@ -240,7 +248,7 @@ TEST_CASE("RDMS") {
   SECTION("CI") {
 
     std::vector<std::bitset<128>> states; std::vector<double> coeffs;
-    asci::read_wavefunction<128>( ch4_wfn_fname, states, coeffs );
+    macis::read_wavefunction<128>( ch4_wfn_fname, states, coeffs );
 
 
     coeffs.resize(5000);

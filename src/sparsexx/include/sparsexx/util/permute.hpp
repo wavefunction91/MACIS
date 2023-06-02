@@ -1,3 +1,11 @@
+/*
+ * MACIS Copyright (c) 2023, The Regents of the University of California,
+ * through Lawrence Berkeley National Laboratory (subject to receipt of
+ * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ *
+ * See LICENSE.txt for details
+ */
+
 #pragma once
 
 #include <sparsexx/matrix_types/type_traits.hpp>
@@ -6,7 +14,13 @@
 #include <vector>
 #include <algorithm>
 #include <numeric>
+
+#ifdef _OPENMP
 #include <omp.h>
+#else
+inline int omp_get_max_threads(){ return 1; }
+inline int omp_get_thread_num() { return 0; }
+#endif
 
 namespace sparsexx {
 

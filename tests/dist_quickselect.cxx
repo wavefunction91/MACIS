@@ -1,5 +1,13 @@
+/*
+ * MACIS Copyright (c) 2023, The Regents of the University of California,
+ * through Lawrence Berkeley National Laboratory (subject to receipt of
+ * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ *
+ * See LICENSE.txt for details
+ */
+
 #include "ut_common.hpp"
-#include <asci/util/dist_quickselect.hpp>
+#include <macis/util/dist_quickselect.hpp>
 
 TEMPLATE_TEST_CASE("Distributed Quickselect", "[mpi]", 
   std::less<int>, std::greater<int> ) {
@@ -7,8 +15,8 @@ TEMPLATE_TEST_CASE("Distributed Quickselect", "[mpi]",
   MPI_Barrier(MPI_COMM_WORLD);
 
   // MPI Info
-  const auto world_size = asci::comm_size(MPI_COMM_WORLD);
-  const auto world_rank = asci::comm_rank(MPI_COMM_WORLD);
+  const auto world_size = macis::comm_size(MPI_COMM_WORLD);
+  const auto world_rank = macis::comm_rank(MPI_COMM_WORLD);
   
   std::vector<int> local_data;
   switch(world_rank) {
@@ -35,11 +43,11 @@ TEMPLATE_TEST_CASE("Distributed Quickselect", "[mpi]",
   std::vector<int> local_sizes, displ;
   int local_n = local_data.size();
   size_t total_n = 
-    asci::total_gather_and_exclusive_scan( local_n, local_sizes, displ, 
+    macis::total_gather_and_exclusive_scan( local_n, local_sizes, displ, 
       MPI_COMM_WORLD );
 
   std::vector<int> global_data(total_n);
-  auto mpi_dtype = asci::mpi_traits<int>::datatype();
+  auto mpi_dtype = macis::mpi_traits<int>::datatype();
   MPI_Allgatherv( local_data.data(), local_data.size(), mpi_dtype, 
     global_data.data(), local_sizes.data(), displ.data(), mpi_dtype, 
     MPI_COMM_WORLD ); 
@@ -51,7 +59,7 @@ TEMPLATE_TEST_CASE("Distributed Quickselect", "[mpi]",
   for(int k = 0; k < total_n; ++k) {
     std::vector<int> data_copy = local_data;
     auto kth_element = 
-      asci::dist_quickselect( data_copy.begin(), data_copy.end(), k+1, 
+      macis::dist_quickselect( data_copy.begin(), data_copy.end(), k+1, 
         MPI_COMM_WORLD, comp, std::equal_to<int>{}) ;
     REQUIRE( global_data[k] == kth_element );
     MPI_Barrier(MPI_COMM_WORLD);
