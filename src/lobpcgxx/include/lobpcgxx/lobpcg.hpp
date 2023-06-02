@@ -1,10 +1,9 @@
 #pragma once
 
-
 #include <algorithm>
+#include <functional>
 #include <iostream>
 #include <vector>
-#include <functional>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -14,5 +13,3 @@
 
 #include "driver.hpp"
 #include "simplified_interface.hpp"
-
-

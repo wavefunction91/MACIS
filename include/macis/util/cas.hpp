@@ -7,9 +7,9 @@
  */
 
 #pragma once
-#include <macis/util/mcscf.hpp>
-#include <macis/types.hpp>
 #include <macis/solvers/selected_ci_diag.hpp>
+#include <macis/types.hpp>
+#include <macis/util/mcscf.hpp>
 
 namespace macis {
 
@@ -25,40 +25,38 @@ namespace macis {
  *  @param[in] T        The one-body Hamiltonian
  *  @param[in] V        The two-body Hamiltonian
  *  @param[out] ORDM    The CAS-CI 1-RDM
- *  @param[out] TRDM    The CAS-CI 2-RDM 
+ *  @param[out] TRDM    The CAS-CI 2-RDM
  *  @param[out] C       The CAS-CI CI vector
  *  @param[in]  comm    MPI Communicator on which to solve the EVP.
  */
 template <typename HamGen>
-double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb, 
-  size_t nalpha, size_t nbeta, double* T, double* V, double* ORDM, 
-  double* TRDM, std::vector<double>& C, MPI_Comm comm) {
-
+double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb,
+                          size_t nalpha, size_t nbeta, double* T, double* V,
+                          double* ORDM, double* TRDM, std::vector<double>& C,
+                          MPI_Comm comm) {
   constexpr auto nbits = HamGen::nbits;
 
-  int rank; MPI_Comm_rank(comm, &rank);
+  int rank;
+  MPI_Comm_rank(comm, &rank);
 
   // Hamiltonian Matrix Element Generator
   size_t no = norb.get();
-  HamGen ham_gen( 
-    matrix_span<double>(T,no,no),
-    rank4_span<double>(V,no,no,no,no) 
-  );
-  
+  HamGen ham_gen(matrix_span<double>(T, no, no),
+                 rank4_span<double>(V, no, no, no, no));
+
   // Compute Lowest Energy Eigenvalue (ED)
   auto dets = generate_hilbert_space<nbits>(norb.get(), nalpha, nbeta);
-  double E0 = selected_ci_diag( dets.begin(), dets.end(), ham_gen,
-    settings.ci_matel_tol, settings.ci_max_subspace, settings.ci_res_tol, C, 
-    comm, true);
+  double E0 = selected_ci_diag(dets.begin(), dets.end(), ham_gen,
+                               settings.ci_matel_tol, settings.ci_max_subspace,
+                               settings.ci_res_tol, C, comm, true);
 
   // Compute RDMs
   ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
-    C.data(), matrix_span<double>(ORDM,no,no), 
-    rank4_span<double>(TRDM,no,no,no,no));
+                    C.data(), matrix_span<double>(ORDM, no, no),
+                    rank4_span<double>(TRDM, no, no, no, no));
 
   return E0;
 }
-
 
 /// Functor wraper around `compute_casci_rdms`
 template <typename HamGen>
@@ -69,4 +67,4 @@ struct CASRDMFunctor {
   }
 };
 
-}
+}  // namespace macis

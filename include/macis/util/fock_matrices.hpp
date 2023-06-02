@@ -8,13 +8,14 @@
 
 #pragma once
 #include <stddef.h>
+
 #include <macis/types.hpp>
 
 namespace macis {
 
 /** @brief Compute the inactive fock matrix.
  *
- *  Computes the inactive fock matrix from MO integrals. 
+ *  Computes the inactive fock matrix from MO integrals.
  *
  *  Fi(p,q) = T(p,q) + \sum_i 2*V(p,q,i,i) - V(p,i,i,q)
  *
@@ -23,7 +24,7 @@ namespace macis {
  *  first `ninact` indices correspond to inactive orbitals).
  *
  *  @param[in]  norb   Number of total orbitals
- *  @param[in]  ninact Number of inactive orbitals 
+ *  @param[in]  ninact Number of inactive orbitals
  *  @param[in]  T     The MO 1-body hamiltonian
  *  @param[in]  LDT   The leading dimension of `T`
  *  @param[in]  V     The MO 2-body hamiltonian
@@ -31,9 +32,9 @@ namespace macis {
  *  @param[out] Fi    The inactive fock matrix.
  *  @param[in]  LDFi  The leading dimension of `Fi`
  */
-void inactive_fock_matrix( NumOrbital norb, NumInactive ninact,
-  const double* T, size_t LDT, const double* V, size_t LDV, 
-  double* Fi, size_t LDF );
+void inactive_fock_matrix(NumOrbital norb, NumInactive ninact, const double* T,
+                          size_t LDT, const double* V, size_t LDV, double* Fi,
+                          size_t LDF);
 
 /** @brief Compute the inactive energy.
  *
@@ -50,9 +51,8 @@ void inactive_fock_matrix( NumOrbital norb, NumInactive ninact,
  *
  *  @returns The inactive energy.
  */
-double inactive_energy( NumInactive ninact, const double* T,
-  size_t LDT, const double* Fi, size_t LDF );
-
+double inactive_energy(NumInactive ninact, const double* T, size_t LDT,
+                       const double* Fi, size_t LDF);
 
 /** @brief Extact the active-active subblock of a structured matrix.
  *
@@ -70,8 +70,8 @@ double inactive_energy( NumInactive ninact, const double* T,
  *  @param[in]  LDAS   Leading dimension of `A_sub`
  */
 void active_submatrix_1body(NumActive nact, NumInactive ninact,
-  const double* A_full, size_t LDAF, double* A_sub,
-  size_t LDAS);
+                            const double* A_full, size_t LDAF, double* A_sub,
+                            size_t LDAS);
 
 /** @brief Extact the all-active subblock of a structured tensor.
  *
@@ -79,7 +79,7 @@ void active_submatrix_1body(NumActive nact, NumInactive ninact,
  *  basis. Input tensor is assumed to contain inactive orbitals
  *  as the leading block.
  *
- *  A_sub(0:na, 0:na, 0:na, 0:na) = 
+ *  A_sub(0:na, 0:na, 0:na, 0:na) =
  *    A(ni:ni+na, ni:ni+na, ni:ni+na, ni:ni+na)
  *
  *  @param[in]  nact   Number of active orbitals
@@ -90,15 +90,15 @@ void active_submatrix_1body(NumActive nact, NumInactive ninact,
  *  @param[in]  LDAS   Single index leading dimension of `A_sub`
  */
 void active_subtensor_2body(NumActive nact, NumInactive ninact,
-  const double* A_full, size_t LDAF, double* A_sub,
-  size_t LDAS);
+                            const double* A_full, size_t LDAF, double* A_sub,
+                            size_t LDAS);
 
 /** @brief Compute the active-space hamiltonian.
  *
  *  Computes the active-only 1- and 2-body hamiltonian contributions for
  *  active space calculations from full dimensional hamiltonian contributions.
- *  Input tensors are assumed to be structured to have inactive orbtitals 
- *  as leading indices. 
+ *  Input tensors are assumed to be structured to have inactive orbtitals
+ *  as leading indices.
  *
  *  This function computes the full dimensional inactive Fock matrix (`Fi`)
  *  as a by-product.
@@ -122,9 +122,9 @@ void active_subtensor_2body(NumActive nact, NumInactive ninact,
  *  @param[in]  LDVF   The (single index) leading dimension of `V_act`
  */
 void active_hamiltonian(NumOrbital norb, NumActive nact, NumInactive ninact,
-  const double* T_full, size_t LDTF, const double* V_full, size_t LDVF,
-  double* Fi, size_t LDFi, double* T_act, size_t LDTA, double* V_act,
-  size_t LDVA);
+                        const double* T_full, size_t LDTF, const double* V_full,
+                        size_t LDVF, double* Fi, size_t LDFi, double* T_act,
+                        size_t LDTA, double* V_act, size_t LDVA);
 
 /** Compute the active Fock matrix.
  *
@@ -144,14 +144,13 @@ void active_hamiltonian(NumOrbital norb, NumActive nact, NumInactive ninact,
  *  @param[out] Fa     The active fock matrix.
  *  @param[in]  LDFa   The leading dimension of `Fa`
  */
-void active_fock_matrix( NumOrbital norb,  NumInactive ninact,
-  NumActive nact, const double* V, size_t LDV, 
-  const double* A1RDM, size_t LDD, double* Fa, 
-  size_t LDF ); 
+void active_fock_matrix(NumOrbital norb, NumInactive ninact, NumActive nact,
+                        const double* V, size_t LDV, const double* A1RDM,
+                        size_t LDD, double* Fa, size_t LDF);
 
 /** @brief Compute the auxillary Q matrix
  *
- *  Computes the auxillary Q matrix contribution to the 
+ *  Computes the auxillary Q matrix contribution to the
  *  generalized Fock matrix. Takes full dimensional MO
  *  integrals and the all-active 2RDM.
  *
@@ -169,9 +168,9 @@ void active_fock_matrix( NumOrbital norb,  NumInactive ninact,
  *  @param[out] Q      The Q matrix.
  *  @param[in]  LDQ    The leading dimension of `Q`
  */
-void aux_q_matrix( NumActive nact, NumOrbital norb,  NumInactive ninact,
-  const double* V, size_t LDV, const double* A2RDM,
-  size_t LDD, double* Q, size_t LDQ );
+void aux_q_matrix(NumActive nact, NumOrbital norb, NumInactive ninact,
+                  const double* V, size_t LDV, const double* A2RDM, size_t LDD,
+                  double* Q, size_t LDQ);
 
 /** @brief Compute the generalized Fock given pre-computed contributions.
  *
@@ -196,17 +195,18 @@ void aux_q_matrix( NumActive nact, NumOrbital norb,  NumInactive ninact,
  *  @param[out] F      The generalized fock matrix.
  *  @param[in]  LDF    The leading dimension of `F`
  */
-void generalized_fock_matrix( NumOrbital norb,  NumInactive ninact,
-  NumActive nact, const double* Fi, size_t LDFi, const double* Fa,
-  size_t LDFa, const double* A1RDM, size_t LDD, 
-  const double* Q, size_t LDQ, double* F, size_t LDF ); 
+void generalized_fock_matrix(NumOrbital norb, NumInactive ninact,
+                             NumActive nact, const double* Fi, size_t LDFi,
+                             const double* Fa, size_t LDFa, const double* A1RDM,
+                             size_t LDD, const double* Q, size_t LDQ, double* F,
+                             size_t LDF);
 
 /** @brief Compute the generalized Fock matrix from non-active intermediates.
  *
- *  Compute the generalied Fock matrix (see `generalized_fock_matrix`) 
- *  given only the inactive Fock matrix and active RDMs. This function 
- *  will compute the active Fock and auxillary Q internally and discard. 
- *  The function requires full dimenional MO integrals must be structured 
+ *  Compute the generalied Fock matrix (see `generalized_fock_matrix`)
+ *  given only the inactive Fock matrix and active RDMs. This function
+ *  will compute the active Fock and auxillary Q internally and discard.
+ *  The function requires full dimenional MO integrals must be structured
  *  as [inactive, active, virtual].
  *
  *  TODO: This function should only require GAAA integrals
@@ -223,15 +223,16 @@ void generalized_fock_matrix( NumOrbital norb,  NumInactive ninact,
  *  @param[out] F      The generalized fock matrix.
  *  @param[in]  LDF    The leading dimension of `F`
  */
-void generalized_fock_matrix_comp_mat1( NumOrbital norb, 
-  NumInactive ninact, NumActive nact, const double* Fi, size_t LDFi,
-  const double* V_full, size_t LDV, 
-  const double* A1RDM, size_t LDD1, const double* A2RDM,
-  size_t LDD2, double* F, size_t LDF );
+void generalized_fock_matrix_comp_mat1(NumOrbital norb, NumInactive ninact,
+                                       NumActive nact, const double* Fi,
+                                       size_t LDFi, const double* V_full,
+                                       size_t LDV, const double* A1RDM,
+                                       size_t LDD1, const double* A2RDM,
+                                       size_t LDD2, double* F, size_t LDF);
 
 /** @brief Compute the generalized Fock matrix given no intermediates.
  *
- *  Compute the generalized Fock matrix only from full MO integrals and 
+ *  Compute the generalized Fock matrix only from full MO integrals and
  *  active RDMs. All intermediates are computed internally and discarded.
  *  All full MO input tensors must be structured as [inactive, active, virtual].
  *
@@ -249,11 +250,12 @@ void generalized_fock_matrix_comp_mat1( NumOrbital norb,
  *  @param[out] F      The generalized fock matrix.
  *  @param[in]  LDF    The leading dimension of `F`
  */
-void generalized_fock_matrix_comp_mat2( NumOrbital norb, 
-  NumInactive ninact, NumActive nact, const double* T, size_t LDT,
-  const double* V, size_t LDV, 
-  const double* A1RDM, size_t LDD1, const double* A2RDM,
-  size_t LDD2, double* F, size_t LDF );
+void generalized_fock_matrix_comp_mat2(NumOrbital norb, NumInactive ninact,
+                                       NumActive nact, const double* T,
+                                       size_t LDT, const double* V, size_t LDV,
+                                       const double* A1RDM, size_t LDD1,
+                                       const double* A2RDM, size_t LDD2,
+                                       double* F, size_t LDF);
 
 /** @brief Compute the CI energy from the generalized Fock matrix.
  *
@@ -263,7 +265,7 @@ void generalized_fock_matrix_comp_mat2( NumOrbital norb,
  *  This function only requires the active 1RDM as the inactive/virtual
  *  RDMs are known implicitly. The full MO 1-body hamiltonian must be
  *  structured as [inactive, active, virtual]
- *  
+ *
  *  @param[in] ninact Number if inactive orbitals
  *  @param[in] nact   Number of active orbitals
  *  @param[in] T     The MO 1-body hamiltonian
@@ -275,8 +277,9 @@ void generalized_fock_matrix_comp_mat2( NumOrbital norb,
  *
  *  @returns The CI energy
  */
-double energy_from_generalized_fock( NumInactive ninact, NumActive nact,
-  const double* T, size_t LDT, const double* A1RDM, size_t LDD,
-  const double* F, size_t LDF);
+double energy_from_generalized_fock(NumInactive ninact, NumActive nact,
+                                    const double* T, size_t LDT,
+                                    const double* A1RDM, size_t LDD,
+                                    const double* F, size_t LDF);
 
-}
+}  // namespace macis

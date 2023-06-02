@@ -44,6 +44,12 @@ Office of Science, Office of Basic Energy Science (BES). It was originally
 developed under the Scalable Predictive Methods for Excitations and Correlated
 Phenomena [(SPEC)](https://spec.labworks.org/home) Center.
 
+## Main Contributors
+
+* David Williams-Young (LBNL): dbwy [at] lbl [dot] gov
+* Carlos Mejuto Zaera (SISSA)
+* Norm Tubman (NASA)
+
 # Dependencies
 
 * CMake (3.14+)
@@ -87,6 +93,30 @@ cmake -S /path/to/macis -B /path/to/build [MACIS configure options]
 cmake --build /path/to/build
 ```
 
+MACIS is linkable both as an installed library as well as a CMake subproject via `FetchContent`
+```
+# MACIS Discovery
+find_package( macis REQUIRED )
+target_link_libraries( my_target PUBLIC macis::macis )
+```
+
+```
+# MACIS as CMake Subproject
+include(FetchContent)
+
+# Set MACIS CMake options (see below)
+
+# Pull master branch of MACIS
+FetchContent_Declare( macis 
+  GIT_REPOSITORY https://github/com/wavefunction91/MACIS.git 
+  GIT_TAG master 
+)
+FetchContent_MakeAvailable( macis )
+
+# Link to target
+target_link_libraries( my_target PUBLIC macis::macis )
+```
+
 ## Influential CMake Variables
 
 | Variable Name              | Description                                               | Default  |
@@ -107,7 +137,7 @@ Have a question, comment or concern? Open an [Issue](https://github.com/wavefunc
 
 # License
 
-MACIS is made freely available under the terms of a modified 3-Clause BSD
+MACIS is made freely available under the terms of the LBNL modified 3-Clause BSD
 license. See LICENSE.txt for details.
 
 # Acknowledgments

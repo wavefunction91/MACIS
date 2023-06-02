@@ -18,6 +18,6 @@ struct real<std::complex<T>> {
 template <typename T>
 using real_t = typename real<T>::type;
 
-}
+}  // namespace detail
 
-}
+}  // namespace lobpcgxx
