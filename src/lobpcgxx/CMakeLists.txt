@@ -14,6 +14,7 @@ endif()
 
 # blaspp auto-detects cuda,hip modules and enables device backends
 set( gpu_backend "none" CACHE STRING "GPU backend to use" FORCE)
+message( WARNING "Turning off GPU Backend for BLAS++/LAPACK++")
 
 find_package(lapackpp CONFIG QUIET)
 if(NOT lapackpp_FOUND )

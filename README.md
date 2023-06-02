@@ -100,7 +100,7 @@ cmake --build /path/to/build
 # Example Usage
 
 Coming Soon.... See `tests/standalone_driver.cxx` for an example end-to-end
-invocation of MACIS for various integrands.
+invocation of MACIS for CAS-CI, CAS-SCF and ASCI-CI.
 
 # License
 
