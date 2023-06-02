@@ -15,6 +15,10 @@ jobs:
     strategy:
       matrix:
         compiler: [ {suite: gnu, version: 12}, {suite: llvm, version: 14} ]
+        openmp_flag: [ON, OFF]
+        exclude:
+            - compiler: {suite: llvm, version: 14}
+              openmp_flag: ON
 
     steps:
     - uses: actions/checkout@v3
@@ -24,6 +28,11 @@ jobs:
       run: $GITHUB_WORKSPACE/.github/workflows/scripts/compiler_setup.sh 
            ${{matrix.compiler.suite}} ${{matrix.compiler.version}}
            
+    - name: Enable or Disable OpenMP
+      shell: bash
+      run: echo "set(MACIS_ENABLE_OPENMP ${{matrix.openmp_flag}} CACHE BOOL \"\" FORCE)" >> 
+              ${GITHUB_WORKSPACE}/${GH_ACTIONS_TOOLCHAIN}
+
     - name: Setup Build Type
       shell: bash
       run: echo "set(CMAKE_BUILD_TYPE Release CACHE BOOL \"\" FORCE)" >> 
