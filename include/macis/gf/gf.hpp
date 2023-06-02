@@ -51,6 +51,19 @@ namespace macis
     bool saveGFmats                = false;
   };
 
+  /**
+   * @brief Gets fermionic sign incurred by inserting an electron of spin
+   *        up in a given orbital to a given determinant.
+   *
+   * @param[in] const std::bitset<nbits> &st: Determinant to which we are adding 
+   *            an electron.
+   * @param[in] size_t orb: Index of the orbital where we are adding the electron. 
+   *
+   * @returns double: Fermionic sign of the operation.
+   *
+   * @author Carlos Mejuto Zaera
+   * @date 28/01/2022
+   */
   template<size_t nbits>
   inline double GetInsertionUpSign( const std::bitset<nbits> &st, size_t orb )
   {
@@ -58,6 +71,19 @@ namespace macis
     return ((st & mask).count() % 2 == 1 ? -1. : 1.);
   }
 
+  /**
+   * @brief Gets fermionic sign incurred by inserting an electron of spin
+   *        down in a given orbital to a given determinant.
+   *
+   * @param[in] const std::bitset<nbits> &st: Determinant to which we are adding 
+   *            an electron.
+   * @param[in] size_t orb: Index of the orbital where we are adding the electron. 
+   *
+   * @returns double: Fermionic sign of the operation.
+   *
+   * @author Carlos Mejuto Zaera
+   * @date 28/01/2022
+   */
   template<size_t nbits>
   inline double GetInsertionDoSign( const std::bitset<nbits> &st, size_t orb )
   {
@@ -135,6 +161,12 @@ namespace macis
     }
   } 
 
+  /**
+   * @brief Class for comparing two determinants, to use in sorting routines.
+   *
+   * @author Carlos Mejuto Zaera
+   * @date 28/01/2022
+   */
   template<size_t nbits>
   class BitSetComparator {
     public:
