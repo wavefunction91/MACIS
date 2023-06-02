@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
     // }
 
     //// sparsexx::spblas::gespmbv( K, 1., A, V.data(), N, 0., AV_serial.data(),
-    ///N );
+    /// N );
 
     auto pspbmv_dur = time_op([&]() {
       sparsexx::spblas::pgespmbv_grv(K, 1., dist_B, V.data(), N, 0.,
