@@ -41,8 +41,8 @@ namespace macis {
  *         calling dgeqrf and dorgqr to evaluate the R and
  *         Q matrices, which are returned. Here, the input
  *         matrix has more rows than columns.
- * 
- * @param[inout] std::vector<std::vector<double> > &Q: On input, 
+ *
+ * @param[inout] std::vector<std::vector<double> > &Q: On input,
  *               matrix for which to evaluate the QR decomposition.
  *               On output, Q-matrix.
  * @param[out] std::vector<std::vector<double> > &R: On output, R
@@ -61,8 +61,8 @@ bool QRdecomp(std::vector<std::vector<double> > &Q,
  *         calling dgeqrf and dorgqr to evaluate the R and
  *         Q matrices, which are returned. Here, the input
  *         matrix has more columns than rows.
- * 
- * @param[inout] std::vector<std::vector<double> > &Q: On input, 
+ *
+ * @param[inout] std::vector<std::vector<double> > &Q: On input,
  *               matrix for which to evaluate the QR decomposition.
  *               On output, Q-matrix.
  * @param[out] std::vector<std::vector<double> > &R: On output, R
@@ -141,11 +141,12 @@ bool GetEigsysBand(std::vector<std::vector<double> > &mat, int nSupDiag,
  * @date 25/04/2022
  */
 template <class Cont, class Functor>
-void MyBandLan(
-    const Functor &H,
-    //std::vector<std::vector<Cont> > &qs, std::vector<std::vector<Cont> > &bandH,
-    std::vector<Cont> &qs, std::vector<std::vector<Cont> > &bandH,
-    int &nLanIts, int nbands, int N, double thres = 1.E-6, bool print = false) {
+void MyBandLan(const Functor &H,
+               // std::vector<std::vector<Cont> > &qs,
+               // std::vector<std::vector<Cont> > &bandH,
+               std::vector<Cont> &qs, std::vector<std::vector<Cont> > &bandH,
+               int &nLanIts, int nbands, int N, double thres = 1.E-6,
+               bool print = false) {
   // BAND LANCZOS ROUTINE. TAKES AS INPUT THE HAMILTONIAN H, INITIAL VECTORS qs
   // AND RETURNS THE BAND HAMILTONIAN bandH. IT PERFORMS nLanIts ITERATIONS,
   // STOPPING IF THE NORM OF ANY NEW KRYLOV VECTOR IS BELOW thres. IF LANCZOS IS
@@ -155,18 +156,18 @@ void MyBandLan(
   bandH.resize(nLanIts, std::vector<Cont>(nLanIts, 0.));
 
   // MAKE SPACE FOR 2 * nbands VECTORS
-  //qs.resize(2 * nbands, std::vector<Cont>(qs[0].size(), 0.));
-  qs.resize( 2 * nbands * N );
-  //std::vector<Cont> temp(qs[0].size(), 0.);
+  // qs.resize(2 * nbands, std::vector<Cont>(qs[0].size(), 0.));
+  qs.resize(2 * nbands * N);
+  // std::vector<Cont> temp(qs[0].size(), 0.);
   std::vector<Cont> temp(N, 0.);
   if(print) {
     for(int i = 0; i < nbands; i++) {
       std::ofstream ofile("lanvec_" + std::to_string(i + 1) + ".dat",
                           std::ios::out);
       ofile.precision(dbl::max_digits10);
-      //for(size_t el = 0; el < qs[i].size(); el++)
+      // for(size_t el = 0; el < qs[i].size(); el++)
       for(size_t el = 0; el < N; el++)
-        //ofile << std::scientific << qs[i][el] << std::endl;
+        // ofile << std::scientific << qs[i][el] << std::endl;
         ofile << std::scientific << qs[el + i * N] << std::endl;
       ofile.close();
     }
@@ -182,8 +183,10 @@ void MyBandLan(
   for(int it = 1; it <= nLanIts; it++) {
     int band_indx_i =
         true_indx[it];  // TO WHAT ELEMENT OF THE VECTOR SET DO WE APPLY THIS
-    //H.operator_action( 1, 1., qs[band_indx_i].data(), temp.size(), 0., temp.data(), temp.size() );
-    H.operator_action( 1, 1., qs.data() + band_indx_i * N, N, 0., temp.data(), N );
+    // H.operator_action( 1, 1., qs[band_indx_i].data(), temp.size(), 0.,
+    // temp.data(), temp.size() );
+    H.operator_action(1, 1., qs.data() + band_indx_i * N, N, 0., temp.data(),
+                      N);
     if(print) {
       std::ofstream ofile("Htimes_lanvec_" + std::to_string(it) + ".dat",
                           std::ios::out);
@@ -197,17 +200,18 @@ void MyBandLan(
       int band_indx_j = true_indx[jt];
 #pragma omp parallel for
       for(size_t coeff = 0; coeff < temp.size(); coeff++)
-        //temp[coeff] -= bandH[it - 1][jt - 1] * qs[band_indx_j][coeff];
-        temp[coeff] -= bandH[it - 1][jt - 1] * qs[N * band_indx_j+coeff];
+        // temp[coeff] -= bandH[it - 1][jt - 1] * qs[band_indx_j][coeff];
+        temp[coeff] -= bandH[it - 1][jt - 1] * qs[N * band_indx_j + coeff];
     }
     for(int jt = it; jt <= std::min(it + nbands - 1, nLanIts); jt++) {
       int band_indx_j = true_indx[jt];
-      //bandH[it - 1][jt - 1] = MyInnProd(temp, qs[band_indx_j]);
-      bandH[it - 1][jt - 1] = blas::dot(N, temp.data(), 1, qs.data() + band_indx_j * N, 1);
+      // bandH[it - 1][jt - 1] = MyInnProd(temp, qs[band_indx_j]);
+      bandH[it - 1][jt - 1] =
+          blas::dot(N, temp.data(), 1, qs.data() + band_indx_j * N, 1);
       bandH[jt - 1][it - 1] = bandH[it - 1][jt - 1];
 #pragma omp parallel for
       for(size_t coeff = 0; coeff < temp.size(); coeff++)
-        //temp[coeff] -= bandH[it - 1][jt - 1] * qs[band_indx_j][coeff];
+        // temp[coeff] -= bandH[it - 1][jt - 1] * qs[band_indx_j][coeff];
         temp[coeff] -= bandH[it - 1][jt - 1] * qs[N * band_indx_j + coeff];
     }
     if(it + nbands <= nLanIts) {
@@ -226,23 +230,23 @@ void MyBandLan(
         break;
 #pragma omp parallel for
         for(size_t coeff = 0; coeff < temp.size(); coeff++)
-	  //qs[true_indx[it + nbands]][coeff] = 0.;
+          // qs[true_indx[it + nbands]][coeff] = 0.;
           qs[true_indx[it + nbands] * N + coeff] = 0.;
         std::cout << "FOUND A ZERO VECTOR AT POSITION " << next_indx
                   << std::endl;
       } else {
 #pragma omp parallel for
         for(size_t coeff = 0; coeff < temp.size(); coeff++)
-          //qs[true_indx[it + nbands]][coeff] =
+          // qs[true_indx[it + nbands]][coeff] =
           qs[true_indx[it + nbands] * N + coeff] =
               temp[coeff] / bandH[it - 1][it + nbands - 1];
         if(print) {
           std::ofstream ofile("lanvec_" + std::to_string(it + nbands) + ".dat",
                               std::ios::out);
           ofile.precision(dbl::max_digits10);
-          //for(size_t el = 0; el < qs[true_indx[it + nbands]].size(); el++)
+          // for(size_t el = 0; el < qs[true_indx[it + nbands]].size(); el++)
           for(size_t el = 0; el < N; el++)
-            //ofile << std::scientific << qs[true_indx[it + nbands]][el]
+            // ofile << std::scientific << qs[true_indx[it + nbands]][el]
             ofile << std::scientific << qs[true_indx[it + nbands] * N + el]
                   << std::endl;
           ofile.close();

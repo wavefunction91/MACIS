@@ -23,19 +23,19 @@ void Hste_v(const std::vector<double> &alphas, const std::vector<double> &betas,
   // INITIALIZE VARIABLES
   // COMPUTE EIGENVALUES AND EIGENVECTORS OF THE TRIDIAGONAL MATRIX
   lapack::Job JOBZ = lapack::Job::Vec;
-  int N = alphas.size(), LDZ = N; // SIZES
-  std::vector<double> D, E;       // DIAGONAL AND SUB-DIAGONAL ELEMENTS
-  std::vector<double> Z;          // EIGENVECTORS
+  int N = alphas.size(), LDZ = N;  // SIZES
+  std::vector<double> D, E;        // DIAGONAL AND SUB-DIAGONAL ELEMENTS
+  std::vector<double> Z;           // EIGENVECTORS
   // INITIALIZE MATRIX
-  D.resize( N );
+  D.resize(N);
   for(int64_t i = 0; i < N; i++) D[i] = alphas[i];
-  E.resize( N - 1 );
+  E.resize(N - 1);
   for(int64_t i = 1; i < N; i++) E[i - 1] = betas[i];
   // ALLOCATE MEMORY
-  Z.resize( N * LDZ );
+  Z.resize(N * LDZ);
 
   // ACTUAL EIGENVALUE CALCULATION
-  lapack::steqr( JOBZ, N, D.data(), E.data(), Z.data(), LDZ);
+  lapack::steqr(JOBZ, N, D.data(), E.data(), Z.data(), LDZ);
   // SAVE EIGENVECTORS
   for(int i = 0; i < N; i++) {
     for(int j = 0; j < N; j++) eigvecs(i, j) = Z[i + j * N];
@@ -55,21 +55,21 @@ void Hsyev(const eigMatD &H, Eigen::VectorXd &eigvals, eigMatD &eigvecs) {
   // INITIALIZE VARIABLES
   // COMPUTE EIGENVALUES AND EIGENVECTORS, H IS
   // STORED IN THE UPPER TRIANGLE
-  lapack::Job  JOBZ = lapack::Job::Vec;
+  lapack::Job JOBZ = lapack::Job::Vec;
   lapack::Uplo UPLO = lapack::Uplo::Upper;
   int N = H.rows(), LDA = N;  // SIZES
   std::vector<double> A;      // MATRIX AND WORKSPACE
   std::vector<double> W;      // EIGENVALUES AND WORKSPACE
   // INITIALIZE MATRIX
-  A.resize( N * N );
+  A.resize(N * N);
   for(int i = 0; i < N; i++) {
     for(int j = 0; j < N; j++) A[i + j * N] = H(i, j);
   }
   // ALLOCATE MEMORY
-  W.resize( N );
+  W.resize(N);
 
   // ACTUAL EIGENVALUE CALCULATION
-  lapack::syev( JOBZ, UPLO, N, A.data(), LDA, W.data() );
+  lapack::syev(JOBZ, UPLO, N, A.data(), LDA, W.data());
   // SAVE EIGENVECTORS
   for(int i = 0; i < N; i++) {
     for(int j = 0; j < N; j++) eigvecs(i, N - 1 - j) = A[i + j * N];

@@ -35,14 +35,14 @@ bool QRdecomp(std::vector<std::vector<double> > &Q,
   std::vector<double> A, TAU;
 
   // INITIALIZE A
-  A.resize( M * N, 0.);
+  A.resize(M * N, 0.);
   for(int i = 0; i < M; i++) {
     for(int j = 0; j < N; j++) A[i + j * M] = Q[i][j];
     Q[i].clear();
   }
-  // INITIALIZE TAU, AND COMPUTE R MATRIX 
-  TAU.resize( N );
-  lapack::geqrf( M, N, A.data(), LDA, TAU.data() );
+  // INITIALIZE TAU, AND COMPUTE R MATRIX
+  TAU.resize(N);
+  lapack::geqrf(M, N, A.data(), LDA, TAU.data());
   // SAVE THE R MATRIX
   R.resize(N);
   for(int i = 0; i < N; i++) {
@@ -53,7 +53,7 @@ bool QRdecomp(std::vector<std::vector<double> > &Q,
 
   // NOW, COMPUTE THE ACTUAL Q MATRIX
   int K = N;
-  lapack::orgqr( M, N, K, A.data(), LDA, TAU.data() );
+  lapack::orgqr(M, N, K, A.data(), LDA, TAU.data());
   // SAVE THE Q MATRIX
   for(int i = 0; i < M; i++) {
     Q[i].resize(N);
@@ -82,14 +82,14 @@ bool QRdecomp_tr(std::vector<std::vector<double> > &Q,
   std::vector<double> A, TAU;
 
   // INITIALIZE A
-  A.resize( M * N );
+  A.resize(M * N);
   for(int i = 0; i < M; i++) {
     for(int j = 0; j < N; j++) A[i + j * M] = Q[j][i];
   }
 
   // INITIALIZE TAU, AND EVALUATE R MATRIX
-  TAU.resize( N );
-  lapack::geqrf( M, N, A.data(), LDA, TAU.data() );
+  TAU.resize(N);
+  lapack::geqrf(M, N, A.data(), LDA, TAU.data());
   // SAVE THE R MATRIX
   R.resize(N);
   for(int i = 0; i < N; i++) {
@@ -100,7 +100,7 @@ bool QRdecomp_tr(std::vector<std::vector<double> > &Q,
 
   // NOW, COMPUTE THE ACTUAL Q MATRIX
   int K = N;
-  lapack::orgqr( M, N, K, A.data(), LDA, TAU.data() );
+  lapack::orgqr(M, N, K, A.data(), LDA, TAU.data());
   // SAVE THE Q MATRIX
   for(int i = 0; i < M; i++) {
     for(int j = 0; j < N; j++) Q[j][i] = A[i + j * M];
@@ -121,20 +121,20 @@ bool GetEigsys(std::vector<std::vector<double> > &mat,
   eigvecs.clear();
   // PREPARE VARIABLES FOR LAPACK
   lapack::Uplo UPLO = lapack::Uplo::Upper;
-  lapack::Job  JOBZ = lapack::Job::Vec;
+  lapack::Job JOBZ = lapack::Job::Vec;
   int N = mat.size(), LDA = mat.size();
   std::vector<double> A, D;
 
   // INITIALIZE A
-  A.resize( N * N );
+  A.resize(N * N);
   for(int i = 0; i < N; i++) {
     for(int j = 0; j < N; j++) A[i + j * N] = mat[i][j];
     mat[i].clear();
   }
   mat.clear();
   // ALLOCATE REST OF THE MEMORY
-  D.resize( N );
-  lapack::heev_2stage( JOBZ, UPLO, N, A.data(), LDA, D.data());
+  D.resize(N);
+  lapack::heev_2stage(JOBZ, UPLO, N, A.data(), LDA, D.data());
 
   // NOW, STORE THE EIGENVALUES AND EIGENVECTORS
   eigvals.resize(N);
@@ -160,30 +160,31 @@ bool GetEigsysBand(std::vector<std::vector<double> > &mat, int nSupDiag,
   eigvecs.clear();
   // PREPARE VARIABLES FOR LAPACK
   lapack::Uplo UPLO = lapack::Uplo::Upper;
-  lapack::Job  VECT = lapack::Job::Vec;
+  lapack::Job VECT = lapack::Job::Vec;
   lapack::Job COMPZ = lapack::Job::Vec;
   int N = mat.size(), LDQ = mat.size(), LDAB = nSupDiag + 1;
   std::vector<double> AB, D, E, Q;
 
   // INITIALIZE A
-  AB.resize( (nSupDiag + 1) * N );
+  AB.resize((nSupDiag + 1) * N);
   for(int j = 0; j < N; j++) {
     for(int i = std::max(0, j - nSupDiag); i <= j; i++)
       AB[nSupDiag + i - j + j * (nSupDiag + 1)] = mat[i][j];
   }
   mat.clear();
   // ALLOCATE REST OF THE MEMORY
-  Q.resize( N * N );
-  D.resize( N );
-  E.resize( N - 1 );
+  Q.resize(N * N);
+  D.resize(N);
+  E.resize(N - 1);
 
   // TRANSFORM THE MATRIX TO TRIDIAGONAL FORM
   // NOW, TRANSFORM MATRIX TO TRIDIAGONAL FORM
-  lapack::sbtrd( VECT, UPLO, N, nSupDiag, AB.data(), LDAB, D.data(), E.data(), Q.data(), LDQ );
+  lapack::sbtrd(VECT, UPLO, N, nSupDiag, AB.data(), LDAB, D.data(), E.data(),
+                Q.data(), LDQ);
   AB.clear();
 
   // FINALLY, COMPUTE THE EIGENVALUES AND EIGENVECTORS!
-  lapack::steqr( COMPZ, N, D.data(), E.data(), Q.data(), LDQ );
+  lapack::steqr(COMPZ, N, D.data(), E.data(), Q.data(), LDQ);
 
   // NOW, STORE THE EIGENVALUES AND EIGENVECTORS
   eigvals.resize(N);
@@ -254,10 +255,9 @@ void BandResolvent(
   std::cout << "BAND LANCZOS ...";
   SparseMatrixOperator Hop(H);
   int nbands = vecs.size();
-  std::vector<double> qs( vecs.size() * n, 0. );
-  for( int i = 0; i < vecs.size(); i++ )
-	  for( int j = 0; j < n; j++ )
-		  qs[j + n * i] = vecs[i][j];
+  std::vector<double> qs(vecs.size() * n, 0.);
+  for(int i = 0; i < vecs.size(); i++)
+    for(int j = 0; j < n; j++) qs[j + n * i] = vecs[i][j];
   MyBandLan<double>(Hop, qs, bandH, nLanIts, nbands, n, 1.E-6, print);
   std::cout << "DONE! ";
   if(print) {

@@ -229,8 +229,8 @@ void get_GF_basis_AS_1El(int orb, bool sp_up, bool is_part, const VectorXd &wfn,
   std::bitset<nbits> uni_string;
   std::vector<std::bitset<nbits>> founddets;
   founddets.reserve(trunc_size);
-  std::map<std::bitset<nbits>, size_t, bitset_less_comparator<nbits>> founddet_pos,
-      basedet_pos;
+  std::map<std::bitset<nbits>, size_t, bitset_less_comparator<nbits>>
+      founddet_pos, basedet_pos;
   typename std::map<std::bitset<nbits>, size_t,
                     bitset_less_comparator<nbits>>::iterator it;
   // ACTIVE SPACE
@@ -386,7 +386,8 @@ std::vector<std::vector<double>> BuildWfn4Lanczos(
     const std::vector<std::bitset<nbits>> &GF_dets, bool is_part,
     std::vector<int> &todelete, double zero_thresh = 1.E-7) {
   // INITIALIZE THE DICTIONARY OF BASE DETERMINANTS
-  std::map<std::bitset<nbits>, size_t, bitset_less_comparator<nbits>> base_dets_pos;
+  std::map<std::bitset<nbits>, size_t, bitset_less_comparator<nbits>>
+      base_dets_pos;
   for(size_t iii = 0; iii < base_dets.size(); iii++)
     base_dets_pos[base_dets[iii]] = iii;
 

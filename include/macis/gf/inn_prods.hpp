@@ -32,7 +32,7 @@ namespace macis {
  */
 inline double MyInnProd(const std::vector<double>& vecR,
                         const std::vector<double>& vecL) {
-  return blas::dot( vecR.size(), vecR.data(), 1, vecL.data(), 1 );
+  return blas::dot(vecR.size(), vecR.data(), 1, vecL.data(), 1);
 }
 
 /**
@@ -49,7 +49,7 @@ inline double MyInnProd(const std::vector<double>& vecR,
 inline std::complex<double> MyInnProd(
     const std::vector<std::complex<double> >& vecR,
     const std::vector<std::complex<double> >& vecL) {
-  return blas::dot( vecR.size(), vecR.data(), 1, vecL.data(), 1 );
+  return blas::dot(vecR.size(), vecR.data(), 1, vecL.data(), 1);
 }
 
 /**
@@ -66,7 +66,7 @@ inline std::complex<double> MyInnProd(
 inline std::complex<double> MyInnProd(
     const std::vector<std::complex<double> >& vecR,
     const std::vector<double>& vecL) {
-  return blas::dot( vecR.size(), vecR.data(), 1, vecL.data(), 1 );
+  return blas::dot(vecR.size(), vecR.data(), 1, vecL.data(), 1);
 }
 
 /**
@@ -81,7 +81,7 @@ inline std::complex<double> MyInnProd(
  */
 inline std::complex<double> MyInnProd(const Eigen::VectorXcd& vecR,
                                       const Eigen::VectorXcd& vecL) {
-  return blas::dot( vecR.size(), vecR.data(), 1, vecL.data(), 1 );
+  return blas::dot(vecR.size(), vecR.data(), 1, vecL.data(), 1);
 }
 
 /**
@@ -96,6 +96,6 @@ inline std::complex<double> MyInnProd(const Eigen::VectorXcd& vecR,
  */
 inline double MyInnProd(const Eigen::VectorXd& vecR,
                         const Eigen::VectorXd& vecL) {
-  return blas::dot( vecR.size(), vecR.data(), 1, vecL.data(), 1 );
+  return blas::dot(vecR.size(), vecR.data(), 1, vecL.data(), 1);
 }
 }  // namespace macis

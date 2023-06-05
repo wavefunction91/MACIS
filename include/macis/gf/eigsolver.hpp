@@ -21,7 +21,6 @@
 
 namespace macis {
 
-
 typedef Eigen::VectorXd VectorXd;
 typedef Eigen::MatrixXd eigMatD;
 typedef Eigen::SparseMatrix<double, Eigen::RowMajor> SpMatD;
