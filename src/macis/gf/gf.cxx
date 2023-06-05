@@ -29,7 +29,6 @@ void write_GF(
       }
       ofile << std::endl;
     }
-    ofile.close();
 
     std::string fname2 = is_part ? "GFMatrix_OrbitalIndices_ADD.dat"
                                  : "GFMatrix_OrbitalIndices_SUB.dat";
@@ -39,7 +38,6 @@ void write_GF(
         continue;
       ofile2 << GF_orbs[iii] << std::endl;
     }
-    ofile2.close();
   } else {
     std::string fname = is_part ? "LanGF_ADD_" : "LanGF_SUB_";
     fname += std::to_string(GF_orbs[0] + 1) + "_" +
@@ -49,7 +47,6 @@ void write_GF(
     for(int iii = 0; iii < nfreqs; iii++)
       ofile << std::scientific << real(ws[iii]) << " " << imag(ws[iii]) << " "
             << real(GF[iii][0][0]) << " " << imag(GF[iii][0][0]) << std::endl;
-    ofile.close();
   }
 }
 

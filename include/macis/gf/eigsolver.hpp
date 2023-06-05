@@ -17,20 +17,14 @@
 #pragma once
 #include <Eigen/Core>
 #include <Eigen/Sparse>
+#include <lapack.hh>
 
 namespace macis {
 
-using namespace Eigen;
 
-typedef MatrixXd eigMatD;
-typedef SparseMatrix<double, RowMajor> SpMatD;
-
-extern "C" {
-extern int dsteqr_(char *, int *, double *, double *, double *, int *, double *,
-                   int *);
-extern int dsyev_(char *, char *, int *, double *, int *, double *, double *,
-                  int *, int *);
-}
+typedef Eigen::VectorXd VectorXd;
+typedef Eigen::MatrixXd eigMatD;
+typedef Eigen::SparseMatrix<double, Eigen::RowMajor> SpMatD;
 
 /**
  * @brief Computes the eigenvalues and eigenvectors of a tridiagonal, symmetric
@@ -45,7 +39,7 @@ extern int dsyev_(char *, char *, int *, double *, int *, double *, double *,
  * @date 05/04/2021
  */
 void Hste_v(const std::vector<double> &alphas, const std::vector<double> &betas,
-            VectorXd &eigvals, eigMatD &eigvecs);
+            Eigen::VectorXd &eigvals, eigMatD &eigvecs);
 
 /**
  * @brief Computes the eigenvalues and eigenvectors of a tridiagonal, symmetric
@@ -59,6 +53,6 @@ void Hste_v(const std::vector<double> &alphas, const std::vector<double> &betas,
  * @author Carlos Mejuto Zaera
  * @date 05/04/2021
  */
-void Hsyev(const eigMatD &H, VectorXd &eigvals, eigMatD &eigvecs);
+void Hsyev(const eigMatD &H, Eigen::VectorXd &eigvals, eigMatD &eigvecs);
 
 }  // namespace macis

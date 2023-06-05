@@ -32,14 +32,7 @@ namespace macis {
  */
 inline double MyInnProd(const std::vector<double>& vecR,
                         const std::vector<double>& vecL) {
-  // SIMPLE INNER PRODUCT ROUTINE
-  double res = 0.;
-#pragma omp declare reduction(Vsum:double                   \
-                              : omp_out = omp_out + omp_in) \
-    initializer(omp_priv = 0.)
-#pragma omp parallel for reduction(Vsum : res)
-  for(size_t i = 0; i < vecR.size(); i++) res += vecR[i] * vecL[i];
-  return res;
+  return blas::dot( vecR.size(), vecR.data(), 1, vecL.data(), 1 );
 }
 
 /**
@@ -56,14 +49,7 @@ inline double MyInnProd(const std::vector<double>& vecR,
 inline std::complex<double> MyInnProd(
     const std::vector<std::complex<double> >& vecR,
     const std::vector<std::complex<double> >& vecL) {
-  // SIMPLE INNER PRODUCT ROUTINE
-  std::complex<double> res(0., 0.);
-#pragma omp declare reduction \
-        (Vsum:std::complex<double>:omp_out=omp_out+omp_in)\
-        initializer(omp_priv=std::complex<double>(0.,0.))
-#pragma omp parallel for reduction(Vsum : res)
-  for(size_t i = 0; i < vecR.size(); i++) res += conj(vecR[i]) * vecL[i];
-  return res;
+  return blas::dot( vecR.size(), vecR.data(), 1, vecL.data(), 1 );
 }
 
 /**
@@ -80,15 +66,7 @@ inline std::complex<double> MyInnProd(
 inline std::complex<double> MyInnProd(
     const std::vector<std::complex<double> >& vecR,
     const std::vector<double>& vecL) {
-  // SIMPLE INNER PRODUCT ROUTINE
-  std::complex<double> res(0., 0.);
-#pragma omp declare reduction \
-        (Vsum:std::complex<double>:omp_out=omp_out+omp_in)\
-        initializer(omp_priv=std::complex<double>(0.,0.))
-#pragma omp parallel for reduction(Vsum : res)
-  for(size_t i = 0; i < vecR.size(); i++)
-    res += conj(vecR[i]) * std::complex<double>(vecL[i], 0.);
-  return res;
+  return blas::dot( vecR.size(), vecR.data(), 1, vecL.data(), 1 );
 }
 
 /**
@@ -103,8 +81,7 @@ inline std::complex<double> MyInnProd(
  */
 inline std::complex<double> MyInnProd(const Eigen::VectorXcd& vecR,
                                       const Eigen::VectorXcd& vecL) {
-  // SIMPLE INNER PRODUCT ROUTINE
-  return vecR.dot(vecL);
+  return blas::dot( vecR.size(), vecR.data(), 1, vecL.data(), 1 );
 }
 
 /**
@@ -119,7 +96,6 @@ inline std::complex<double> MyInnProd(const Eigen::VectorXcd& vecR,
  */
 inline double MyInnProd(const Eigen::VectorXd& vecR,
                         const Eigen::VectorXd& vecL) {
-  // SIMPLE INNER PRODUCT ROUTINE
-  return vecR.dot(vecL);
+  return blas::dot( vecR.size(), vecR.data(), 1, vecL.data(), 1 );
 }
 }  // namespace macis

@@ -31,36 +31,18 @@ bool QRdecomp(std::vector<std::vector<double> > &Q,
   // PREPARE VARIABLES TO CALL LAPACK
   int M = Q.size(), N = Q[0].size();
   assert(M >= N);
-  int LDA = M, INFO = 0, LWORK;
-  double *A, *TAU, *WORK;
+  int LDA = M, INFO = 0;
+  std::vector<double> A, TAU;
 
   // INITIALIZE A
-  A = new double[M * N];
+  A.resize( M * N, 0.);
   for(int i = 0; i < M; i++) {
     for(int j = 0; j < N; j++) A[i + j * M] = Q[i][j];
     Q[i].clear();
   }
-  // INITIALIZE TAU, AND PERFORM WORKSPACE QUERY
-  TAU = new double[N];
-  WORK = new double[N];
-  LWORK = -1;
-
-  dgeqrf_(&M, &N, A, &LDA, TAU, WORK, &LWORK, &INFO);
-  if(INFO != 0) {
-    std::cout << "ERROR IN dgeqrf_ MEMORY QUERY!! ERROR CODE: " << INFO
-              << std::endl;
-    return false;
-  }
-  LWORK = int(WORK[0]);
-  delete[] WORK;
-  // NOW, PERFORM ACTUAL QR DECOMPOSITION
-  WORK = new double[LWORK];
-  dgeqrf_(&M, &N, A, &LDA, TAU, WORK, &LWORK, &INFO);
-  if(INFO != 0) {
-    std::cout << "ERROR IN dgeqrf_ QR DECOMPOSITION!! ERROR CODE: " << INFO
-              << std::endl;
-    return false;
-  }
+  // INITIALIZE TAU, AND COMPUTE R MATRIX 
+  TAU.resize( N );
+  lapack::geqrf( M, N, A.data(), LDA, TAU.data() );
   // SAVE THE R MATRIX
   R.resize(N);
   for(int i = 0; i < N; i++) {
@@ -71,32 +53,12 @@ bool QRdecomp(std::vector<std::vector<double> > &Q,
 
   // NOW, COMPUTE THE ACTUAL Q MATRIX
   int K = N;
-  // FIRST, PERFORM WORKSPACE QUERY
-  LWORK = -1;
-  dorgqr_(&M, &N, &K, A, &LDA, TAU, WORK, &LWORK, &INFO);
-  if(INFO != 0) {
-    std::cout << "ERROR IN dorgqr_ MEMORY QUERY!! ERROR CODE: " << INFO
-              << std::endl;
-    return false;
-  }
-  LWORK = int(WORK[0]);
-  delete[] WORK;
-  WORK = new double[LWORK];
-  // NOW, COMPUTE ACTUAL Q
-  dorgqr_(&M, &N, &K, A, &LDA, TAU, WORK, &LWORK, &INFO);
-  if(INFO != 0) {
-    std::cout << "ERROR IN dorgqr_ COMPUTATION OF Q!! ERROR CODE: " << INFO
-              << std::endl;
-    return false;
-  }
-  delete[] TAU;
-  delete[] WORK;
+  lapack::orgqr( M, N, K, A.data(), LDA, TAU.data() );
   // SAVE THE Q MATRIX
   for(int i = 0; i < M; i++) {
     Q[i].resize(N);
     for(int j = 0; j < N; j++) Q[i][j] = A[i + j * M];
   }
-  delete[] A;
 
   return true;
 }
@@ -116,36 +78,18 @@ bool QRdecomp_tr(std::vector<std::vector<double> > &Q,
   // PREPARE VARIABLES TO CALL LAPACK
   int M = Q[0].size(), N = Q.size();
   assert(M >= N);
-  int LDA = M, INFO = 0, LWORK;
-  double *A, *TAU, *WORK;
+  int LDA = M, INFO = 0;
+  std::vector<double> A, TAU;
 
   // INITIALIZE A
-  A = new double[M * N];
+  A.resize( M * N );
   for(int i = 0; i < M; i++) {
     for(int j = 0; j < N; j++) A[i + j * M] = Q[j][i];
   }
 
-  // INITIALIZE TAU, AND PERFORM WORKSPACE QUERY
-  TAU = new double[N];
-  WORK = new double[N];
-  LWORK = -1;
-
-  dgeqrf_(&M, &N, A, &LDA, TAU, WORK, &LWORK, &INFO);
-  if(INFO != 0) {
-    std::cout << "ERROR IN dgeqrf_ MEMORY QUERY!! ERROR CODE: " << INFO
-              << std::endl;
-    return false;
-  }
-  LWORK = int(WORK[0]);
-  delete[] WORK;
-  // NOW, PERFORM ACTUAL QR DECOMPOSITION
-  WORK = new double[LWORK];
-  dgeqrf_(&M, &N, A, &LDA, TAU, WORK, &LWORK, &INFO);
-  if(INFO != 0) {
-    std::cout << "ERROR IN dgeqrf_ QR DECOMPOSITION!! ERROR CODE: " << INFO
-              << std::endl;
-    return false;
-  }
+  // INITIALIZE TAU, AND EVALUATE R MATRIX
+  TAU.resize( N );
+  lapack::geqrf( M, N, A.data(), LDA, TAU.data() );
   // SAVE THE R MATRIX
   R.resize(N);
   for(int i = 0; i < N; i++) {
@@ -156,31 +100,11 @@ bool QRdecomp_tr(std::vector<std::vector<double> > &Q,
 
   // NOW, COMPUTE THE ACTUAL Q MATRIX
   int K = N;
-  // FIRST, PERFORM WORKSPACE QUERY
-  LWORK = -1;
-  dorgqr_(&M, &N, &K, A, &LDA, TAU, WORK, &LWORK, &INFO);
-  if(INFO != 0) {
-    std::cout << "ERROR IN dorgqr_ MEMORY QUERY!! ERROR CODE: " << INFO
-              << std::endl;
-    return false;
-  }
-  LWORK = int(WORK[0]);
-  delete[] WORK;
-  WORK = new double[LWORK];
-  // NOW, COMPUTE ACTUAL Q
-  dorgqr_(&M, &N, &K, A, &LDA, TAU, WORK, &LWORK, &INFO);
-  if(INFO != 0) {
-    std::cout << "ERROR IN dorgqr_ COMPUTATION OF Q!! ERROR CODE: " << INFO
-              << std::endl;
-    return false;
-  }
-  delete[] TAU;
-  delete[] WORK;
+  lapack::orgqr( M, N, K, A.data(), LDA, TAU.data() );
   // SAVE THE Q MATRIX
   for(int i = 0; i < M; i++) {
     for(int j = 0; j < N; j++) Q[j][i] = A[i + j * M];
   }
-  delete[] A;
 
   return true;
 }
@@ -196,88 +120,30 @@ bool GetEigsys(std::vector<std::vector<double> > &mat,
   eigvals.clear();
   eigvecs.clear();
   // PREPARE VARIABLES FOR LAPACK
-  char UPLO = 'U', COMPZ = 'V';
-  int N = mat.size(), LDA = mat.size(), LWORK = -1, INFO;
-  double *A, *D, *E, *TAU, *WORK;
+  lapack::Uplo UPLO = lapack::Uplo::Upper;
+  lapack::Job  JOBZ = lapack::Job::Vec;
+  int N = mat.size(), LDA = mat.size();
+  std::vector<double> A, D;
 
   // INITIALIZE A
-  A = new double[N * N];
+  A.resize( N * N );
   for(int i = 0; i < N; i++) {
     for(int j = 0; j < N; j++) A[i + j * N] = mat[i][j];
     mat[i].clear();
   }
   mat.clear();
   // ALLOCATE REST OF THE MEMORY
-  D = new double[N];
-  E = new double[N - 1];
-  TAU = new double[N - 1];
-  WORK = new double[N];
-
-  // TRANSFORM THE MATRIX TO TRIDIAGONAL FORM
-  // FIRST, PERFORM MEMORY QUERY
-  dsytrd_(&UPLO, &N, A, &LDA, D, E, TAU, WORK, &LWORK, &INFO);
-  if(INFO != 0) {
-    std::cout << "ERROR IN dsytrd_ MEMORY QUERY!! ERROR CODE: " << INFO
-              << std::endl;
-    return false;
-  }
-  LWORK = WORK[0];
-  delete[] WORK;
-  WORK = new double[LWORK];
-  // NOW, TRANSFORM MATRIX TO TRIDIAGONAL FORM
-  dsytrd_(&UPLO, &N, A, &LDA, D, E, TAU, WORK, &LWORK, &INFO);
-  if(INFO != 0) {
-    std::cout
-        << "ERROR IN dsytrd_ COMPUTING THE TRIDIAGONAL MATRIX!! ERROR CODE: "
-        << INFO << std::endl;
-    return false;
-  }
-
-  // COMPUTE THE TRANSFORMATION MATRIX, NECESSARY TO COMPUTE EIGENVECTORS
-  // FIRST, PERFORM MEMORY QUERY
-  LWORK = -1;
-  dorgtr_(&UPLO, &N, A, &LDA, TAU, WORK, &LWORK, &INFO);
-  if(INFO != 0) {
-    std::cout << "ERROR IN dorgtr_ MEMORY QUERY!! ERROR CODE: " << INFO
-              << std::endl;
-    return false;
-  }
-  LWORK = WORK[0];
-  delete[] WORK;
-  WORK = new double[LWORK];
-  // NOW, COMPUTE THE TRANSFORMATION MATRIX. IT WILL BE STORED IN A
-  dorgtr_(&UPLO, &N, A, &LDA, TAU, WORK, &LWORK, &INFO);
-  if(INFO != 0) {
-    std::cout
-        << "ERROR IN dorgtr_ COMPUTING TRANSFORMATION MATRIX!! ERROR CODE: "
-        << INFO << std::endl;
-    return false;
-  }
-  delete[] TAU;
-
-  // FINALLY, COMPUTE THE EIGENVALUES AND EIGENVECTORS!
-  delete[] WORK;
-  WORK = new double[2 * N - 2];
-  dsteqr_(&COMPZ, &N, D, E, A, &LDA, WORK, &INFO);
-  if(INFO != 0) {
-    std::cout << "ERROR IN dsteqr_ COMPUTING EIGENVECTORS AND EIGENVALUES!! "
-                 "ERROR CODE: "
-              << INFO << std::endl;
-    return false;
-  }
-  delete[] WORK;
-  delete[] E;
+  D.resize( N );
+  lapack::heev_2stage( JOBZ, UPLO, N, A.data(), LDA, D.data());
 
   // NOW, STORE THE EIGENVALUES AND EIGENVECTORS
   eigvals.resize(N);
   for(int i = 0; i < N; i++) eigvals[i] = D[i];
-  delete[] D;
   eigvecs.resize(N);
   for(int i = 0; i < N; i++) {
     eigvecs[i].resize(N);
     for(int j = 0; j < N; j++) eigvecs[i][j] = A[j + i * N];
   }
-  delete[] A;
 
   return true;
 }
@@ -293,57 +159,41 @@ bool GetEigsysBand(std::vector<std::vector<double> > &mat, int nSupDiag,
   eigvals.clear();
   eigvecs.clear();
   // PREPARE VARIABLES FOR LAPACK
-  char UPLO = 'U', VECT = 'V', COMPZ = 'V';
-  int N = mat.size(), LDQ = mat.size(), LDAB = nSupDiag + 1, LWORK = -1, INFO;
-  double *AB, *D, *E, *Q, *WORK;
+  lapack::Uplo UPLO = lapack::Uplo::Upper;
+  lapack::Job  VECT = lapack::Job::Vec;
+  lapack::Job COMPZ = lapack::Job::Vec;
+  int N = mat.size(), LDQ = mat.size(), LDAB = nSupDiag + 1;
+  std::vector<double> AB, D, E, Q;
 
   // INITIALIZE A
-  AB = new double[(nSupDiag + 1) * N];
+  AB.resize( (nSupDiag + 1) * N );
   for(int j = 0; j < N; j++) {
     for(int i = std::max(0, j - nSupDiag); i <= j; i++)
       AB[nSupDiag + i - j + j * (nSupDiag + 1)] = mat[i][j];
   }
   mat.clear();
   // ALLOCATE REST OF THE MEMORY
-  Q = new double[N * N];
-  D = new double[N];
-  E = new double[N - 1];
-  WORK = new double[N];
+  Q.resize( N * N );
+  D.resize( N );
+  E.resize( N - 1 );
 
   // TRANSFORM THE MATRIX TO TRIDIAGONAL FORM
   // NOW, TRANSFORM MATRIX TO TRIDIAGONAL FORM
-  dsbtrd_(&VECT, &UPLO, &N, &nSupDiag, AB, &LDAB, D, E, Q, &LDQ, WORK, &INFO);
-  if(INFO != 0) {
-    std::cout
-        << "ERROR IN dsbtrd_ COMPUTING THE TRIDIAGONAL MATRIX!! ERROR CODE: "
-        << INFO << std::endl;
-    return false;
-  }
-  delete[] AB;
+  lapack::sbtrd( VECT, UPLO, N, nSupDiag, AB.data(), LDAB, D.data(), E.data(), Q.data(), LDQ );
+  AB.clear();
 
   // FINALLY, COMPUTE THE EIGENVALUES AND EIGENVECTORS!
-  delete[] WORK;
-  WORK = new double[2 * N - 2];
-  dsteqr_(&COMPZ, &N, D, E, Q, &LDQ, WORK, &INFO);
-  if(INFO != 0) {
-    std::cout << "ERROR IN dsteqr_ COMPUTING EIGENVECTORS AND EIGENVALUES!! "
-                 "ERROR CODE: "
-              << INFO << std::endl;
-    return false;
-  }
-  delete[] WORK;
-  delete[] E;
+  lapack::steqr( COMPZ, N, D.data(), E.data(), Q.data(), LDQ );
 
   // NOW, STORE THE EIGENVALUES AND EIGENVECTORS
   eigvals.resize(N);
   for(int i = 0; i < N; i++) eigvals[i] = D[i];
-  delete[] D;
+  D.clear();
   eigvecs.resize(N);
   for(int i = 0; i < N; i++) {
     eigvecs[i].resize(N);
     for(int j = 0; j < N; j++) eigvecs[i][j] = Q[j + i * N];
   }
-  delete[] Q;
 
   return true;
 }
@@ -402,7 +252,13 @@ void BandResolvent(
   // NEXT, COMPUTE THE BAND LANCZOS
   std::vector<std::vector<double> > bandH;
   std::cout << "BAND LANCZOS ...";
-  MyBandLan<double>(H, vecs, bandH, nLanIts, 1.E-6, print);
+  SparseMatrixOperator Hop(H);
+  int nbands = vecs.size();
+  std::vector<double> qs( vecs.size() * n, 0. );
+  for( int i = 0; i < vecs.size(); i++ )
+	  for( int j = 0; j < n; j++ )
+		  qs[j + n * i] = vecs[i][j];
+  MyBandLan<double>(Hop, qs, bandH, nLanIts, nbands, n, 1.E-6, print);
   std::cout << "DONE! ";
   if(print) {
     std::ofstream ofile("BLH.dat", std::ios::out);

@@ -37,7 +37,7 @@
 
 namespace macis {
 
-using namespace Eigen;
+typedef Eigen::VectorXd VectorXd;
 
 typedef std::numeric_limits<double> dbl;
 typedef std::chrono::high_resolution_clock Clock;
@@ -166,21 +166,6 @@ void GF_Diag(const VectorXd &state_0, const MatOp &H,
 }
 
 /**
- * @brief Class for comparing two determinants, to use in sorting routines.
- *
- * @author Carlos Mejuto Zaera
- * @date 28/01/2022
- */
-template <size_t nbits>
-class BitSetComparator {
- public:
-  bool operator()(const std::bitset<nbits> &c1,
-                  const std::bitset<nbits> &c2) const {
-    return bitset_less(c1, c2);
-  }
-};
-
-/**
  * @brief Routine to build basis to compute the basis for Green's function
  *        calculation on the state |wfn> considering orbital orb. Templated
  *        to allow for differente slater determinant implementations (thinking
@@ -244,10 +229,10 @@ void get_GF_basis_AS_1El(int orb, bool sp_up, bool is_part, const VectorXd &wfn,
   std::bitset<nbits> uni_string;
   std::vector<std::bitset<nbits>> founddets;
   founddets.reserve(trunc_size);
-  std::map<std::bitset<nbits>, size_t, BitSetComparator<nbits>> founddet_pos,
+  std::map<std::bitset<nbits>, size_t, bitset_less_comparator<nbits>> founddet_pos,
       basedet_pos;
   typename std::map<std::bitset<nbits>, size_t,
-                    BitSetComparator<nbits>>::iterator it;
+                    bitset_less_comparator<nbits>>::iterator it;
   // ACTIVE SPACE
   std::vector<uint32_t> as_orbs;
   for(size_t i = 0; i < occs.size(); i++) {
@@ -401,7 +386,7 @@ std::vector<std::vector<double>> BuildWfn4Lanczos(
     const std::vector<std::bitset<nbits>> &GF_dets, bool is_part,
     std::vector<int> &todelete, double zero_thresh = 1.E-7) {
   // INITIALIZE THE DICTIONARY OF BASE DETERMINANTS
-  std::map<std::bitset<nbits>, size_t, BitSetComparator<nbits>> base_dets_pos;
+  std::map<std::bitset<nbits>, size_t, bitset_less_comparator<nbits>> base_dets_pos;
   for(size_t iii = 0; iii < base_dets.size(); iii++)
     base_dets_pos[base_dets[iii]] = iii;
 
@@ -428,7 +413,7 @@ std::vector<std::vector<double>> BuildWfn4Lanczos(
         std::bitset<nbits> temp(GF_dets[ndet]);
         temp.flip(sporb);
         typename std::map<std::bitset<nbits>, size_t,
-                          BitSetComparator<nbits>>::const_iterator it =
+                          bitset_less_comparator<nbits>>::const_iterator it =
             base_dets_pos.find(temp);
         if(it != base_dets_pos.end()) {
           // IT DOES COME INDEED FROM A DETERMINANT IN THE ORIGINAL GROUND STATE
