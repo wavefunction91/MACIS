@@ -85,7 +85,7 @@ int main(int argc, char** argv) {
     auto nalpha = input.getData<size_t>("CI.NALPHA");
     auto nbeta = input.getData<size_t>("CI.NBETA");
 
-    //if(nalpha != nbeta) throw std::runtime_error("NALPHA != NBETA");
+    // if(nalpha != nbeta) throw std::runtime_error("NALPHA != NBETA");
 
     // Read FCIDUMP File
     size_t norb = macis::read_fcidump_norb(fcidump_fname);
@@ -230,7 +230,7 @@ int main(int argc, char** argv) {
 
     // MP2 Guess Orbitals
     if(mp2_guess) {
-      if( nalpha != nbeta ) 
+      if(nalpha != nbeta)
         throw std::runtime_error("MP2 Guess only implemented for closed-shell");
 
       console->info("Calculating MP2 Natural Orbitals");
@@ -307,9 +307,8 @@ int main(int argc, char** argv) {
         }
 
       } else {
-
         if(nalpha != nbeta)
-            throw std::runtime_error("ASCI Only Implemented for Closed-Shell");
+          throw std::runtime_error("ASCI Only Implemented for Closed-Shell");
 
         // Generate the Hamiltonian Generator
         generator_t ham_gen(
@@ -383,8 +382,7 @@ int main(int argc, char** argv) {
 
       // MCSCF
     } else if(job == Job::MCSCF) {
-
-      if( nalpha != nbeta )
+      if(nalpha != nbeta)
         throw std::runtime_error("MCSCF Only Implemented for Closed-Shells");
 
       // Possibly read active RDMs
