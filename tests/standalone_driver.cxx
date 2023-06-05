@@ -85,7 +85,7 @@ int main(int argc, char** argv) {
     auto nalpha = input.getData<size_t>("CI.NALPHA");
     auto nbeta = input.getData<size_t>("CI.NBETA");
 
-    if(nalpha != nbeta) throw std::runtime_error("NALPHA != NBETA");
+    //if(nalpha != nbeta) throw std::runtime_error("NALPHA != NBETA");
 
     // Read FCIDUMP File
     size_t norb = macis::read_fcidump_norb(fcidump_fname);
@@ -230,6 +230,9 @@ int main(int argc, char** argv) {
 
     // MP2 Guess Orbitals
     if(mp2_guess) {
+      if( nalpha != nbeta ) 
+        throw std::runtime_error("MP2 Guess only implemented for closed-shell");
+
       console->info("Calculating MP2 Natural Orbitals");
       size_t nocc_canon = n_inactive + nalpha;
       size_t nvir_canon = norb - nocc_canon;
@@ -291,7 +294,7 @@ int main(int argc, char** argv) {
           auto det_logger = world_rank
                                 ? spdlog::null_logger_mt("determinants")
                                 : spdlog::stdout_color_mt("determinants");
-          det_logger->info("Print leading determinants > {:.12f}",
+          det_logger->info("Print leading determinants > {:.2e}",
                            determinants_threshold);
           auto dets = macis::generate_hilbert_space<generator_t::nbits>(
               n_active, nalpha, nbeta);
@@ -304,6 +307,10 @@ int main(int argc, char** argv) {
         }
 
       } else {
+
+        if(nalpha != nbeta)
+            throw std::runtime_error("ASCI Only Implemented for Closed-Shell");
+
         // Generate the Hamiltonian Generator
         generator_t ham_gen(
             macis::matrix_span<double>(T_active.data(), n_active, n_active),
@@ -376,6 +383,10 @@ int main(int argc, char** argv) {
 
       // MCSCF
     } else if(job == Job::MCSCF) {
+
+      if( nalpha != nbeta )
+        throw std::runtime_error("MCSCF Only Implemented for Closed-Shells");
+
       // Possibly read active RDMs
       if(rdm_fname.size()) {
         console->info("  * RDMFILE = {}", rdm_fname);
