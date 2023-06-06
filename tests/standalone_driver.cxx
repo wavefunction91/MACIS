@@ -382,8 +382,6 @@ int main(int argc, char** argv) {
 
       // MCSCF
     } else if(job == Job::MCSCF) {
-      if(nalpha != nbeta)
-        throw std::runtime_error("MCSCF Only Implemented for Closed-Shells");
 
       // Possibly read active RDMs
       if(rdm_fname.size()) {
