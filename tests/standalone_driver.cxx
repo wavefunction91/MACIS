@@ -283,7 +283,6 @@ int main(int argc, char** argv) {
       using generator_t = macis::DoubleLoopHamiltonianGenerator<nwfn_bits>;
       if(ci_exp == CIExpansion::CAS) {
         std::vector<double> C_local;
-        // TODO: VERIFY MPI + CAS
         E0 = macis::CASRDMFunctor<generator_t>::rdms(
             mcscf_settings, NumOrbital(n_active), nalpha, nbeta,
             T_active.data(), V_active.data(), active_ordm.data(),
