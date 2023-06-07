@@ -20,6 +20,7 @@ add_executable( macis_test
   mcscf.cxx
   asci.cxx
   dist_quickselect.cxx
+  hubbard.cxx
 )
 target_link_libraries( macis_test PUBLIC macis Catch2::Catch2 )
 target_include_directories( macis_test PUBLIC ${PROJECT_BINARY_DIR}/tests )
