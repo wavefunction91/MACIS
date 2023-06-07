@@ -381,7 +381,6 @@ int main(int argc, char** argv) {
 
       // MCSCF
     } else if(job == Job::MCSCF) {
-
       // Possibly read active RDMs
       if(rdm_fname.size()) {
         console->info("  * RDMFILE = {}", rdm_fname);
