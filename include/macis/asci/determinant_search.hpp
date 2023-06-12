@@ -145,8 +145,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs, HamiltonianGenerator<N>& ham_gen
-    MACIS_MPI_CODE(, MPI_Comm comm)) {
+    const double* V_pqrs,
+    HamiltonianGenerator<N>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
 
@@ -223,8 +223,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
 #else
-  int  world_rank = 0;
-  int  world_size = 1;
+  int world_rank = 0;
+  int world_size = 1;
 #endif
 
   const auto n_occ_alpha = uniq_alpha_wfn[0].count();
@@ -259,10 +259,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   }
 
   auto gen_c_st = clock_type::now();
-  auto constraints =
-      dist_constraint_general(asci_settings.constraint_level, norb,
-                              n_sing_alpha, n_doub_alpha, uniq_alpha_wfn
-                              MACIS_MPI_CODE(, comm));
+  auto constraints = dist_constraint_general(
+      asci_settings.constraint_level, norb, n_sing_alpha, n_doub_alpha,
+      uniq_alpha_wfn MACIS_MPI_CODE(, comm));
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
@@ -402,8 +401,8 @@ std::vector<wfn_t<N>> asci_search(
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs, HamiltonianGenerator<N>& ham_gen
-    MACIS_MPI_CODE(, MPI_Comm comm)) {
+    const double* V_pqrs,
+    HamiltonianGenerator<N>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
 
@@ -412,8 +411,8 @@ std::vector<wfn_t<N>> asci_search(
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
 #else
-  int  world_rank = 0;
-  int  world_size = 1;
+  int world_rank = 0;
+  int world_size = 1;
 #endif
 
   auto logger = spdlog::get("asci_search");

@@ -33,8 +33,8 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   std::vector<double> X_local;  // Precludes guess reuse
   auto E = selected_ci_diag<N, index_t>(
       wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
-      mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol, X_local
-      MACIS_MPI_CODE(, comm));
+      mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol,
+      X_local MACIS_MPI_CODE(, comm));
 
 #ifdef MACIS_ENABLE_MPI
   auto world_size = comm_size(comm);
@@ -61,7 +61,7 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     X = std::move(X_local);
   }
 #else
-  X = std::move(X_local); // Serial
+  X = std::move(X_local);  // Serial
 #endif
 
   return std::make_tuple(E, wfn, X);
