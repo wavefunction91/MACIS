@@ -11,9 +11,9 @@
 #include <macis/macis_config.hpp>
 
 #ifdef MACIS_ENABLE_MPI
-  #define MACIS_MPI_CODE(...) __VA_ARGS__
+#define MACIS_MPI_CODE(...) __VA_ARGS__
 #else
-  #define MACIS_MPI_CODE(...) 
+#define MACIS_MPI_CODE(...)
 #endif
 
 #ifdef MACIS_ENABLE_MPI
