@@ -14,9 +14,14 @@ namespace macis {
 template <size_t N, typename index_t = int32_t>
 auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                  double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X,
-                 HamiltonianGenerator<N>& ham_gen, size_t norb, MPI_Comm comm) {
+                 HamiltonianGenerator<N>& ham_gen, size_t norb
+                 MACIS_MPI_CODE(, MPI_Comm comm)) {
   auto logger = spdlog::get("asci_refine");
+#ifdef MACIS_ENABLE_MPI
   auto world_rank = comm_rank(comm);
+#else
+  int world_rank = 0;
+#endif
   if(!logger)
     logger = world_rank ? spdlog::null_logger_mt("asci_refine")
                         : spdlog::stdout_color_mt("asci_refine");
@@ -39,7 +44,7 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     double E;
     std::tie(E, wfn, X) = asci_iter<N, index_t>(
         asci_settings, mcscf_settings, ndets, E0, std::move(wfn), std::move(X),
-        ham_gen, norb, comm);
+        ham_gen, norb MACIS_MPI_CODE(, comm));
     if(wfn.size() != ndets)
       throw std::runtime_error("Wavefunction size can't change in refinement");
 
