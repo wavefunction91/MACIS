@@ -7,6 +7,7 @@
  */
 
 #pragma once
+#include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
@@ -602,6 +603,12 @@ std::vector<wfn_t<N>> asci_search(
       MPI_Allgatherv(keep_strings_local.data(), n_geq_local, string_dtype,
                      keep_strings_global.data(), local_sizes.data(),
                      displ.data(), string_dtype, comm);
+
+      // Edge case where NGEQ > TOPK - erase equivalent elements
+      if(n_geq_global > top_k_elements) {
+        n_geq_global = top_k_elements;
+        keep_strings_global.resize(n_geq_global);
+      }
 
       // Make fake strings
       topk.resize(n_geq_global);
