@@ -10,9 +10,8 @@
 
 namespace macis {
 
-void hubbard_1d(size_t nsites, double t, double U,  
-                std::vector<double>& T, std::vector<double>& V,
-                bool pbc) {
+void hubbard_1d(size_t nsites, double t, double U, std::vector<double>& T,
+                std::vector<double>& V, bool pbc) {
   T.resize(nsites * nsites);
   V.resize(nsites * nsites * nsites * nsites);
 
@@ -32,8 +31,8 @@ void hubbard_1d(size_t nsites, double t, double U,
 
   // PBC for 1-D
   if(pbc) {
-    T[ (nsites-1) ]         = -t;
-    T[ (nsites-1) * nsites] = -t;
+    T[(nsites - 1)] = -t;
+    T[(nsites - 1) * nsites] = -t;
   }
 }
 

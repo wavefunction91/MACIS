@@ -6,8 +6,6 @@
  * See LICENSE.txt for details
  */
 
-
-
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
@@ -26,16 +24,11 @@ TEST_CASE("Hubbard") {
   std::vector<double> T, V;
 
   SECTION("1D") {
-
     bool pbc;
 
-    SECTION("No PBC") {
-      pbc = false;
-    }
+    SECTION("No PBC") { pbc = false; }
 
-    SECTION("PBC") {
-      pbc = true;
-    }
+    SECTION("PBC") { pbc = true; }
 
     macis::hubbard_1d(nsites, t, U, T, V, pbc);
 
@@ -60,7 +53,7 @@ TEST_CASE("Hubbard") {
         else if(std::abs(p - q) == 1)
           REQUIRE(mat_el == -t);
         else if(pbc) {
-          if( (p == 0 and q == nsites-1) or (p == nsites-1 and q == 0) )
+          if((p == 0 and q == nsites - 1) or (p == nsites - 1 and q == 0))
             REQUIRE(mat_el == -t);
           else
             REQUIRE(mat_el == 0.0);
