@@ -40,3 +40,8 @@ configure_file( ut_common.hpp.in ${PROJECT_BINARY_DIR}/tests/ut_common.hpp)
 #target_link_libraries(pymacis PUBLIC macis)
 
 add_test( NAME MACIS_SERIAL_TEST COMMAND $<TARGET_FILE:macis_test> )
+if( MACIS_ENABLE_MPI )
+  add_test( NAME MACIS_MPI_TEST
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS} $<TARGET_FILE:macis_test> ${MPIEXEC_POSTFLAGS}
+  )
+endif()

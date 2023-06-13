@@ -70,6 +70,7 @@ TEST_CASE("CSR Hamiltonian") {
   }
 }
 
+#ifdef MACIS_ENABLE_MPI
 TEST_CASE("Distributed CSR Hamiltonian") {
   MPI_Barrier(MPI_COMM_WORLD);
   size_t norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
@@ -133,3 +134,4 @@ TEST_CASE("Distributed CSR Hamiltonian") {
 
   MPI_Barrier(MPI_COMM_WORLD);
 }
+#endif

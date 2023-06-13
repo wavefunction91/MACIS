@@ -16,9 +16,12 @@ jobs:
       matrix:
         compiler: [ {suite: gnu, version: 12} ]
         openmp_flag: [ON, OFF]
+        mpi_flag: [ON, OFF]
         exclude:
             - compiler: {suite: llvm, version: 14}
               openmp_flag: ON
+            - openmp_flag: OFF
+              mpi_flag: ON
 
     steps:
     - uses: actions/checkout@v3
@@ -31,6 +34,11 @@ jobs:
     - name: Enable or Disable OpenMP
       shell: bash
       run: echo "set(MACIS_ENABLE_OPENMP ${{matrix.openmp_flag}} CACHE BOOL \"\" FORCE)" >> 
+              ${GITHUB_WORKSPACE}/${GH_ACTIONS_TOOLCHAIN}
+
+    - name: Enable or Disable MPI
+      shell: bash
+      run: echo "set(MACIS_ENABLE_MPI ${{matrix.mpi_flag}} CACHE BOOL \"\" FORCE)" >> 
               ${GITHUB_WORKSPACE}/${GH_ACTIONS_TOOLCHAIN}
 
     - name: Setup Build Type
