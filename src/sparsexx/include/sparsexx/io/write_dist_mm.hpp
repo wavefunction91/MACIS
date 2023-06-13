@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include <macis/macis_config.hpp>
+#include <sparsexx/sparsexx_config.hpp>
 
-#ifdef MACIS_ENABLE_MPI
+#ifdef SPARSEXX_ENABLE_MPI
 #include <sparsexx/io/write_mm.hpp>
 #include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
 

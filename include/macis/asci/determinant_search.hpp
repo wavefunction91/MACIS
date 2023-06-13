@@ -500,7 +500,7 @@ std::vector<wfn_t<N>> asci_search(
   auto bit_sort_en = clock_type::now();
 
   {
-#if MACIS_ENABLE_MPI
+#ifdef MACIS_ENABLE_MPI
     size_t npairs = allreduce(asci_pairs.size(), MPI_SUM, comm);
 #else
     size_t npairs = asci_pairs.size();
