@@ -207,7 +207,7 @@ TEST_CASE("Triplets") {
 
 TEST_CASE("ASCI") {
 
-  MPI_Barrier(MPI_COMM_WORLD);
+  MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
   using macis::NumActive;
   using macis::NumElectron;
   using macis::NumInactive;
@@ -252,7 +252,7 @@ TEST_CASE("ASCI") {
   asci_settings.ntdets_max = 10000;
   std::tie(E0, dets, C) = 
     macis::asci_grow( asci_settings, mcscf_settings, E0, std::move(dets),
-        std::move(C), ham_gen, norb, MPI_COMM_WORLD);
+        std::move(C), ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
   REQUIRE( E0 == Approx(-8.542926243842e+01) );
   REQUIRE( dets.size() == 10000 );
@@ -262,7 +262,7 @@ TEST_CASE("ASCI") {
   // ASCI Refine
   std::tie(E0, dets, C) = 
     macis::asci_refine( asci_settings, mcscf_settings, E0, std::move(dets),
-        std::move(C), ham_gen, norb, MPI_COMM_WORLD);
+        std::move(C), ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
   
 
   REQUIRE( E0 == Approx(-8.542925964708e+01) );
@@ -270,6 +270,6 @@ TEST_CASE("ASCI") {
   REQUIRE( C.size() == 10000 );
   REQUIRE( std::inner_product(C.begin(), C.end(), C.begin(), 0.0) == Approx(1.0) );
 
-  MPI_Barrier(MPI_COMM_WORLD);
+  MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
   spdlog::drop_all();
 }
