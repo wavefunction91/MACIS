@@ -6,6 +6,9 @@
  * See LICENSE.txt for details
  */
 
+#include <macis/util/mpi.hpp>
+
+#ifdef MACIS_ENABLE_MPI
 #include <macis/util/dist_quickselect.hpp>
 
 #include "ut_common.hpp"
@@ -66,3 +69,4 @@ TEMPLATE_TEST_CASE("Distributed Quickselect", "[mpi]", std::less<int>,
 
   MPI_Barrier(MPI_COMM_WORLD);
 }
+#endif

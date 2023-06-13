@@ -7,9 +7,8 @@
  */
 
 #pragma once
-#include <mpi.h>
-
 #include <macis/types.hpp>
+#include <macis/util/mpi.hpp>
 
 namespace macis {
 
@@ -34,6 +33,7 @@ double casscf_diis(MCSCFSettings settings, NumElectron nalpha,
                    NumElectron nbeta, NumOrbital norb, NumInactive ninact,
                    NumActive nact, NumVirtual nvirt, double E_core, double* T,
                    size_t LDT, double* V, size_t LDV, double* A1RDM,
-                   size_t LDD1, double* A2RDM, size_t LDD2, MPI_Comm comm);
+                   size_t LDD1, double* A2RDM,
+                   size_t LDD2 MACIS_MPI_CODE(, MPI_Comm comm));
 
 }  // namespace macis

@@ -19,14 +19,21 @@ add_library( macis
 
 target_include_directories( macis PUBLIC 
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-    #$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
+    $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 target_compile_features(macis PUBLIC cxx_std_17)
 
+configure_file( 
+  ${PROJECT_SOURCE_DIR}/include/macis/macis_config.hpp.in
+  ${PROJECT_BINARY_DIR}/include/macis/macis_config.hpp
+)
+
 # Parallelism
-find_package( MPI REQUIRED )
-target_link_libraries( macis PUBLIC MPI::MPI_CXX )
+if(MACIS_ENABLE_MPI)
+  find_package( MPI REQUIRED )
+  target_link_libraries( macis PUBLIC MPI::MPI_CXX )
+endif()
 if(MACIS_ENABLE_OPENMP)
   find_package(OpenMP REQUIRED)
   target_link_libraries( macis PUBLIC OpenMP::OpenMP_CXX )
@@ -80,6 +87,11 @@ install(
   DIRECTORY   ${PROJECT_SOURCE_DIR}/include
   DESTINATION ${CMAKE_INSTALL_PREFIX}
   FILES_MATCHING PATTERN "*.hpp"
+)
+# Install generated headers
+install(
+  FILES       ${PROJECT_BINARY_DIR}/include/macis/macis_config.hpp
+  DESTINATION include/macis
 )
 
    
