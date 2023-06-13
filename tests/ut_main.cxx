@@ -7,14 +7,18 @@
  */
 
 #define CATCH_CONFIG_RUNNER
-#include <mpi.h>
+#include <macis/util/mpi.hpp>
 
 #include "catch2/catch.hpp"
 
 int main(int argc, char* argv[]) {
+#ifdef MACIS_ENABLE_MPI
   MPI_Init(&argc, &argv);
+#endif
   int result = Catch::Session().run(argc, argv);
+#ifdef MACIS_ENABLE_MPI
   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
+#endif
   return result;
 }

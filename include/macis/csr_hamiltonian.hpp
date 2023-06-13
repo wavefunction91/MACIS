@@ -9,9 +9,13 @@
 #pragma once
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/types.hpp>
-#include <sparsexx/matrix_types/csr_matrix.hpp>
-#include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
+#include <macis/util/mpi.hpp>
 
+#ifdef MACIS_ENABLE_MPI
+#include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
+#endif
+
+#include <sparsexx/matrix_types/csr_matrix.hpp>
 namespace macis {
 
 // Base implementation of bitset CSR generation
@@ -31,6 +35,15 @@ sparsexx::csr_matrix<double, index_t> make_csr_hamiltonian_block(
   }
 }
 
+template <typename index_t, size_t N>
+sparsexx::csr_matrix<double, index_t> make_csr_hamiltonian(
+    wavefunction_iterator_t<N> sd_begin, wavefunction_iterator_t<N> sd_end,
+    HamiltonianGenerator<N>& ham_gen, double H_thresh) {
+  return make_csr_hamiltonian_block<index_t>(sd_begin, sd_end, sd_begin, sd_end,
+                                             ham_gen, H_thresh);
+}
+
+#ifdef MACIS_ENABLE_MPI
 // Base implementation of dist-CSR H construction for bitsets
 template <typename index_t, size_t N>
 sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double, index_t>>
@@ -67,5 +80,6 @@ make_dist_csr_hamiltonian(MPI_Comm comm, wavefunction_iterator_t<N> sd_begin,
 
   return H_dist;
 }
+#endif
 
 }  // namespace macis

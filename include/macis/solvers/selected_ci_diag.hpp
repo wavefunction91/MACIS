@@ -14,13 +14,15 @@
 #include <macis/types.hpp>
 #include <macis/util/mpi.hpp>
 #include <sparsexx/matrix_types/dense_conversions.hpp>
+#include <sparsexx/util/submatrix.hpp>
 
 namespace macis {
 
+#ifdef MACIS_ENABLE_MPI
 template <typename SpMatType>
-double selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
-                        double davidson_res_tol, std::vector<double>& C_local,
-                        MPI_Comm comm) {
+double parallel_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
+                                 double davidson_res_tol,
+                                 std::vector<double>& C_local, MPI_Comm comm) {
   auto logger = spdlog::get("ci_solver");
   if(!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
@@ -57,9 +59,59 @@ double selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
 
   auto [niter, E] =
       p_davidson(H.local_row_extent(), davidson_max_m, op, D_local.data(),
-                 davidson_res_tol, C_local.data(), H.comm());
+                 davidson_res_tol, C_local.data() MACIS_MPI_CODE(, H.comm()));
 
   MPI_Barrier(comm);
+  auto dav_en = clock_type::now();
+
+  logger->info("  {} = {:4}, {} = {:.6e} Eh, {} = {:.5e} ms", "DAV_NITER",
+               niter, "E0", E, "DAVIDSON_DUR",
+               duration_type(dav_en - dav_st).count());
+
+  return E;
+}
+#endif
+
+template <typename SpMatType>
+double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
+                               double davidson_res_tol,
+                               std::vector<double>& C) {
+  auto logger = spdlog::get("ci_solver");
+  if(!logger) {
+    logger = spdlog::stdout_color_mt("ci_solver");
+  }
+
+  using clock_type = std::chrono::high_resolution_clock;
+  using duration_type = std::chrono::duration<double, std::milli>;
+
+  // Resize eigenvector size
+  C.resize(H.m(), 0);
+
+  // Extract Diagonal
+  auto D = extract_diagonal_elements(H);
+
+  // Setup guess
+  auto max_c = *std::max_element(C.begin(), C.end(), [](auto a, auto b) {
+    return std::abs(a) < std::abs(b);
+  });
+  max_c = std::abs(max_c);
+
+  if(max_c > (1. / C.size())) {
+    logger->info("  * Will use passed vector as guess");
+  } else {
+    logger->info("  * Will generate identity guess");
+    diagonal_guess(C.size(), H, C.data());
+  }
+
+  // Setup Davidson Functor
+  SparseMatrixOperator op(H);
+
+  // Solve EVP
+  auto dav_st = clock_type::now();
+
+  auto [niter, E] =
+      davidson(H.m(), davidson_max_m, op, D.data(), davidson_res_tol, C.data());
+
   auto dav_en = clock_type::now();
 
   logger->info("  {} = {:4}, {} = {:.6e} Eh, {} = {:.5e} ms", "DAV_NITER",
@@ -74,8 +126,9 @@ double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
                         wavefunction_iterator_t<N> dets_end,
                         HamiltonianGenerator<N>& ham_gen, double h_el_tol,
                         size_t davidson_max_m, double davidson_res_tol,
-                        std::vector<double>& C_local, MPI_Comm comm,
-                        const bool quiet = false) {
+                        std::vector<double>& C_local,
+                        MACIS_MPI_CODE(MPI_Comm comm, )
+                            const bool quiet = false) {
   auto logger = spdlog::get("ci_solver");
   if(!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
@@ -90,22 +143,34 @@ double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
   using duration_type = std::chrono::duration<double, std::milli>;
 
   // Generate Hamiltonian
-  MPI_Barrier(comm);
+  MACIS_MPI_CODE(MPI_Barrier(comm);)
   auto H_st = clock_type::now();
 
+#ifdef MACIS_ENABLE_MPI
   auto H = make_dist_csr_hamiltonian<index_t>(comm, dets_begin, dets_end,
                                               ham_gen, h_el_tol);
+#else
+  auto H =
+      make_csr_hamiltonian<index_t>(dets_begin, dets_end, ham_gen, h_el_tol);
+#endif
 
   auto H_en = clock_type::now();
-  MPI_Barrier(comm);
+  MACIS_MPI_CODE(MPI_Barrier(comm);)
 
   // Get total NNZ
+#ifdef MACIS_ENABLE_MPI
   size_t local_nnz = H.nnz();
   size_t total_nnz = allreduce(local_nnz, MPI_SUM, comm);
   size_t max_nnz = allreduce(local_nnz, MPI_MAX, comm);
   size_t min_nnz = allreduce(local_nnz, MPI_MIN, comm);
+#else
+  size_t total_nnz = H.nnz();
+#endif
+
   logger->info("  {}   = {:6}, {}     = {:.5e} ms", "NNZ", total_nnz, "H_DUR",
                duration_type(H_en - H_st).count());
+
+#ifdef MACIS_ENABLE_MPI
   auto world_size = comm_size(comm);
   if(world_size > 1) {
     double local_hdur = duration_type(H_en - H_st).count();
@@ -117,17 +182,26 @@ double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
         "  H_DUR_MAX = {:.2e} ms, H_DUR_MIN = {:.2e} ms, H_DUR_AVG = {:.2e} ms",
         max_hdur, min_hdur, avg_hdur);
   }
+#endif
   logger->info("  {} = {:.2e} GiB", "HMEM_LOC",
                H.mem_footprint() / 1073741824.);
   logger->info("  {} = {:.2f}%", "H_SPARSE",
                total_nnz / double(H.n() * H.n()) * 100);
+#ifdef MACIS_ENABLE_MPI
   if(world_size > 1) {
     logger->info("  NNZ_MAX = {}, NNZ_MIN = {}, NNZ_AVG = {}", max_nnz, min_nnz,
                  total_nnz / double(world_size));
   }
+#endif
 
   // Solve EVP
-  auto E = selected_ci_diag(H, davidson_max_m, davidson_res_tol, C_local, comm);
+#ifdef MACIS_ENABLE_MPI
+  auto E = parallel_selected_ci_diag(H, davidson_max_m, davidson_res_tol,
+                                     C_local, comm);
+#else
+  auto E =
+      serial_selected_ci_diag(H, davidson_max_m, davidson_res_tol, C_local);
+#endif
 
   return E;
 }

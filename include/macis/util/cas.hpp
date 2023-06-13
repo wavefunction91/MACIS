@@ -30,14 +30,18 @@ namespace macis {
  *  @param[in]  comm    MPI Communicator on which to solve the EVP.
  */
 template <typename HamGen>
-double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb,
-                          size_t nalpha, size_t nbeta, double* T, double* V,
-                          double* ORDM, double* TRDM, std::vector<double>& C,
-                          MPI_Comm comm) {
+double compute_casci_rdms(
+    MCSCFSettings settings, NumOrbital norb, size_t nalpha, size_t nbeta,
+    double* T, double* V, double* ORDM, double* TRDM,
+    std::vector<double>& C MACIS_MPI_CODE(, MPI_Comm comm)) {
   constexpr auto nbits = HamGen::nbits;
 
+#ifdef MACIS_ENABLE_MPI
   int rank;
   MPI_Comm_rank(comm, &rank);
+#else
+  int rank = 0;
+#endif
 
   // Hamiltonian Matrix Element Generator
   size_t no = norb.get();
@@ -46,9 +50,10 @@ double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb,
 
   // Compute Lowest Energy Eigenvalue (ED)
   auto dets = generate_hilbert_space<nbits>(norb.get(), nalpha, nbeta);
-  double E0 = selected_ci_diag(dets.begin(), dets.end(), ham_gen,
-                               settings.ci_matel_tol, settings.ci_max_subspace,
-                               settings.ci_res_tol, C, comm, true);
+  double E0 =
+      selected_ci_diag(dets.begin(), dets.end(), ham_gen, settings.ci_matel_tol,
+                       settings.ci_max_subspace, settings.ci_res_tol, C,
+                       MACIS_MPI_CODE(comm, ) true);
 
   // Compute RDMs
   ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
