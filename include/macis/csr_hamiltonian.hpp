@@ -39,10 +39,8 @@ template <typename index_t, size_t N>
 sparsexx::csr_matrix<double, index_t> make_csr_hamiltonian(
     wavefunction_iterator_t<N> sd_begin, wavefunction_iterator_t<N> sd_end,
     HamiltonianGenerator<N>& ham_gen, double H_thresh) {
-
-  return make_csr_hamiltonian_block<index_t>(sd_begin, sd_end, sd_begin, sd_end, ham_gen,
-        H_thresh);
-
+  return make_csr_hamiltonian_block<index_t>(sd_begin, sd_end, sd_begin, sd_end,
+                                             ham_gen, H_thresh);
 }
 
 #ifdef MACIS_ENABLE_MPI

@@ -17,8 +17,8 @@ double casscf_diis(MCSCFSettings settings, NumElectron nalpha,
                    NumElectron nbeta, NumOrbital norb, NumInactive ninact,
                    NumActive nact, NumVirtual nvirt, double E_core, double* T,
                    size_t LDT, double* V, size_t LDV, double* A1RDM,
-                   size_t LDD1, double* A2RDM, size_t LDD2 
-                   MACIS_MPI_CODE(, MPI_Comm comm)) {
+                   size_t LDD1, double* A2RDM,
+                   size_t LDD2 MACIS_MPI_CODE(, MPI_Comm comm)) {
   using generator_t = DoubleLoopHamiltonianGenerator<64>;
   using functor_t = CASRDMFunctor<generator_t>;
   functor_t op;
