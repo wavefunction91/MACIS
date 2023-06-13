@@ -8,12 +8,20 @@
 
 #pragma once
 #include "catch2/catch.hpp"
-#include <mpi.h>
+
+#include <macis/util/mpi.hpp>
+#ifdef MACIS_ENABLE_MPI
 
 #define ROOT_ONLY(comm) \
   int mpi_rank; \
   MPI_Comm_rank(comm,&mpi_rank); \
   if(mpi_rank > 0 ) return;
+
+#else
+
+#define ROOT_ONLY(comm)
+
+#endif
 
 
 #cmakedefine REF_DATA_PREFIX "@REF_DATA_PREFIX@"
