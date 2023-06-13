@@ -48,8 +48,8 @@ TEST_CASE("Davidson") {
   auto E0_ref = -7.623197835987e+01;
 
   // Generate CSR Hamiltonian
-  auto H = macis::make_csr_hamiltonian<int32_t>(
-      dets.begin(), dets.end(), ham_gen, 1e-16);
+  auto H = macis::make_csr_hamiltonian<int32_t>(dets.begin(), dets.end(),
+                                                ham_gen, 1e-16);
 
   // Obtain lowest eigenvalue
   SECTION("With Vectors") {

@@ -139,7 +139,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
   return asci_pairs;
 }
 
-
 #ifdef MACIS_ENABLE_MPI
 template <size_t N>
 asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
@@ -147,8 +146,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs,
-    HamiltonianGenerator<N>& ham_gen, MPI_Comm comm) {
+    const double* V_pqrs, HamiltonianGenerator<N>& ham_gen, MPI_Comm comm) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
 
@@ -256,9 +254,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   }
 
   auto gen_c_st = clock_type::now();
-  auto constraints = dist_constraint_general(
-      asci_settings.constraint_level, norb, n_sing_alpha, n_doub_alpha,
-      uniq_alpha_wfn, comm);
+  auto constraints =
+      dist_constraint_general(asci_settings.constraint_level, norb,
+                              n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());

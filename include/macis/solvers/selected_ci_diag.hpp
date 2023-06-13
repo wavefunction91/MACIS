@@ -21,8 +21,8 @@ namespace macis {
 #ifdef MACIS_ENABLE_MPI
 template <typename SpMatType>
 double parallel_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
-                        double davidson_res_tol, std::vector<double>& C_local,
-                        MPI_Comm comm) {
+                                 double davidson_res_tol,
+                                 std::vector<double>& C_local, MPI_Comm comm) {
   auto logger = spdlog::get("ci_solver");
   if(!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
@@ -74,7 +74,8 @@ double parallel_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
 
 template <typename SpMatType>
 double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
-                        double davidson_res_tol, std::vector<double>& C) {
+                               double davidson_res_tol,
+                               std::vector<double>& C) {
   auto logger = spdlog::get("ci_solver");
   if(!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
@@ -90,9 +91,9 @@ double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
   auto D = extract_diagonal_elements(H);
 
   // Setup guess
-  auto max_c = *std::max_element(
-      C.begin(), C.end(),
-      [](auto a, auto b) { return std::abs(a) < std::abs(b); });
+  auto max_c = *std::max_element(C.begin(), C.end(), [](auto a, auto b) {
+    return std::abs(a) < std::abs(b);
+  });
   max_c = std::abs(max_c);
 
   if(max_c > (1. / C.size())) {
@@ -120,14 +121,14 @@ double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
   return E;
 }
 
-
 template <size_t N, typename index_t = int32_t>
 double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
                         wavefunction_iterator_t<N> dets_end,
                         HamiltonianGenerator<N>& ham_gen, double h_el_tol,
                         size_t davidson_max_m, double davidson_res_tol,
-                        std::vector<double>& C_local, MACIS_MPI_CODE(MPI_Comm comm,)
-                        const bool quiet = false) {
+                        std::vector<double>& C_local,
+                        MACIS_MPI_CODE(MPI_Comm comm, )
+                            const bool quiet = false) {
   auto logger = spdlog::get("ci_solver");
   if(!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
@@ -149,7 +150,8 @@ double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
   auto H = make_dist_csr_hamiltonian<index_t>(comm, dets_begin, dets_end,
                                               ham_gen, h_el_tol);
 #else
-  auto H = make_csr_hamiltonian<index_t>(dets_begin, dets_end, ham_gen, h_el_tol);
+  auto H =
+      make_csr_hamiltonian<index_t>(dets_begin, dets_end, ham_gen, h_el_tol);
 #endif
 
   auto H_en = clock_type::now();
@@ -194,9 +196,11 @@ double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
 
   // Solve EVP
 #ifdef MACIS_ENABLE_MPI
-  auto E = parallel_selected_ci_diag(H, davidson_max_m, davidson_res_tol, C_local, comm);
+  auto E = parallel_selected_ci_diag(H, davidson_max_m, davidson_res_tol,
+                                     C_local, comm);
 #else
-  auto E = serial_selected_ci_diag(H, davidson_max_m, davidson_res_tol, C_local);
+  auto E =
+      serial_selected_ci_diag(H, davidson_max_m, davidson_res_tol, C_local);
 #endif
 
   return E;

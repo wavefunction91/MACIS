@@ -46,7 +46,6 @@ class SparseMatrixOperator {
 
   void operator_action(size_t m, double alpha, const double* V, size_t LDV,
                        double beta, double* AV, size_t LDAV) const {
-
 #ifdef MACIS_ENABLE_MPI
     if constexpr(sparsexx::is_dist_sparse_matrix_v<SpMatType>) {
       sparsexx::spblas::pgespmv(alpha, m_matrix_, V, beta, AV, m_spmv_info_);
@@ -224,7 +223,6 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
 
   return std::make_pair(iter, LAM[0]);
 }
-
 
 #ifdef MACIS_ENABLE_MPI
 inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,

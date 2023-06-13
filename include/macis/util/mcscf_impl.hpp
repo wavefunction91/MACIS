@@ -26,8 +26,8 @@ double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings,
                   NumElectron nalpha, NumElectron nbeta, NumOrbital norb,
                   NumInactive ninact, NumActive nact, NumVirtual nvirt,
                   double E_core, double* T, size_t LDT, double* V, size_t LDV,
-                  double* A1RDM, size_t LDD1, double* A2RDM, size_t LDD2
-                  MACIS_MPI_CODE(, MPI_Comm comm)) {
+                  double* A1RDM, size_t LDD1, double* A2RDM,
+                  size_t LDD2 MACIS_MPI_CODE(, MPI_Comm comm)) {
   /******************************************************************
    *  Top of MCSCF Routine - Setup and print header info to logger  *
    ******************************************************************/
@@ -141,8 +141,8 @@ double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings,
     std::fill_n(A1RDM, na2, 0.0);
     std::fill_n(A2RDM, na4, 0.0);
     rdm_op.rdms(settings, NumOrbital(na), nalpha.get(), nbeta.get(),
-                T_active.data(), V_active.data(), A1RDM, A2RDM, X_CI
-                MACIS_MPI_CODE(, comm)) +
+                T_active.data(), V_active.data(), A1RDM, A2RDM,
+                X_CI MACIS_MPI_CODE(, comm)) +
         E_inactive;
   } else {
     logger->info("Using Passed RDMs");
@@ -291,8 +291,8 @@ double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings,
     std::fill_n(A1RDM, na2, 0.0);
     std::fill_n(A2RDM, na4, 0.0);
     E0 = rdm_op.rdms(settings, NumOrbital(na), nalpha.get(), nbeta.get(),
-                     T_active.data(), V_active.data(), A1RDM, A2RDM, X_CI
-                     MACIS_MPI_CODE(, comm)) +
+                     T_active.data(), V_active.data(), A1RDM, A2RDM,
+                     X_CI MACIS_MPI_CODE(, comm)) +
          E_inactive;
 
     /************************************************************

@@ -69,8 +69,8 @@ int main(int argc, char** argv) {
   auto world_rank = macis::comm_rank(MPI_COMM_WORLD);
   auto world_size = macis::comm_size(MPI_COMM_WORLD);
 #else
-  int  world_rank = 0;
-  int  world_size = 1;
+  int world_rank = 0;
+  int world_size = 1;
 #endif
   {
     // Create Logger
@@ -350,10 +350,9 @@ int main(int argc, char** argv) {
         auto asci_st = hrt_t::now();
 
         // Growth phase
-        std::tie(E0, dets, C) =
-            macis::asci_grow(asci_settings, mcscf_settings, E0, std::move(dets),
-                             std::move(C), ham_gen, n_active
-                             MACIS_MPI_CODE(, MPI_COMM_WORLD));
+        std::tie(E0, dets, C) = macis::asci_grow(
+            asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
+            ham_gen, n_active MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
         // Refinement phase
         if(asci_settings.max_refine_iter) {
@@ -405,13 +404,12 @@ int main(int argc, char** argv) {
       }
 
       // CASSCF
-      E0 = macis::casscf_diis(mcscf_settings, NumElectron(nalpha),
-                              NumElectron(nbeta), NumOrbital(norb),
-                              NumInactive(n_inactive), NumActive(n_active),
-                              NumVirtual(n_virtual), E_core, T.data(), norb,
-                              V.data(), norb, active_ordm.data(), n_active,
-                              active_trdm.data(), n_active
-                              MACIS_MPI_CODE(, MPI_COMM_WORLD));
+      E0 = macis::casscf_diis(
+          mcscf_settings, NumElectron(nalpha), NumElectron(nbeta),
+          NumOrbital(norb), NumInactive(n_inactive), NumActive(n_active),
+          NumVirtual(n_virtual), E_core, T.data(), norb, V.data(), norb,
+          active_ordm.data(), n_active, active_trdm.data(),
+          n_active MACIS_MPI_CODE(, MPI_COMM_WORLD));
     }
 
     console->info("E(CI)  = {:.12f} Eh", E0);
