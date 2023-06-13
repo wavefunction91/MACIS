@@ -66,6 +66,7 @@ TEST_CASE("Davidson") {
     sparsexx::spblas::gespmbv(1, 1., H, X.data(), H.n(), 0., AX.data(), H.n());
     REQUIRE(blas::dot(X.size(), X.data(), 1, AX.data(), 1) == Approx(E0));
   }
+  spdlog::drop_all();
 }
 
 #ifdef MACIS_ENABLE_MPI

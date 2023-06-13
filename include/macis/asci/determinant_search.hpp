@@ -139,6 +139,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
   return asci_pairs;
 }
 
+
+#ifdef MACIS_ENABLE_MPI
 template <size_t N>
 asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     ASCISettings asci_settings, wavefunction_iterator_t<N> cdets_begin,
@@ -146,7 +148,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
     const double* V_pqrs,
-    HamiltonianGenerator<N>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
+    HamiltonianGenerator<N>& ham_gen, MPI_Comm comm) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
 
@@ -219,13 +221,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     }
   }
 
-#ifdef MACIS_ENABLE_MPI
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
-#else
-  int world_rank = 0;
-  int world_size = 1;
-#endif
 
   const auto n_occ_alpha = uniq_alpha_wfn[0].count();
   const auto n_vir_alpha = norb - n_occ_alpha;
@@ -261,7 +258,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   auto gen_c_st = clock_type::now();
   auto constraints = dist_constraint_general(
       asci_settings.constraint_level, norb, n_sing_alpha, n_doub_alpha,
-      uniq_alpha_wfn MACIS_MPI_CODE(, comm));
+      uniq_alpha_wfn, comm);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
@@ -393,6 +390,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
   return asci_pairs;
 }
+#endif
 
 template <size_t N>
 std::vector<wfn_t<N>> asci_search(
@@ -451,10 +449,12 @@ std::vector<wfn_t<N>> asci_search(
     asci_pairs = asci_contributions_standard(
         asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
         V_red, G_pqrs, V_pqrs, ham_gen);
+#ifdef MACIS_ENABLE_MPI
   else
     asci_pairs = asci_contributions_constraint(
         asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
         V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
+#endif
   auto pairs_en = clock_type::now();
 
   {
