@@ -26,7 +26,18 @@ TEST_CASE("Hubbard") {
   std::vector<double> T, V;
 
   SECTION("1D") {
-    macis::hubbard_1d(nsites, t, U, T, V);
+
+    bool pbc;
+
+    SECTION("No PBC") {
+      pbc = false;
+    }
+
+    SECTION("PBC") {
+      pbc = true;
+    }
+
+    macis::hubbard_1d(nsites, t, U, T, V, pbc);
 
     // Check two-body term
     for(int p = 0; p < nsites; ++p)
@@ -48,7 +59,12 @@ TEST_CASE("Hubbard") {
           REQUIRE(mat_el == Approx(-U / 2));
         else if(std::abs(p - q) == 1)
           REQUIRE(mat_el == -t);
-        else
+        else if(pbc) {
+          if( (p == 0 and q == nsites-1) or (p == nsites-1 and q == 0) )
+            REQUIRE(mat_el == -t);
+          else
+            REQUIRE(mat_el == 0.0);
+        } else
           REQUIRE(mat_el == 0.0);
       }
   }
