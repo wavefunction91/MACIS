@@ -8,6 +8,9 @@
 
 #pragma once
 
+#include <macis/macis_config.hpp>
+
+#ifdef MACIS_ENABLE_MPI
 #include <sparsexx/io/write_mm.hpp>
 #include <sparsexx/matrix_types/dist_sparse_matrix.hpp>
 
@@ -76,3 +79,4 @@ void write_dist_mm(std::string fname, const dist_sparse_matrix<SpMatType>& A,
 }
 
 }  // namespace sparsexx
+#endif

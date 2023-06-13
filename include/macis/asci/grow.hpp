@@ -16,9 +16,15 @@ namespace macis {
 template <size_t N, typename index_t = int32_t>
 auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X,
-               HamiltonianGenerator<N>& ham_gen, size_t norb, MPI_Comm comm) {
+               HamiltonianGenerator<N>& ham_gen, size_t norb 
+               MACIS_MPI_CODE(, MPI_Comm comm)) {
+#ifdef MACIS_ENABLE_MPI
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
+#else
+  auto world_rank = 0;
+  auto world_size = 1;
+#endif
 
   using hrt_t = std::chrono::high_resolution_clock;
   using dur_t = std::chrono::duration<double, std::milli>;
@@ -50,7 +56,7 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     auto ai_st = hrt_t::now();
     std::tie(E, wfn, X) = asci_iter<N, index_t>(
         asci_settings, mcscf_settings, ndets_new, E0, std::move(wfn),
-        std::move(X), ham_gen, norb, comm);
+        std::move(X), ham_gen, norb MACIS_MPI_CODE(, comm));
     auto ai_en = hrt_t::now();
     dur_t ai_dur = ai_en - ai_st;
     logger->trace("  * ASCI_ITER_DUR = {:.2e} ms", ai_dur.count());
@@ -105,10 +111,12 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       }
 
       // Broadcast rotated integrals
+#ifdef MACIS_ENABLE_MPI
       if(world_size > 1) {
         bcast(ham_gen.T(), norb * norb, 0, comm);
         bcast(ham_gen.V(), norb * norb * norb * norb, 0, comm);
       }
+#endif
 
       // Regenerate intermediates
       ham_gen.generate_integral_intermediates(ham_gen.V_pqrs_);
@@ -119,9 +127,11 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       selected_ci_diag(wfn.begin(), wfn.end(), ham_gen,
                        mcscf_settings.ci_matel_tol,
                        mcscf_settings.ci_max_subspace,
-                       mcscf_settings.ci_res_tol, X_local, comm);
+                       mcscf_settings.ci_res_tol, X_local
+                       MACIS_MPI_CODE(, comm));
 
       if(world_size > 1) {
+#ifdef MACIS_ENABLE_MPI
         // Broadcast X_local to X
         const size_t wfn_size = wfn.size();
         const size_t local_count = wfn_size / world_size;
@@ -138,6 +148,7 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
           }
           MPI_Bcast(X_rem, nrem, MPI_DOUBLE, world_size - 1, comm);
         }
+#endif
       } else {
         // Avoid copy
         X = std::move(X_local);

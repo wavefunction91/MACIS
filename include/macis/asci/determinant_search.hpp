@@ -458,7 +458,11 @@ std::vector<wfn_t<N>> asci_search(
   auto pairs_en = clock_type::now();
 
   {
+#ifdef MACIS_ENABLE_MPI
     size_t npairs = allreduce(asci_pairs.size(), MPI_SUM, comm);
+#else
+    size_t npairs = asci_pairs.size();
+#endif
     logger->info("  * ASCI Kept {} Pairs", npairs);
 
 #ifdef MACIS_ENABLE_MPI
@@ -496,8 +500,11 @@ std::vector<wfn_t<N>> asci_search(
   auto bit_sort_en = clock_type::now();
 
   {
+#if MACIS_ENABLE_MPI
     size_t npairs = allreduce(asci_pairs.size(), MPI_SUM, comm);
-    ;
+#else
+    size_t npairs = asci_pairs.size();
+#endif
     logger->info("  * ASCI will search over {} unique determinants", npairs);
 
     float pairs_dur = duration_type(pairs_en - pairs_st).count();

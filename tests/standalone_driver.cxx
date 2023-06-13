@@ -6,7 +6,6 @@
  * See LICENSE.txt for details
  */
 
-#include <mpi.h>
 #include <spdlog/cfg/env.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -64,10 +63,15 @@ int main(int argc, char** argv) {
 
   constexpr size_t nwfn_bits = 64;
 
-  MPI_Init(&argc, &argv);
+  MACIS_MPI_CODE(MPI_Init(&argc, &argv);)
 
+#ifdef MACIS_ENABLE_MPI
   auto world_rank = macis::comm_rank(MPI_COMM_WORLD);
   auto world_size = macis::comm_size(MPI_COMM_WORLD);
+#else
+  int  world_rank = 0;
+  int  world_size = 1;
+#endif
   {
     // Create Logger
     auto console = world_rank ? spdlog::null_logger_mt("standalone_driver")
@@ -284,7 +288,7 @@ int main(int argc, char** argv) {
         E0 = macis::CASRDMFunctor<generator_t>::rdms(
             mcscf_settings, NumOrbital(n_active), nalpha, nbeta,
             T_active.data(), V_active.data(), active_ordm.data(),
-            active_trdm.data(), C_local, MPI_COMM_WORLD);
+            active_trdm.data(), C_local MACIS_MPI_CODE(, MPI_COMM_WORLD));
         E0 += E_inactive + E_core;
 
         if(print_determinants) {
@@ -348,13 +352,14 @@ int main(int argc, char** argv) {
         // Growth phase
         std::tie(E0, dets, C) =
             macis::asci_grow(asci_settings, mcscf_settings, E0, std::move(dets),
-                             std::move(C), ham_gen, n_active, MPI_COMM_WORLD);
+                             std::move(C), ham_gen, n_active
+                             MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
         // Refinement phase
         if(asci_settings.max_refine_iter) {
           std::tie(E0, dets, C) = macis::asci_refine(
               asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
-              ham_gen, n_active, MPI_COMM_WORLD);
+              ham_gen, n_active MACIS_MPI_CODE(, MPI_COMM_WORLD));
         }
         E0 += E_inactive + E_core;
         auto asci_en = hrt_t::now();
@@ -367,11 +372,13 @@ int main(int argc, char** argv) {
         }
 
         // Dump Hamiltonian
+#if 0
         if(0) {
           auto H = macis::make_dist_csr_hamiltonian<int64_t>(
               MPI_COMM_WORLD, dets.begin(), dets.end(), ham_gen, 1e-16);
           sparsexx::write_dist_mm("ham.mtx", H, 1);
         }
+#endif
       }
 
       // MCSCF
@@ -403,7 +410,8 @@ int main(int argc, char** argv) {
                               NumInactive(n_inactive), NumActive(n_active),
                               NumVirtual(n_virtual), E_core, T.data(), norb,
                               V.data(), norb, active_ordm.data(), n_active,
-                              active_trdm.data(), n_active, MPI_COMM_WORLD);
+                              active_trdm.data(), n_active
+                              MACIS_MPI_CODE(, MPI_COMM_WORLD));
     }
 
     console->info("E(CI)  = {:.12f} Eh", E0);
@@ -415,5 +423,5 @@ int main(int argc, char** argv) {
 
   }  // MPI Scope
 
-  MPI_Finalize();
+  MACIS_MPI_CODE(MPI_Finalize();)
 }

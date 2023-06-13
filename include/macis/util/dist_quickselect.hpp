@@ -12,6 +12,7 @@
 #include <random>
 #include <vector>
 
+#ifdef MACIS_ENABLE_MPI
 namespace macis {
 
 template <typename RandomIt, typename ValueType, class OrderCompare,
@@ -149,3 +150,4 @@ typename RandomIt::value_type dist_quickselect(RandomIt begin, RandomIt end,
 }
 
 }  // namespace macis
+#endif

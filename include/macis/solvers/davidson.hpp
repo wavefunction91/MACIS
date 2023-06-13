@@ -17,7 +17,11 @@
 #include <macis/util/mpi.hpp>
 #include <random>
 #include <sparsexx/matrix_types/csr_matrix.hpp>
+
+#ifdef MACIS_ENABLE_MPI
 #include <sparsexx/spblas/pspmbv.hpp>
+#endif
+
 #include <sparsexx/spblas/spmbv.hpp>
 
 namespace macis {
@@ -27,22 +31,31 @@ class SparseMatrixOperator {
   using index_type = typename SpMatType::index_type;
 
   const SpMatType& m_matrix_;
+#ifdef MACIS_ENABLE_MPI
   sparsexx::spblas::spmv_info<index_type> m_spmv_info_;
+#endif
 
  public:
   SparseMatrixOperator(const SpMatType& m) : m_matrix_(m) {
+#ifdef MACIS_ENABLE_MPI
     if constexpr(sparsexx::is_dist_sparse_matrix_v<SpMatType>) {
       m_spmv_info_ = sparsexx::spblas::generate_spmv_comm_info(m);
     }
+#endif
   }
 
   void operator_action(size_t m, double alpha, const double* V, size_t LDV,
                        double beta, double* AV, size_t LDAV) const {
+
+#ifdef MACIS_ENABLE_MPI
     if constexpr(sparsexx::is_dist_sparse_matrix_v<SpMatType>) {
       sparsexx::spblas::pgespmv(alpha, m_matrix_, V, beta, AV, m_spmv_info_);
     } else {
+#endif
       sparsexx::spblas::gespmbv(m, alpha, m_matrix_, V, LDV, beta, AV, LDAV);
+#ifdef MACIS_ENABLE_MPI
     }
+#endif
   }
 };
 
@@ -55,6 +68,7 @@ void diagonal_guess(size_t N, const SpMatType& A, double* X) {
   X[min_idx] = 1.;
 }
 
+#ifdef MACIS_ENABLE_MPI
 template <typename SpMatType>
 void p_diagonal_guess(size_t N_local, const SpMatType& A, double* X) {
   auto comm = A.comm();
@@ -93,6 +107,7 @@ void p_diagonal_guess(size_t N_local, const SpMatType& A, double* X) {
     X[min_idx - A.local_row_start()] = 1.;
   }
 }
+#endif
 
 inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
                          double* V_new) {
@@ -210,6 +225,8 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
   return std::make_pair(iter, LAM[0]);
 }
 
+
+#ifdef MACIS_ENABLE_MPI
 inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
                            int64_t LDV, double* V_new, MPI_Comm comm) {
   std::vector<double> inner(K);
@@ -377,5 +394,6 @@ auto p_davidson(int64_t N_local, int64_t max_m, const Functor& op,
 
   return std::make_pair(iter, LAM[0]);
 }
+#endif
 
 }  // namespace macis

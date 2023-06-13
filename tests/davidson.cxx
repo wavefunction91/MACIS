@@ -12,6 +12,7 @@
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/solvers/davidson.hpp>
 #include <macis/util/fcidump.hpp>
+#include <sparsexx/util/submatrix.hpp>
 
 #include "ut_common.hpp"
 
@@ -47,8 +48,8 @@ TEST_CASE("Davidson") {
   auto E0_ref = -7.623197835987e+01;
 
   // Generate CSR Hamiltonian
-  auto H = macis::make_csr_hamiltonian_block<int32_t>(
-      dets.begin(), dets.end(), dets.begin(), dets.end(), ham_gen, 1e-16);
+  auto H = macis::make_csr_hamiltonian<int32_t>(
+      dets.begin(), dets.end(), ham_gen, 1e-16);
 
   // Obtain lowest eigenvalue
   SECTION("With Vectors") {
@@ -67,6 +68,7 @@ TEST_CASE("Davidson") {
   }
 }
 
+#ifdef MACIS_ENABLE_MPI
 TEST_CASE("Parallel Davidson") {
   if(!spdlog::get("davidson")) {
     auto l = spdlog::null_logger_mt("davidson");
@@ -130,3 +132,4 @@ TEST_CASE("Parallel Davidson") {
   MPI_Barrier(MPI_COMM_WORLD);
   spdlog::drop_all();
 }
+#endif
