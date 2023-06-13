@@ -6,19 +6,20 @@
  * See LICENSE.txt for details
  */
 
+#include <spdlog/sinks/null_sink.h>
+#include <spdlog/spdlog.h>
+
 #include <iostream>
 #include <macis/asci/determinant_contributions.hpp>
+#include <macis/asci/grow.hpp>
+#include <macis/asci/refine.hpp>
 #include <macis/bitset_operations.hpp>
+#include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/sd_operations.hpp>
 #include <macis/types.hpp>
 #include <macis/util/fcidump.hpp>
-#include <macis/asci/grow.hpp>
-#include <macis/asci/refine.hpp>
-#include <macis/hamiltonian_generator/double_loop.hpp>
 
 #include "ut_common.hpp"
-#include <spdlog/sinks/null_sink.h>
-#include <spdlog/spdlog.h>
 
 template <size_t NRadix, size_t NBits>
 std::array<unsigned, NRadix> top_set_indices(std::bitset<NBits> word) {
@@ -206,7 +207,6 @@ TEST_CASE("Triplets") {
 }
 
 TEST_CASE("ASCI") {
-
   MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
   using macis::NumActive;
   using macis::NumElectron;
@@ -242,33 +242,34 @@ TEST_CASE("ASCI") {
   macis::MCSCFSettings mcscf_settings;
 
   // HF guess
-  std::vector<macis::wfn_t<64>> dets = 
-    {macis::canonical_hf_determinant<64>(nalpha, nbeta)};;
+  std::vector<macis::wfn_t<64>> dets = {
+      macis::canonical_hf_determinant<64>(nalpha, nbeta)};
+  ;
   std::vector<double> C = {1.0};
-  double E0 = ham_gen.matrix_element(dets[0], dets[0]); 
-
+  double E0 = ham_gen.matrix_element(dets[0], dets[0]);
 
   // ASCI Grow
   asci_settings.ntdets_max = 10000;
-  std::tie(E0, dets, C) = 
-    macis::asci_grow( asci_settings, mcscf_settings, E0, std::move(dets),
-        std::move(C), ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+  std::tie(E0, dets, C) = macis::asci_grow(
+      asci_settings, mcscf_settings, E0, std::move(dets), std::move(C), ham_gen,
+      norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
-  REQUIRE( E0 == Approx(-8.542926243842e+01) );
-  REQUIRE( dets.size() == 10000 );
-  REQUIRE( C.size() == 10000 );
-  REQUIRE( std::inner_product(C.begin(), C.end(), C.begin(), 0.0) == Approx(1.0) );
+  REQUIRE(E0 == Approx(-8.542926243842e+01));
+  REQUIRE(dets.size() == 10000);
+  REQUIRE(C.size() == 10000);
+  REQUIRE(std::inner_product(C.begin(), C.end(), C.begin(), 0.0) ==
+          Approx(1.0));
 
   // ASCI Refine
-  std::tie(E0, dets, C) = 
-    macis::asci_refine( asci_settings, mcscf_settings, E0, std::move(dets),
-        std::move(C), ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
-  
+  std::tie(E0, dets, C) = macis::asci_refine(
+      asci_settings, mcscf_settings, E0, std::move(dets), std::move(C), ham_gen,
+      norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
-  REQUIRE( E0 == Approx(-8.542925964708e+01) );
-  REQUIRE( dets.size() == 10000 );
-  REQUIRE( C.size() == 10000 );
-  REQUIRE( std::inner_product(C.begin(), C.end(), C.begin(), 0.0) == Approx(1.0) );
+  REQUIRE(E0 == Approx(-8.542925964708e+01));
+  REQUIRE(dets.size() == 10000);
+  REQUIRE(C.size() == 10000);
+  REQUIRE(std::inner_product(C.begin(), C.end(), C.begin(), 0.0) ==
+          Approx(1.0));
 
   MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
   spdlog::drop_all();

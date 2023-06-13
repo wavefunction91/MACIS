@@ -7,8 +7,8 @@
  */
 
 #pragma once
-#include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
 #include <chrono>
@@ -607,7 +607,7 @@ std::vector<wfn_t<N>> asci_search(
       // Edge case where NGEQ > TOPK - erase equivalent elements
       if(n_geq_global > top_k_elements) {
         n_geq_global = top_k_elements;
-        keep_strings_global.resize(n_geq_global); 
+        keep_strings_global.resize(n_geq_global);
       }
 
       // Make fake strings
