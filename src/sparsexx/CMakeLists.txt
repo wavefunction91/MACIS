@@ -24,13 +24,19 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 endif()
 
 
-find_package( MPI   REQUIRED )
-find_package( OpenMP         )
-
 option( SPARSEXX_ENABLE_MKL       "Enable MKL Bindings"             OFF )
 option( SPARSEXX_ENABLE_CEREAL    "Enable serialization via cereal" OFF )
 option( SPARSEXX_ENABLE_RANGES_V3 "Enable Ranges-v3"                OFF )
 option( SPARSEXX_ENABLE_METIS     "Enable METIS"                    OFF )
+option( SPARSEXX_ENABLE_OPENMP    "Enable OpenMP" ${MACIS_ENABLE_OPENMP})
+option( SPARSEXX_ENABLE_MPI       "Enable MPI"    ${MACIS_ENABLE_MPI}   )
+
+if(SPARSEXX_ENABLE_MPI)
+find_package( MPI   REQUIRED )
+endif()
+if(SPARSEXX_ENABLE_OPENMP)
+find_package( OpenMP         )
+endif()
 
 if( SPARSEXX_ENABLE_MKL )
   find_package( IntelMKL COMPONENTS lp64 REQUIRED )
@@ -116,7 +122,9 @@ endif()
 
 add_library( sparsexx src/metis_wrapper.cxx )
 target_compile_features( sparsexx PUBLIC cxx_std_17 )
-target_link_libraries( sparsexx PUBLIC MPI::MPI_CXX  )
+if( TARGET MPI::MPI_CXX )
+  target_link_libraries( sparsexx PUBLIC MPI::MPI_CXX  )
+endif()
 if( TARGET OpenMP::OpenMP_CXX )
   target_link_libraries( sparsexx PUBLIC OpenMP::OpenMP_CXX )
 endif()

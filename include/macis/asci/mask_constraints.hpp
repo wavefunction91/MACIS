@@ -482,6 +482,7 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 }
 #endif
 
+#ifdef MACIS_ENABLE_MPI
 template <size_t N>
 auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
                              size_t nd_othr,
@@ -599,6 +600,7 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
 
   return constraints;
 }
+#endif
 
 #if 0
 template <typename Integral, size_t N>

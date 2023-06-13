@@ -7,6 +7,16 @@
  */
 
 #pragma once
+
+#include <macis/macis_config.hpp>
+
+#ifdef MACIS_ENABLE_MPI
+#define MACIS_MPI_CODE(...) __VA_ARGS__
+#else
+#define MACIS_MPI_CODE(...)
+#endif
+
+#ifdef MACIS_ENABLE_MPI
 #include <mpi.h>
 
 #include <bitset>
@@ -219,3 +229,4 @@ struct mpi_traits<std::bitset<N>> {
 };
 
 }  // namespace macis
+#endif
