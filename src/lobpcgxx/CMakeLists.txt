@@ -21,10 +21,11 @@ if(NOT lapackpp_FOUND )
 include( FetchContent )
   FetchContent_Declare( blaspp
     GIT_REPOSITORY https://github.com/icl-utk-edu/blaspp.git
-    GIT_TAG 01b5678bb764755254e907e6c56d4054b0ebabc1
+    GIT_TAG 13622021629f5fd27591bb7da60bae5b19561f01 
   )
   FetchContent_Declare( lapackpp
     GIT_REPOSITORY https://github.com/icl-utk-edu/lapackpp.git
+    GIT_TAG 5bc9c85201ace48213df5ac7d1ef026c9668dfbd
   )
   
   FetchContent_MakeAvailable( blaspp )
