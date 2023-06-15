@@ -7,13 +7,14 @@
  */
 
 #pragma once
+#include <string.h>
+#include <strings.h>
+
 #include <bit>
 #include <cassert>
 #include <climits>
 #include <iostream>
 #include <macis/types.hpp>
-#include <string.h>
-#include <strings.h>
 
 namespace macis {
 

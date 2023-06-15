@@ -355,7 +355,7 @@ int main(int argc, char** argv) {
           // GF vector
           std::vector<std::vector<std::complex<double>>> GF(
               nws, std::vector<std::complex<double>>(
-                     1, std::complex<double>(0., 0.)));
+                       1, std::complex<double>(0., 0.)));
 
           // Occupation numbers
           std::vector<double> occs(n_active, 1.);

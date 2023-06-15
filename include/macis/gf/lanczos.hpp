@@ -200,9 +200,9 @@ class SparsexDistSpMatOp {
  * @date 05/04/2021
  */
 template <class MatOp>
-void MyLanczos(const Eigen::VectorXd &start_vec, const MatOp &H, int64_t nLanIts,
-               std::vector<double> &alphas, std::vector<double> &betas,
-               double tol) {
+void MyLanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
+               int64_t nLanIts, std::vector<double> &alphas,
+               std::vector<double> &betas, double tol) {
   // LANCZOS ROUTINE USING TEMPLATED MATRIX
   // CLASS. ONLY NEEDS TO PROVIDE A MATRIX
   // VECTOR PRODUCT.
@@ -267,7 +267,8 @@ void MyLanczos(const Eigen::VectorXd &start_vec, const MatOp &H, int64_t nLanIts
  */
 template <class MatOp>
 void MyLanczos_BackProj(const Eigen::VectorXd &start_vec, const MatOp &H,
-                        int64_t nLanIts, Eigen::VectorXd &vec_P, Eigen::VectorXd &vec_BP) {
+                        int64_t nLanIts, Eigen::VectorXd &vec_P,
+                        Eigen::VectorXd &vec_BP) {
   // REBUILD THE EIGENVECTOR FROM A PREVIOUS LANZOS
   // CALCULATION.
   int64_t n = start_vec.rows();
@@ -327,8 +328,9 @@ void MyLanczos_BackProj(const Eigen::VectorXd &start_vec, const MatOp &H,
  * @date 05/04/2021
  */
 template <class MatOp>
-int64_t GetGSEn_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H, double &E0,
-                        Eigen::VectorXd &psi0_Lan, const LanczosSettings &settings) {
+int64_t GetGSEn_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
+                        double &E0, Eigen::VectorXd &psi0_Lan,
+                        const LanczosSettings &settings) {
   // COMPUTE LOWEST EIGENVALUE OF MATRIX H
   // USING LANCZOS. RETURNS EIGENVECTOR IN
   // THE BASIS OF KRYLOV VECTORS
@@ -447,8 +449,9 @@ int64_t GetGSEn_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H, double
  * @date 05/04/2021
  */
 template <class MatOp>
-void GetGSEnVec_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H, double &E0,
-                        Eigen::VectorXd &psi0, const LanczosSettings &settings) {
+void GetGSEnVec_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
+                        double &E0, Eigen::VectorXd &psi0,
+                        const LanczosSettings &settings) {
   // COMPUTE LOWEST EIGENVALUE AND EIGENVECTOR
   // OF MATRIX H USING LANCZOS.
   double Lantol = settings.Lantol;
@@ -561,7 +564,8 @@ void GetGS(const MatOp &H, double &E0, Eigen::VectorXd &psi0,
   int64_t n = H.rows();
   // Initial vector. We choose (1,0,0,0,...)t
   // for HF, Otherwhise  (1,1,1,1,...)t
-  Eigen::VectorXd start_psi = isHF ? Eigen::VectorXd::Zero(n) : Eigen::VectorXd::Ones(n);
+  Eigen::VectorXd start_psi =
+      isHF ? Eigen::VectorXd::Zero(n) : Eigen::VectorXd::Ones(n);
   start_psi(0) = 1.;
   // Determine lowest eigenvalue for the given
   // tolerance.

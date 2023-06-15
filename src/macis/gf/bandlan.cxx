@@ -16,10 +16,8 @@ inline bool is_file(const std::string &name) {
 }
 
 namespace macis {
-bool QRdecomp(std::vector<double> &Q,
-              std::vector<double> &R,
-	      int Qrows, 
-	      int Qcols) {
+bool QRdecomp(std::vector<double> &Q, std::vector<double> &R, int Qrows,
+              int Qcols) {
   // CALL LAPACK'S QR DECOMPOSITION ROUTINES.
   // INPUT: Q: INPUT MATRIX TO PERFORM A QR DECOMPOSITION FOR. MAY BE
   // RECTANGULAR,
@@ -34,7 +32,7 @@ bool QRdecomp(std::vector<double> &Q,
   int M = Qrows, N = Qcols;
   assert(M >= N);
   int LDA = M, INFO = 0;
-  std::vector<double> A( M * N, 0. ), TAU( N, 0. );
+  std::vector<double> A(M * N, 0.), TAU(N, 0.);
 
   // INITIALIZE A
   for(int i = 0; i < M; i++)
@@ -56,10 +54,8 @@ bool QRdecomp(std::vector<double> &Q,
   return true;
 }
 
-bool QRdecomp_tr(std::vector<double> &Q,
-                 std::vector<double> &R,
-		 int Qrows,
-		 int Qcols) {
+bool QRdecomp_tr(std::vector<double> &Q, std::vector<double> &R, int Qrows,
+                 int Qcols) {
   // CALL LAPACK'S QR DECOMPOSITION ROUTINES.
   // INPUT: Q: INPUT MATRIX TO PERFORM A QR DECOMPOSITION FOR. MAY BE
   // RECTANGULAR,
@@ -74,7 +70,7 @@ bool QRdecomp_tr(std::vector<double> &Q,
   int M = Qcols, N = Qrows;
   assert(M >= N);
   int LDA = M, INFO = 0;
-  std::vector<double> A( M * N, 0. ), TAU( N, 0. );
+  std::vector<double> A(M * N, 0.), TAU(N, 0.);
 
   // INITIALIZE A
   for(int i = 0; i < M; i++)
@@ -91,16 +87,14 @@ bool QRdecomp_tr(std::vector<double> &Q,
   int K = N;
   lapack::orgqr(M, N, K, A.data(), LDA, TAU.data());
   // SAVE THE Q MATRIX
-  for(int i = 0; i < M; i++) 
+  for(int i = 0; i < M; i++)
     for(int j = 0; j < N; j++) Q[i + j * M] = A[i + j * M];
 
   return true;
 }
 
-bool GetEigsys(std::vector<double> &mat,
-               std::vector<double> &eigvals,
-               std::vector<double> &eigvecs,
-	       int matsize) {
+bool GetEigsys(std::vector<double> &mat, std::vector<double> &eigvals,
+               std::vector<double> &eigvecs, int matsize) {
   // COMPUTES THE EIGENVALUES AND EIGENVECTORS OF THE SYMMETRIC MATRIX mat BY
   // CALLING LAPACK. WE ASSUME THE UPPER TRIANGULAR PART OF A IS STORED. FIRST,
   // IT BRINGS THE MATRIX INTO TRIANGULAR FORM, THEN COMPUTES THE EIGENVALUES
@@ -112,13 +106,13 @@ bool GetEigsys(std::vector<double> &mat,
   lapack::Uplo UPLO = lapack::Uplo::Upper;
   lapack::Job JOBZ = lapack::Job::Vec;
   int N = matsize, LDA = matsize;
-  std::vector<double> A( N * N, 0. ), D( N, 0. );
+  std::vector<double> A(N * N, 0.), D(N, 0.);
 
   // INITIALIZE A
-  for(int i = 0; i < N; i++) 
+  for(int i = 0; i < N; i++)
     for(int j = 0; j < N; j++) A[i + j * N] = mat[i + j * N];
   mat.clear();
-  // COMPUTE EIGENVALUES AND EIGENVECTORS 
+  // COMPUTE EIGENVALUES AND EIGENVECTORS
   lapack::heev_2stage(JOBZ, UPLO, N, A.data(), LDA, D.data());
 
   // NOW, STORE THE EIGENVALUES AND EIGENVECTORS
@@ -132,9 +126,8 @@ bool GetEigsys(std::vector<double> &mat,
 }
 
 bool GetEigsysBand(std::vector<double> &mat, int nSupDiag,
-                   std::vector<double> &eigvals,
-                   std::vector<double> &eigvecs,
-		   int matsize) {
+                   std::vector<double> &eigvals, std::vector<double> &eigvecs,
+                   int matsize) {
   // COMPUTES THE EIGENVALUES AND EIGENVECTORS OF THE SYMMETRIC BAND MATRIX mat
   // BY CALLING LAPACK. WE ASSUME THE UPPER TRIANGULAR PART OF A IS STORED.
   // FIRST, IT BRINGS THE MATRIX INTO TRIANGULAR FORM, THEN COMPUTES THE
@@ -147,8 +140,8 @@ bool GetEigsysBand(std::vector<double> &mat, int nSupDiag,
   lapack::Job VECT = lapack::Job::Vec;
   lapack::Job COMPZ = lapack::Job::Vec;
   int N = matsize, LDQ = matsize, LDAB = nSupDiag + 1;
-  std::vector<double> AB( (nSupDiag + 1) * N, 0. );
-  std::vector<double> D( N, 0. ), E( N - 1, 0. ), Q( N * N, 0. );
+  std::vector<double> AB((nSupDiag + 1) * N, 0.);
+  std::vector<double> D(N, 0.), E(N - 1, 0.), Q(N * N, 0.);
 
   // INITIALIZE A
   for(int j = 0; j < N; j++)
@@ -169,8 +162,8 @@ bool GetEigsysBand(std::vector<double> &mat, int nSupDiag,
   eigvals.resize(N);
   for(int i = 0; i < N; i++) eigvals[i] = D[i];
   D.clear();
-  eigvecs.resize( N * N );
-  for(int i = 0; i < N; i++) 
+  eigvecs.resize(N * N);
+  for(int i = 0; i < N; i++)
     for(int j = 0; j < N; j++) eigvecs[i + j * N] = Q[j + i * N];
 
   return true;
@@ -179,19 +172,18 @@ bool GetEigsysBand(std::vector<double> &mat, int nSupDiag,
 void BandResolvent(
     const sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double, int32_t> >
         &H,
-    std::vector<double> &vecs,
-    const std::vector<std::complex<double> > &ws,
-    std::vector<std::vector<std::complex<double> > > &res,
-    int nLanIts, double E0, bool ispart, int nvecs, int len_vec, bool print, bool saveGFmats ) {
+    std::vector<double> &vecs, const std::vector<std::complex<double> > &ws,
+    std::vector<std::vector<std::complex<double> > > &res, int nLanIts,
+    double E0, bool ispart, int nvecs, int len_vec, bool print,
+    bool saveGFmats) {
   // COMPUTES THE RESOLVENT (ws - H)^-1 IN MATRIX FORM FOR THE "BASIS" GIVEN BY
   // THE vecs VECTORS AND THE FREQUENCY GRID IN ws. USES THE BAND LANCZOS
   // ALGORITHM. IT GETS STORED IN res.
   using dbl = std::numeric_limits<double>;
   res.clear();
   std::cout << "RESOLVENT ROUTINE: ";
-  res.resize(ws.size(),
-             std::vector<std::complex<double> >(
-                 nvecs * nvecs, std::complex<double>(0., 0.)));
+  res.resize(ws.size(), std::vector<std::complex<double> >(
+                            nvecs * nvecs, std::complex<double>(0., 0.)));
 
   // FIRST, COMPUTE QR DECOMPOSITION OF THE "BASIS" VECTORS vecs, NECESSARY FOR
   // LANCZOS
@@ -252,9 +244,11 @@ void BandResolvent(
     std::cout << "COMPUTING GF AS CONTINUED FRACTION...";
     std::vector<double> alphas(nLanIts, 0.), betas(nLanIts, 0.);
     for(int i = 0; i < nLanIts; i++)
-      alphas[i] = ispart ? E0 - bandH[i * nLanIts + i] : bandH[i * nLanIts + i] - E0;
+      alphas[i] =
+          ispart ? E0 - bandH[i * nLanIts + i] : bandH[i * nLanIts + i] - E0;
     for(int i = 0; i < nLanIts - 1; i++)
-      betas[i + 1] = ispart ? -bandH[i * nLanIts + i + 1] : bandH[i * nLanIts + i + 1];
+      betas[i + 1] =
+          ispart ? -bandH[i * nLanIts + i + 1] : bandH[i * nLanIts + i + 1];
     betas[0] = R[0];
 #pragma omp parallel for
     for(int indx_w = 0; indx_w < ws.size(); indx_w++) {
@@ -307,7 +301,8 @@ void BandResolvent(
     for(int i_lan = 0; i_lan < nLanIts; i_lan++) {
       for(int j_n = 0; j_n < nvecs; j_n++) {
         for(int l = 0; l < nvecs; l++)
-          S[i_lan * nvecs + j_n] += eigvecs[i_lan + l * nLanIts] * R[l + j_n * nvecs];
+          S[i_lan * nvecs + j_n] +=
+              eigvecs[i_lan + l * nLanIts] * R[l + j_n * nvecs];
       }
     }
     if(saveGFmats) {
@@ -334,8 +329,9 @@ void BandResolvent(
       for(int k = 0; k < nvecs; k++) {
         for(int l = 0; l < nvecs; l++) {
           for(int i_lan = 0; i_lan < nLanIts; i_lan++) {
-            res[iw][k * nvecs + l] +=
-                S[i_lan * nvecs + k] * 1. / (ws[iw] + eigvals[i_lan]) * S[i_lan * nvecs + l];
+            res[iw][k * nvecs + l] += S[i_lan * nvecs + k] * 1. /
+                                      (ws[iw] + eigvals[i_lan]) *
+                                      S[i_lan * nvecs + l];
           }
         }
       }

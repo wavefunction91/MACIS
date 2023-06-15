@@ -53,10 +53,8 @@ namespace macis {
  * @author Carlos Mejuto-Zaera
  * @date 25/04/2022
  */
-bool QRdecomp(std::vector<double> &Q,
-              std::vector<double> &R,
-	      int Qrows,
-	      int Qcols);
+bool QRdecomp(std::vector<double> &Q, std::vector<double> &R, int Qrows,
+              int Qcols);
 
 /**
  * @ brief Wrapper for QR decomposition in LAPACK, basically
@@ -77,10 +75,8 @@ bool QRdecomp(std::vector<double> &Q,
  * @author Carlos Mejuto-Zaera
  * @date 25/04/2022
  */
-bool QRdecomp_tr(std::vector<double> &Q,
-                 std::vector<double> &R,
-		 int Qrows,
-		 int Qcols);
+bool QRdecomp_tr(std::vector<double> &Q, std::vector<double> &R, int Qrows,
+                 int Qcols);
 
 /**
  * @brief Wrapper to LAPACK routine to evaluate the eigenvectors
@@ -100,10 +96,8 @@ bool QRdecomp_tr(std::vector<double> &Q,
  * @author Carlos Mejuto Zaera
  * @date 25/04/2022
  */
-bool GetEigsys(std::vector<double> &mat,
-               std::vector<double> &eigvals,
-               std::vector<double> &eigvecs,
-	       int matsize);
+bool GetEigsys(std::vector<double> &mat, std::vector<double> &eigvals,
+               std::vector<double> &eigvecs, int matsize);
 
 /**
  * @brief Wrapper to LAPACK routine to evaluate the eigenvectors
@@ -125,9 +119,8 @@ bool GetEigsys(std::vector<double> &mat,
  * @date 25/04/2022
  */
 bool GetEigsysBand(std::vector<double> &mat, int nSupDiag,
-                   std::vector<double> &eigvals,
-                   std::vector<double> &eigvecs,
-		   int matsize);
+                   std::vector<double> &eigvals, std::vector<double> &eigvecs,
+                   int matsize);
 
 /**
  * @brief Perform a band Lanczos calculation on the Hamiltonian operator H,
@@ -151,10 +144,9 @@ bool GetEigsysBand(std::vector<double> &mat, int nSupDiag,
  * @date 25/04/2022
  */
 template <class Cont, class Functor>
-void MyBandLan(const Functor &H,
-               std::vector<Cont> &qs, std::vector<Cont> &bandH,
-               int &nLanIts, int nbands, int N, double thres = 1.E-6,
-               bool print = false) {
+void MyBandLan(const Functor &H, std::vector<Cont> &qs,
+               std::vector<Cont> &bandH, int &nLanIts, int nbands, int N,
+               double thres = 1.E-6, bool print = false) {
   // BAND LANCZOS ROUTINE. TAKES AS INPUT THE HAMILTONIAN H, INITIAL VECTORS qs
   // AND RETURNS THE BAND HAMILTONIAN bandH. IT PERFORMS nLanIts ITERATIONS,
   // STOPPING IF THE NORM OF ANY NEW KRYLOV VECTOR IS BELOW thres. IF LANCZOS IS
@@ -203,26 +195,29 @@ void MyBandLan(const Functor &H,
       int band_indx_j = true_indx[jt];
 #pragma omp parallel for
       for(size_t coeff = 0; coeff < temp.size(); coeff++)
-        temp[coeff] -= bandH[(it - 1) * nLanIts + jt - 1] * qs[N * band_indx_j + coeff];
+        temp[coeff] -=
+            bandH[(it - 1) * nLanIts + jt - 1] * qs[N * band_indx_j + coeff];
     }
     for(int jt = it; jt <= std::min(it + nbands - 1, nLanIts); jt++) {
       int band_indx_j = true_indx[jt];
       bandH[(it - 1) * nLanIts + jt - 1] =
           blas::dot(N, temp.data(), 1, qs.data() + band_indx_j * N, 1);
-      bandH[(jt - 1) * nLanIts + it - 1] = bandH[(it - 1 ) * nLanIts + jt - 1];
+      bandH[(jt - 1) * nLanIts + it - 1] = bandH[(it - 1) * nLanIts + jt - 1];
 #pragma omp parallel for
       for(size_t coeff = 0; coeff < temp.size(); coeff++)
-        temp[coeff] -= bandH[(it - 1 ) * nLanIts + jt - 1] * qs[N * band_indx_j + coeff];
+        temp[coeff] -=
+            bandH[(it - 1) * nLanIts + jt - 1] * qs[N * band_indx_j + coeff];
     }
     if(it + nbands <= nLanIts) {
-      bandH[(it - 1 ) * nLanIts + it + nbands - 1] =
+      bandH[(it - 1) * nLanIts + it + nbands - 1] =
           std::sqrt(std::real(MyInnProd(temp, temp)));
-      bandH[(it + nbands - 1 ) * nLanIts + it - 1] = bandH[(it - 1 ) * nLanIts + it + nbands - 1];
+      bandH[(it + nbands - 1) * nLanIts + it - 1] =
+          bandH[(it - 1) * nLanIts + it + nbands - 1];
       true_indx[it + nbands] = next_indx;
-      if(std::abs(bandH[(it - 1 ) * nLanIts + it + nbands - 1]) < thres) {
+      if(std::abs(bandH[(it - 1) * nLanIts + it + nbands - 1]) < thres) {
         std::cout
             << "BAND LANCZOS STOPPED PREMATURELY DUE TO SMALL NORM! NAMELY "
-            << bandH[(it - 1 ) * nLanIts + it + nbands - 1]
+            << bandH[(it - 1) * nLanIts + it + nbands - 1]
             << ", STOPPED AT ITERATION: " << it << std::endl;
         nLanIts = it;
         bandH.resize(nLanIts * nLanIts);
@@ -236,7 +231,7 @@ void MyBandLan(const Functor &H,
 #pragma omp parallel for
         for(size_t coeff = 0; coeff < temp.size(); coeff++)
           qs[true_indx[it + nbands] * N + coeff] =
-              temp[coeff] / bandH[(it - 1 ) * nLanIts + it + nbands - 1];
+              temp[coeff] / bandH[(it - 1) * nLanIts + it + nbands - 1];
         if(print) {
           std::ofstream ofile("lanvec_" + std::to_string(it + nbands) + ".dat",
                               std::ios::out);
@@ -261,7 +256,8 @@ void MyBandLan(const Functor &H,
  * @param[in] const sparsex::dist_sparse_matrix<sparsexx::csr_matrix<double,
  * int32_t> > &H: Hamiltonian operator.
  * @param[in] std::vector<double> &vecs: Vectors for which to
- * compute the resolvent matrix elements in format res[freq.][iorb1 * norbs + iorb2].
+ * compute the resolvent matrix elements in format res[freq.][iorb1 * norbs +
+ * iorb2].
  * @param[in] std::vector<std::complex<double> > &ws: Frequency grid over which
  * to evaluate the resolvent.
  * @param[out] std::vector<std::vector<std::complex<double> > >
@@ -278,10 +274,9 @@ void MyBandLan(const Functor &H,
 void BandResolvent(
     const sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double, int32_t> >
         &H,
-    std::vector<double> &vecs,
-    const std::vector<std::complex<double> > &ws,
-    std::vector<std::vector<std::complex<double> > > &res,
-    int nLanIts, double E0, bool ispart, int nvecs, 
-    int len_vec, bool print = false, bool saveGFmats = false);
+    std::vector<double> &vecs, const std::vector<std::complex<double> > &ws,
+    std::vector<std::vector<std::complex<double> > > &res, int nLanIts,
+    double E0, bool ispart, int nvecs, int len_vec, bool print = false,
+    bool saveGFmats = false);
 
 }  // namespace macis

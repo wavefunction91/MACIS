@@ -9,11 +9,10 @@
 #include "macis/gf/gf.hpp"
 
 namespace macis {
-void write_GF(
-    const std::vector<std::vector<std::complex<double> > > &GF,
-    const std::vector<std::complex<double> > &ws,
-    const std::vector<int> &GF_orbs, const std::vector<int> &todelete,
-    const bool is_part) {
+void write_GF(const std::vector<std::vector<std::complex<double> > > &GF,
+              const std::vector<std::complex<double> > &ws,
+              const std::vector<int> &GF_orbs, const std::vector<int> &todelete,
+              const bool is_part) {
   using dbl = std::numeric_limits<double>;
   size_t nfreqs = ws.size();
   int GFmat_size = GF_orbs.size() - todelete.size();
@@ -26,8 +25,8 @@ void write_GF(
       ofile << std::scientific << real(ws[iii]) << " " << imag(ws[iii]) << " ";
       for(int jjj = 0; jjj < GFmat_size; jjj++) {
         for(int lll = 0; lll < GFmat_size; lll++)
-          ofile << std::scientific << real(GF[iii][jjj * GFmat_size + lll]) << " "
-                << imag(GF[iii][jjj * GFmat_size + lll]) << " ";
+          ofile << std::scientific << real(GF[iii][jjj * GFmat_size + lll])
+                << " " << imag(GF[iii][jjj * GFmat_size + lll]) << " ";
       }
       ofile << std::endl;
     }

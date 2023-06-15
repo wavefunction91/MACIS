@@ -48,6 +48,7 @@ void Hste_v(const std::vector<double> &alphas, const std::vector<double> &betas,
  * @author Carlos Mejuto Zaera
  * @date 05/04/2021
  */
-void Hsyev(const Eigen::MatrixXd &H, Eigen::VectorXd &eigvals, Eigen::MatrixXd &eigvecs);
+void Hsyev(const Eigen::MatrixXd &H, Eigen::VectorXd &eigvals,
+           Eigen::MatrixXd &eigvecs);
 
 }  // namespace macis
