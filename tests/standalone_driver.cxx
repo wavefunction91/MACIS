@@ -353,10 +353,9 @@ int main(int argc, char** argv) {
           gf_settings.is_up_comp = std::vector<bool>(2, true);
 
           // GF vector
-          std::vector<std::vector<std::vector<std::complex<double>>>> GF(
-              1, std::vector<std::vector<std::complex<double>>>(
-                     1, std::vector<std::complex<double>>(
-                            nws, std::complex<double>(0., 0.))));
+          std::vector<std::vector<std::complex<double>>> GF(
+              nws, std::vector<std::complex<double>>(
+                     1, std::complex<double>(0., 0.)));
 
           // Occupation numbers
           std::vector<double> occs(n_active, 1.);

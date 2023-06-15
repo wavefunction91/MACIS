@@ -12,6 +12,8 @@
 #include <climits>
 #include <iostream>
 #include <macis/types.hpp>
+#include <string.h>
+#include <strings.h>
 
 namespace macis {
 

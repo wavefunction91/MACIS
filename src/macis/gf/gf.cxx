@@ -10,11 +10,13 @@
 
 namespace macis {
 void write_GF(
-    const std::vector<std::vector<std::vector<std::complex<double> > > > &GF,
+    const std::vector<std::vector<std::complex<double> > > &GF,
     const std::vector<std::complex<double> > &ws,
     const std::vector<int> &GF_orbs, const std::vector<int> &todelete,
     const bool is_part) {
+  using dbl = std::numeric_limits<double>;
   size_t nfreqs = ws.size();
+  int GFmat_size = GF_orbs.size() - todelete.size();
 
   if(GF_orbs.size() > 1) {
     std::string fname = is_part ? "LanGFMatrix_ADD.dat" : "LanGFMatrix_SUB.dat";
@@ -22,10 +24,10 @@ void write_GF(
     ofile.precision(dbl::max_digits10);
     for(int iii = 0; iii < nfreqs; iii++) {
       ofile << std::scientific << real(ws[iii]) << " " << imag(ws[iii]) << " ";
-      for(int jjj = 0; jjj < GF[iii].size(); jjj++) {
-        for(int lll = 0; lll < GF[iii][jjj].size(); lll++)
-          ofile << std::scientific << real(GF[iii][jjj][lll]) << " "
-                << imag(GF[iii][jjj][lll]) << " ";
+      for(int jjj = 0; jjj < GFmat_size; jjj++) {
+        for(int lll = 0; lll < GFmat_size; lll++)
+          ofile << std::scientific << real(GF[iii][jjj * GFmat_size + lll]) << " "
+                << imag(GF[iii][jjj * GFmat_size + lll]) << " ";
       }
       ofile << std::endl;
     }
@@ -46,7 +48,7 @@ void write_GF(
     ofile.precision(dbl::max_digits10);
     for(int iii = 0; iii < nfreqs; iii++)
       ofile << std::scientific << real(ws[iii]) << " " << imag(ws[iii]) << " "
-            << real(GF[iii][0][0]) << " " << imag(GF[iii][0][0]) << std::endl;
+            << real(GF[iii][0]) << " " << imag(GF[iii][0]) << std::endl;
   }
 }
 

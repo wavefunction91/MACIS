@@ -37,11 +37,6 @@
 
 namespace macis {
 
-typedef Eigen::VectorXd VectorXd;
-
-typedef std::numeric_limits<double> dbl;
-typedef std::chrono::high_resolution_clock Clock;
-
 struct GFSettings {
   size_t norbs = 0;
   size_t trunc_size = 0;
@@ -118,11 +113,12 @@ inline double GetInsertionDoSign(const std::bitset<nbits> &st, size_t orb) {
  * @date 28/01/2022
  */
 template <class MatOp>
-void GF_Diag(const VectorXd &state_0, const MatOp &H,
+void GF_Diag(const Eigen::VectorXd &state_0, const MatOp &H,
              const std::vector<std::complex<double>> &freqs,
              std::vector<std::complex<double>> &gf, double E0, bool ispart,
              int nLanIts = 1000, bool saveABtofile = false,
              std::string fpref = "") {
+  using dbl = std::numeric_limits<double>;
   // FIRST, WE HAVE TO COMPUTE THE LANCZOS alphas AND betas
   double tol = 1.E-6;
   std::vector<double> alphas, betas;
@@ -203,13 +199,15 @@ void GF_Diag(const VectorXd &state_0, const MatOp &H,
  * @date 28/01/2022
  */
 template <size_t nbits, typename index_t = int32_t>
-void get_GF_basis_AS_1El(int orb, bool sp_up, bool is_part, const VectorXd &wfn,
+void get_GF_basis_AS_1El(int orb, bool sp_up, bool is_part, const Eigen::VectorXd &wfn,
                          const std::vector<std::bitset<nbits>> &old_basis,
                          std::vector<std::bitset<nbits>> &new_basis,
                          const std::vector<double> &occs,
                          const GFSettings &settings) {
   // CARLOS: BUILDS BASIS FOR THE ADD SPACE NEEDED TO DESCRIBE THE DIAGONAL
   // PARTICLE GF ELEMENT OF ORBITAL orb.
+  using bitset_map = std::map< std::bitset<nbits>, size_t, bitset_less_comparator<nbits>>;
+  using bitset_map_iterator = typename bitset_map::iterator;
 
   size_t norbs = settings.norbs;
   size_t trunc_size = settings.trunc_size;
@@ -221,18 +219,14 @@ void get_GF_basis_AS_1El(int orb, bool sp_up, bool is_part, const VectorXd &wfn,
             << "* SECTOR FOR ORBITAL " << orb << ", WITH SPIN *"
             << (sp_up ? "UP" : "DOWN") << "*" << std::endl;
 
-  time_t loop1 = time(NULL);
-  auto loop1C = Clock::now();
   size_t ndets = old_basis.size();
   size_t cgf = -1;
   size_t sporb = sp_up ? orb : orb + nbits / 2;
   std::bitset<nbits> uni_string;
   std::vector<std::bitset<nbits>> founddets;
   founddets.reserve(trunc_size);
-  std::map<std::bitset<nbits>, size_t, bitset_less_comparator<nbits>>
-      founddet_pos, basedet_pos;
-  typename std::map<std::bitset<nbits>, size_t,
-                    bitset_less_comparator<nbits>>::iterator it;
+  bitset_map founddet_pos, basedet_pos;
+  bitset_map_iterator it;
   // ACTIVE SPACE
   std::vector<uint32_t> as_orbs;
   for(size_t i = 0; i < occs.size(); i++) {
@@ -281,7 +275,7 @@ void get_GF_basis_AS_1El(int orb, bool sp_up, bool is_part, const VectorXd &wfn,
   std::cout << "Nr. OF STATES: " << cgf + 1 << std::endl;
 
   size_t norb = orb;
-  VectorXd b = Eigen::VectorXd::Zero(cgf + 1);
+  Eigen::VectorXd b = Eigen::VectorXd::Zero(cgf + 1);
   // COMPUTE VECTOR b IN THE NEW BASIS
   for(size_t ndet = 0; ndet < cgf + 1; ndet++) {
     // CHECK, CAN ndet COME FROM ai^+|GS> / ai|wfn> WITH THE ORBITAL *orb?
@@ -379,26 +373,26 @@ void get_GF_basis_AS_1El(int orb, bool sp_up, bool is_part, const VectorXd &wfn,
  * @date 01/02/2022
  */
 template <size_t nbits, typename index_t = int32_t>
-std::vector<std::vector<double>> BuildWfn4Lanczos(
-    const VectorXd &base_wfn, const std::vector<int> &GF_orbs,
+auto BuildWfn4Lanczos(
+    const Eigen::VectorXd &base_wfn, const std::vector<int> &GF_orbs,
     const std::vector<bool> &is_up,
     const std::vector<std::bitset<nbits>> &base_dets,
     const std::vector<std::bitset<nbits>> &GF_dets, bool is_part,
     std::vector<int> &todelete, double zero_thresh = 1.E-7) {
   // INITIALIZE THE DICTIONARY OF BASE DETERMINANTS
-  std::map<std::bitset<nbits>, size_t, bitset_less_comparator<nbits>>
-      base_dets_pos;
+  using bitset_map = std::map< std::bitset<nbits>, size_t, bitset_less_comparator<nbits>>;
+  using bitset_map_iterator = typename bitset_map::const_iterator;
+  
+  bitset_map base_dets_pos;
   for(size_t iii = 0; iii < base_dets.size(); iii++)
     base_dets_pos[base_dets[iii]] = iii;
 
   // PREPARE THE WAVEFUNCTIONS FOR THE BAND LANCZOS
   size_t nterms = GF_dets.size();
-  std::vector<std::vector<double>> wfns(GF_orbs.size(),
-                                        std::vector<double>(nterms, 0.));
+  std::vector<double> wfns(GF_orbs.size() * nterms, 0.);
   for(size_t iorb = 0; iorb < GF_orbs.size(); iorb++) {
     int orb = GF_orbs[iorb];
     bool sp_up = is_up[iorb];
-    // int  sporb = sp_up ? orb : orb + Norbs;
     int sporb = sp_up ? orb : orb + nbits / 2;
     // BUILD THE WAVEFUNCTION FOR ORBITAL orb
     for(size_t ndet = 0; ndet < nterms; ndet++) {
@@ -413,16 +407,14 @@ std::vector<std::vector<double>> BuildWfn4Lanczos(
         // DETERMINANT SPACE
         std::bitset<nbits> temp(GF_dets[ndet]);
         temp.flip(sporb);
-        typename std::map<std::bitset<nbits>, size_t,
-                          bitset_less_comparator<nbits>>::const_iterator it =
-            base_dets_pos.find(temp);
+        bitset_map_iterator it = base_dets_pos.find(temp);
         if(it != base_dets_pos.end()) {
           // IT DOES COME INDEED FROM A DETERMINANT IN THE ORIGINAL GROUND STATE
           // THUS, IT CONTRIBUTES TO wfns1
           double sign = sp_up ? GetInsertionUpSign(temp, orb)
                               : GetInsertionDoSign(temp, orb);
           double fac = base_wfn(it->second);
-          wfns[iorb][ndet] += fac * sign;
+          wfns[iorb * nterms + ndet] += fac * sign;
         }
       }
     }
@@ -437,16 +429,17 @@ std::vector<std::vector<double>> BuildWfn4Lanczos(
     initializer(omp_priv = 0.)
 #pragma omp parallel for reduction(Vsum : st_nrm)
     for(size_t iii = 0; iii < nterms; iii++)
-      st_nrm += wfns[orb_indx][iii] * wfns[orb_indx][iii];
+      st_nrm += wfns[orb_indx * nterms + iii] * wfns[orb_indx * nterms + iii];
     if(abs(st_nrm) <= zero_thresh) todelete.push_back(orb_indx);
   }
+  int nvecs = GF_orbs.size() - todelete.size();
   for(int i = 0; i < todelete.size(); i++)
-    wfns.erase(wfns.begin() + todelete[i] - i);
+    wfns.erase(wfns.begin() + (todelete[i] - i) * nterms, wfns.begin() + (todelete[i] - i + 1) * nterms);
   std::cout << "ORBITALS WITH NO CORRESPONING ADD-VECTOR: [";
   for(int i = 0; i < todelete.size(); i++) std::cout << todelete[i] << ", ";
   std::cout << "]" << std::endl;
 
-  return wfns;
+  return std::tuple( wfns, nvecs );
 }
 
 /**
@@ -454,8 +447,8 @@ std::vector<std::vector<double>> BuildWfn4Lanczos(
  * grid together with the full GF matrix. Also, in case of a multi-orbitla GF,
  * it stores the orbital indices in a separate file.
  *
- * @param [in] const std::vector<std::vector<std::vector<std::complex double> >
- * > > &GF: GF to store. Written as GF[freq-axis][orb1][orb2].
+ * @param [in] const std::vector<std::vector<std::complex double> >
+ * > &GF: GF to store. Written as GF[freq-axis][orb1 * norbs + orb2].
  * @param [in] const std::vector<std::complex<double> > &ws: Frequency grid.
  * @param [in] const std::vector<int> &GF_orbs: Orbital indices for the Green's
  * function, as requested originally in the GF computation. Some of them may not
@@ -469,7 +462,7 @@ std::vector<std::vector<double>> BuildWfn4Lanczos(
  * @date 02/02/2022
  */
 void write_GF(
-    const std::vector<std::vector<std::vector<std::complex<double>>>> &GF,
+    const std::vector<std::vector<std::complex<double>>> &GF,
     const std::vector<std::complex<double>> &ws,
     const std::vector<int> &GF_orbs, const std::vector<int> &todelete,
     const bool is_part);
@@ -487,10 +480,10 @@ void write_GF(
  * quatization, should allow for basic bit operations, and being an index in a
  * dictionary.
  *
- * @param [out] std::vector<std::vector<std::vector<std::complex<double> > > >:
+ * @param [out] std::vector<std::vector<std::complex<double> > >:
  * On output, contains the computed Green's function, in format
- * GF[freq.][orb1][orb2].
- * @param [in] const VectorXd &wfn0: Reference wave function from which to
+ * GF[freq.][orb1 * norbs + orb2].
+ * @param [in] const Eigen::VectorXd &wfn0: Reference wave function from which to
  * compute the GF.
  * @param [in] const FermionHamil &H: Fermionic Hamiltonian defining the system.
  * @param [in] const std::vector<DetType> &base_dets: Basis of Slater
@@ -509,12 +502,13 @@ void write_GF(
  * @date 01/02/2022
  */
 template <size_t nbits, typename index_t = int32_t>
-void RunGFCalc(std::vector<std::vector<std::vector<std::complex<double>>>> &GF,
-               const VectorXd &wfn0, HamiltonianGenerator<nbits> &Hgen,
+void RunGFCalc(std::vector<std::vector<std::complex<double>>> &GF,
+               const Eigen::VectorXd &wfn0, HamiltonianGenerator<nbits> &Hgen,
                const std::vector<std::bitset<nbits>> &base_dets,
                const double energ, const bool is_part,
                const std::vector<std::complex<double>> &ws,
                const std::vector<double> &occs, const GFSettings &settings) {
+  using Clock = std::chrono::high_resolution_clock;
   // READ INPUT
   const size_t trunc_size = settings.trunc_size;
   const int tot_SD = settings.tot_SD;
@@ -589,7 +583,9 @@ void RunGFCalc(std::vector<std::vector<std::vector<std::complex<double>>>> &GF,
 
   // PREPARE THE WAVEFUNCTIONS FOR THE BAND LANCZOS
   std::vector<int> todelete;
-  std::vector<std::vector<double>> wfns = BuildWfn4Lanczos<nbits, index_t>(
+  std::vector<double> wfns;
+  int nvecs;
+  std::tie( wfns, nvecs ) = BuildWfn4Lanczos<nbits, index_t>(
       wfn0, GF_orbs_comp, is_up_comp, base_dets, gf_dets, is_part, todelete);
 
   // //ACTUALLY COMPUTE THE GF!
@@ -597,46 +593,46 @@ void RunGFCalc(std::vector<std::vector<std::vector<std::complex<double>>>> &GF,
   auto GF_loop1C = Clock::now();
 
   if(use_bandLan) {
-    BandResolvent(hamil, wfns, ws, GF, nLanIts, energ, is_part, print,
+    BandResolvent(hamil, wfns, ws, GF, nLanIts, energ, is_part, nvecs, nterms, print,
                   saveGFmats);
   } else {
     // DO SIMPLE LANCZOS FOR ALL GF ELEMENTS
     SparsexDistSpMatOp hamil_wrap(hamil);
+    GF.clear();
     GF.resize(ws.size(),
-              std::vector<std::vector<std::complex<double>>>(
-                  wfns.size(), std::vector<std::complex<double>>(
-                                   wfns.size(), std::complex<double>(0., 0.))));
-    for(int i = 0; i < wfns.size(); i++) {
+              std::vector<std::complex<double>>(
+                  nvecs * nvecs, std::complex<double>(0., 0.)));
+    for(int i = 0; i < nvecs; i++) {
       std::vector<std::complex<double>> tGF;
       // DIAGONAL ELEMENT
       std::cout << "DOING ELEMENT (" << i << ", " << i << ")" << std::endl;
-      VectorXd twfn =
-          Eigen::Map<VectorXd, Eigen::Unaligned>(wfns[i].data(), nterms);
+      Eigen::VectorXd twfn =
+          Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(wfns.data() + nterms * i, nterms);
       std::string fpref_basis = is_part ? "particle" : "hole";
       std::string fpref =
           fpref_basis + "_" + std::to_string(i) + "_" + std::to_string(i);
       GF_Diag<SparsexDistSpMatOp>(twfn, hamil_wrap, ws, tGF, energ, is_part,
                                   nLanIts, saveGFmats, fpref);
-      for(int iw = 0; iw < ws.size(); iw++) GF[iw][i][i] = tGF[iw];
-      for(int j = i + 1; j < wfns.size(); j++) {
+      for(int iw = 0; iw < ws.size(); iw++) GF[iw][i * nvecs + i] = tGF[iw];
+      for(int j = i + 1; j < nvecs; j++) {
         // OFF DIAGONAL ELEMENTS
         std::cout << "DOING ELEMENT (" << i << ", " << j << ")" << std::endl;
         for(size_t iii = 0; iii < nterms; iii++)
-          twfn(iii) = wfns[i][iii] + wfns[j][iii];
+          twfn(iii) = wfns[i * nterms + iii] + wfns[j * nterms + iii];
         fpref = fpref_basis + "_" + std::to_string(i) + "_" +
                 std::to_string(j) + "_a";
         GF_Diag<SparsexDistSpMatOp>(twfn, hamil_wrap, ws, tGF, energ, is_part,
                                     nLanIts, saveGFmats, fpref);
-        for(int iw = 0; iw < ws.size(); iw++) GF[iw][i][j] += 0.25 * tGF[iw];
+        for(int iw = 0; iw < ws.size(); iw++) GF[iw][i * nvecs + j] += 0.25 * tGF[iw];
         for(size_t iii = 0; iii < nterms; iii++)
-          twfn(iii) = wfns[i][iii] - wfns[j][iii];
+          twfn(iii) = wfns[i * nterms + iii] - wfns[j * nterms + iii];
         fpref = fpref_basis + "_" + std::to_string(i) + "_" +
                 std::to_string(j) + "_b";
         GF_Diag<SparsexDistSpMatOp>(twfn, hamil_wrap, ws, tGF, energ, is_part,
                                     nLanIts);
         for(int iw = 0; iw < ws.size(); iw++) {
-          GF[iw][i][j] -= 0.25 * tGF[iw];
-          GF[iw][j][i] = GF[iw][i][j];
+          GF[iw][i * nvecs + j] -= 0.25 * tGF[iw];
+          GF[iw][j * nvecs + i] = GF[iw][i * nvecs + j];
         }
       }
     }

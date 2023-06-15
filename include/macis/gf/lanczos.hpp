@@ -44,7 +44,7 @@ struct LanczosSettings {
  */
 class eigMatDOp {
  private:
-  const eigMatD *mat;
+  const Eigen::MatrixXd *mat;
 
  public:
   /**
@@ -56,7 +56,7 @@ class eigMatDOp {
    * @author Carlos Mejuto Zaera
    * @date 05/04/2021
    */
-  eigMatDOp(const eigMatD &A) { mat = &A; }
+  eigMatDOp(const Eigen::MatrixXd &A) { mat = &A; }
   /**
    * @brief Simple matrix-vector product.
    *
@@ -67,7 +67,7 @@ class eigMatDOp {
    * @author Carlos Mejuto Zaera
    * @date 05/04/2021
    */
-  VectorXd dot(const VectorXd &vec) const { return (*mat) * vec; }
+  Eigen::VectorXd dot(const Eigen::VectorXd &vec) const { return (*mat) * vec; }
   /**
    * @brief Returns nr. of rows in the wrapped matrix.
    *
@@ -89,7 +89,7 @@ class eigMatDOp {
  */
 class SpMatDOp {
  private:
-  const SpMatD *mat;
+  const Eigen::SparseMatrix<double, Eigen::RowMajor> *mat;
 
  public:
   /**
@@ -102,7 +102,7 @@ class SpMatDOp {
    * @author Carlos Mejuto Zaera
    * @date 05/04/2021
    */
-  SpMatDOp(const SpMatD &A) { mat = &A; }
+  SpMatDOp(const Eigen::SparseMatrix<double, Eigen::RowMajor> &A) { mat = &A; }
   /**
    * @brief Simple matrix-vector product.
    *
@@ -113,7 +113,7 @@ class SpMatDOp {
    * @author Carlos Mejuto Zaera
    * @date 05/04/2021
    */
-  VectorXd dot(const VectorXd &vec) const { return (*mat) * vec; }
+  Eigen::VectorXd dot(const Eigen::VectorXd &vec) const { return (*mat) * vec; }
   /**
    * @brief Returns nr. of rows in the wrapped matrix.
    *
@@ -167,7 +167,7 @@ class SparsexDistSpMatOp {
    * @author Carlos Mejuto Zaera
    * @date 05/04/2021
    */
-  VectorXd dot(const VectorXd &vec) const {
+  Eigen::VectorXd dot(const Eigen::VectorXd &vec) const {
     std::vector<double> vin(&vec[0], vec.data() + vec.cols() * vec.rows());
     std::vector<double> vout(vec.size(), 0.);
     sparsexx::spblas::pgespmv(1., *mat, vin.data(), 0., vout.data(), spmv_info);
@@ -200,16 +200,16 @@ class SparsexDistSpMatOp {
  * @date 05/04/2021
  */
 template <class MatOp>
-void MyLanczos(const VectorXd &start_vec, const MatOp &H, int64_t nLanIts,
+void MyLanczos(const Eigen::VectorXd &start_vec, const MatOp &H, int64_t nLanIts,
                std::vector<double> &alphas, std::vector<double> &betas,
                double tol) {
   // LANCZOS ROUTINE USING TEMPLATED MATRIX
   // CLASS. ONLY NEEDS TO PROVIDE A MATRIX
   // VECTOR PRODUCT.
   int64_t n = start_vec.rows();
-  VectorXd qold = VectorXd::Zero(n);
-  VectorXd qtemp = VectorXd::Zero(n);
-  VectorXd qnew = VectorXd::Zero(n);
+  Eigen::VectorXd qold = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd qtemp = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd qnew = Eigen::VectorXd::Zero(n);
   alphas.clear();
   betas.clear();
 
@@ -266,14 +266,14 @@ void MyLanczos(const VectorXd &start_vec, const MatOp &H, int64_t nLanIts,
  * @date 05/04/2021
  */
 template <class MatOp>
-void MyLanczos_BackProj(const VectorXd &start_vec, const MatOp &H,
-                        int64_t nLanIts, VectorXd &vec_P, VectorXd &vec_BP) {
+void MyLanczos_BackProj(const Eigen::VectorXd &start_vec, const MatOp &H,
+                        int64_t nLanIts, Eigen::VectorXd &vec_P, Eigen::VectorXd &vec_BP) {
   // REBUILD THE EIGENVECTOR FROM A PREVIOUS LANZOS
   // CALCULATION.
   int64_t n = start_vec.rows();
-  VectorXd qold = VectorXd::Zero(n);
-  VectorXd qtemp = VectorXd::Zero(n);
-  VectorXd qnew = VectorXd::Zero(n);
+  Eigen::VectorXd qold = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd qtemp = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd qnew = Eigen::VectorXd::Zero(n);
 
   std::vector<double> alphas(nLanIts, 0.);
   std::vector<double> betas(nLanIts + 1, 0.);
@@ -281,7 +281,7 @@ void MyLanczos_BackProj(const VectorXd &start_vec, const MatOp &H,
   double normpsi = sqrt(MyInnProd(start_vec, start_vec));
   int64_t nlan = -1, itermax = nLanIts;
 
-  vec_BP = VectorXd::Zero(n);
+  vec_BP = Eigen::VectorXd::Zero(n);
 
   nlan++;
   qold = start_vec / normpsi;
@@ -327,8 +327,8 @@ void MyLanczos_BackProj(const VectorXd &start_vec, const MatOp &H,
  * @date 05/04/2021
  */
 template <class MatOp>
-int64_t GetGSEn_Lanczos(const VectorXd &start_vec, const MatOp &H, double &E0,
-                        VectorXd &psi0_Lan, const LanczosSettings &settings) {
+int64_t GetGSEn_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H, double &E0,
+                        Eigen::VectorXd &psi0_Lan, const LanczosSettings &settings) {
   // COMPUTE LOWEST EIGENVALUE OF MATRIX H
   // USING LANCZOS. RETURNS EIGENVECTOR IN
   // THE BASIS OF KRYLOV VECTORS
@@ -339,11 +339,11 @@ int64_t GetGSEn_Lanczos(const VectorXd &start_vec, const MatOp &H, double &E0,
   size_t itermax = settings.itermax;
 
   int64_t n = start_vec.rows();
-  VectorXd qold = VectorXd::Zero(n);
-  VectorXd qtemp = VectorXd::Zero(n);
-  VectorXd qnew = VectorXd::Zero(n);
-  VectorXd eigvals;
-  eigMatD eigvecs;
+  Eigen::VectorXd qold = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd qtemp = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd qnew = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd eigvals;
+  Eigen::MatrixXd eigvecs;
   std::vector<double> alphas, betas;
   double currE0, prevE0;
 
@@ -425,7 +425,7 @@ int64_t GetGSEn_Lanczos(const VectorXd &start_vec, const MatOp &H, double &E0,
 
   E0 = currE0;
   if(itermax == 1) {
-    psi0_Lan = VectorXd::Ones(1);
+    psi0_Lan = Eigen::VectorXd::Ones(1);
   } else {
     psi0_Lan = eigvecs.col(0);
   }
@@ -447,8 +447,8 @@ int64_t GetGSEn_Lanczos(const VectorXd &start_vec, const MatOp &H, double &E0,
  * @date 05/04/2021
  */
 template <class MatOp>
-void GetGSEnVec_Lanczos(const VectorXd &start_vec, const MatOp &H, double &E0,
-                        VectorXd &psi0, const LanczosSettings &settings) {
+void GetGSEnVec_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H, double &E0,
+                        Eigen::VectorXd &psi0, const LanczosSettings &settings) {
   // COMPUTE LOWEST EIGENVALUE AND EIGENVECTOR
   // OF MATRIX H USING LANCZOS.
   double Lantol = settings.Lantol;
@@ -457,12 +457,12 @@ void GetGSEnVec_Lanczos(const VectorXd &start_vec, const MatOp &H, double &E0,
   size_t itermax = settings.itermax;
 
   int64_t n = start_vec.rows();
-  VectorXd qold = VectorXd::Zero(n);
-  VectorXd qtemp = VectorXd::Zero(n);
-  VectorXd qnew = VectorXd::Zero(n);
-  VectorXd eigvals;
-  eigMatD eigvecs;
-  std::vector<VectorXd> kry_vecs;
+  Eigen::VectorXd qold = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd qtemp = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd qnew = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd eigvals;
+  Eigen::MatrixXd eigvecs;
+  std::vector<Eigen::VectorXd> kry_vecs;
   std::vector<double> alphas, betas;
   double currE0, prevE0;
 
@@ -528,7 +528,7 @@ void GetGSEnVec_Lanczos(const VectorXd &start_vec, const MatOp &H, double &E0,
   }
 
   E0 = currE0;
-  psi0 = VectorXd::Zero(n);
+  psi0 = Eigen::VectorXd::Zero(n);
   if(kry_vecs.size() == 1) {
     psi0 = kry_vecs[0];
   } else {
@@ -553,7 +553,7 @@ void GetGSEnVec_Lanczos(const VectorXd &start_vec, const MatOp &H, double &E0,
  * @date 05/04/2021
  */
 template <class MatOp>
-void GetGS(const MatOp &H, double &E0, VectorXd &psi0,
+void GetGS(const MatOp &H, double &E0, Eigen::VectorXd &psi0,
            const LanczosSettings &settings, bool isHF = false) {
   // Computes the lowest eigenvalue and corresponding
   // eigenvector from the dense matrix H by using Lanczos.
@@ -561,11 +561,11 @@ void GetGS(const MatOp &H, double &E0, VectorXd &psi0,
   int64_t n = H.rows();
   // Initial vector. We choose (1,0,0,0,...)t
   // for HF, Otherwhise  (1,1,1,1,...)t
-  VectorXd start_psi = isHF ? VectorXd::Zero(n) : VectorXd::Ones(n);
+  Eigen::VectorXd start_psi = isHF ? Eigen::VectorXd::Zero(n) : Eigen::VectorXd::Ones(n);
   start_psi(0) = 1.;
   // Determine lowest eigenvalue for the given
   // tolerance.
-  VectorXd psi0_Lan;
+  Eigen::VectorXd psi0_Lan;
   int64_t nLanIts = GetGSEn_Lanczos(start_psi, H, E0, psi0_Lan, settings);
   // Reconstruct the eigenvector
   MyLanczos_BackProj(start_psi, H, nLanIts, psi0_Lan, psi0);

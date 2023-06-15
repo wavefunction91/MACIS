@@ -13,7 +13,7 @@
 namespace macis {
 
 void Hste_v(const std::vector<double> &alphas, const std::vector<double> &betas,
-            Eigen::VectorXd &eigvals, eigMatD &eigvecs) {
+            Eigen::VectorXd &eigvals, Eigen::MatrixXd &eigvecs) {
   /*
    * COMPUTES THE EIGENVALUES AND EIGENVECTORS OF A TRIDIAGONAL, SYMMETRIC
    * MATRIX A USING LAPACK.
@@ -45,7 +45,7 @@ void Hste_v(const std::vector<double> &alphas, const std::vector<double> &betas,
   for(int i = 0; i < N; i++) eigvals(i) = D[i];
 }
 
-void Hsyev(const eigMatD &H, Eigen::VectorXd &eigvals, eigMatD &eigvecs) {
+void Hsyev(const Eigen::MatrixXd &H, Eigen::VectorXd &eigvals, Eigen::MatrixXd &eigvecs) {
   /*
    * COMPUTES THE EIGENVALUES AND EIGENVECTORS OF A SYMMETRIC MATRIX A USING
    * LAPACK.

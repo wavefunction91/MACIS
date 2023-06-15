@@ -32,8 +32,6 @@
 #include "macis/gf/inn_prods.hpp"
 #include "macis/solvers/davidson.hpp"
 
-typedef std::numeric_limits<double> dbl;
-
 namespace macis {
 
 /**
@@ -42,19 +40,23 @@ namespace macis {
  *         Q matrices, which are returned. Here, the input
  *         matrix has more rows than columns.
  *
- * @param[inout] std::vector<std::vector<double> > &Q: On input,
+ * @param[inout] std::vector<double> &Q: On input,
  *               matrix for which to evaluate the QR decomposition.
  *               On output, Q-matrix.
- * @param[out] std::vector<std::vector<double> > &R: On output, R
+ * @param[out] std::vector<double> &R: On output, R
  *             matrix in the QR decomposition.
+ * @param[in] int Qrows: Nr. of rows in matrix Q.
+ * @param[in] int Qcols: Nr. of cols in matrix Q.
  *
  * @returns bool: Error code from LAPACK routines.
  *
  * @author Carlos Mejuto-Zaera
  * @date 25/04/2022
  */
-bool QRdecomp(std::vector<std::vector<double> > &Q,
-              std::vector<std::vector<double> > &R);
+bool QRdecomp(std::vector<double> &Q,
+              std::vector<double> &R,
+	      int Qrows,
+	      int Qcols);
 
 /**
  * @ brief Wrapper for QR decomposition in LAPACK, basically
@@ -62,62 +64,70 @@ bool QRdecomp(std::vector<std::vector<double> > &Q,
  *         Q matrices, which are returned. Here, the input
  *         matrix has more columns than rows.
  *
- * @param[inout] std::vector<std::vector<double> > &Q: On input,
+ * @param[inout] std::vector<double> &Q: On input,
  *               matrix for which to evaluate the QR decomposition.
  *               On output, Q-matrix.
- * @param[out] std::vector<std::vector<double> > &R: On output, R
+ * @param[out] std::vector<double> &R: On output, R
  *             matrix in the QR decomposition.
+ * @param[in] int Qrows: Nr. of rows in Q.
+ * @param[in] int Qcols: Nr. of cols in Q.
  *
  * @returns bool: Error code from LAPACK routines.
  *
  * @author Carlos Mejuto-Zaera
  * @date 25/04/2022
  */
-bool QRdecomp_tr(std::vector<std::vector<double> > &Q,
-                 std::vector<std::vector<double> > &R);
+bool QRdecomp_tr(std::vector<double> &Q,
+                 std::vector<double> &R,
+		 int Qrows,
+		 int Qcols);
 
 /**
  * @brief Wrapper to LAPACK routine to evaluate the eigenvectors
  *        and eigenvalues of the symmetric matrix mat.
  *
- * @param[inout] std::vector<std::vector<double> > &mat: Matrix for
+ * @param[inout] std::vector<double> &mat: Matrix for
  *               which to compute the eigenvalues/vectors. Erased
  *               during computation.
  * @param[out] std::vector<double> &eigvals: Eigenvalues, sorted from smallest
  *             to largest.
- * @param[out] std::vector<std::vector<double> > &eigvecs: Eigenvectors,
+ * @param[out] std::vector<double> &eigvecs: Eigenvectors,
  *             stored as row vectors.
+ * @param[in] int matsize: Nr. of rows/columns of the square matrix mat.
  *
  * @returns bool: Error code from LAPACK.
  *
  * @author Carlos Mejuto Zaera
  * @date 25/04/2022
  */
-bool GetEigsys(std::vector<std::vector<double> > &mat,
+bool GetEigsys(std::vector<double> &mat,
                std::vector<double> &eigvals,
-               std::vector<std::vector<double> > &eigvecs);
+               std::vector<double> &eigvecs,
+	       int matsize);
 
 /**
  * @brief Wrapper to LAPACK routine to evaluate the eigenvectors
  *        and eigenvalues of the symmetric band matrix mat.
  *
- * @param[inout] std::vector<std::vector<double> > &mat: Matrix for
+ * @param[inout] std::vector<double> &mat: Matrix for
  *               which to compute the eigenvalues/vectors. Erased
  *               during computation.
  * @param[in] int nSupDiag: Nr. of bands.
  * @param[out] std::vector<double> &eigvals: Eigenvalues, sorted from smallest
  *             to largest.
- * @param[out] std::vector<std::vector<double> > &eigvecs: Eigenvectors,
+ * @param[out] std::vector<double> &eigvecs: Eigenvectors,
  *             stored as row vectors.
+ * @param[in] int matsize: Nr. of rows/cols of the square matrix mat.
  *
  * @returns bool: Error code from LAPACK.
  *
  * @author Carlos Mejuto Zaera
  * @date 25/04/2022
  */
-bool GetEigsysBand(std::vector<std::vector<double> > &mat, int nSupDiag,
+bool GetEigsysBand(std::vector<double> &mat, int nSupDiag,
                    std::vector<double> &eigvals,
-                   std::vector<std::vector<double> > &eigvecs);
+                   std::vector<double> &eigvecs,
+		   int matsize);
 
 /**
  * @brief Perform a band Lanczos calculation on the Hamiltonian operator H,
@@ -128,11 +138,11 @@ bool GetEigsysBand(std::vector<std::vector<double> > &mat, int nSupDiag,
  *
  * @param[in] const sparseexx::csr_matrix<double, int32_t> &H: Hamiltonian
  * oprator. Just needs to implement a matrix vector product.
- * @param[in] std::vector<std::vector<Cont> > &qs: Initial set of vetors to
+ * @param[in] std::vector<Cont> &qs: Initial set of vetors to
  * perform the band Lanczos on. Deleted on exit.
- * @param[in] std::vector<std::vector<Cont> > &bandH: On exit, band-diagonal
+ * @param[in] std::vector<Cont> &bandH: On exit, band-diagonal
  * Hamiltonian approximation.
- * @param[in] int &nLanIts: Number of Lanczos iterations to perform.
+ * @param[inout] int &nLanIts: Number of Lanczos iterations to perform.
  * @param[in] double thres: Threshold determining when to ignore beta's for
  * being too small.
  * @param[in] bool print: If true, write intermediate results to file.
@@ -142,9 +152,7 @@ bool GetEigsysBand(std::vector<std::vector<double> > &mat, int nSupDiag,
  */
 template <class Cont, class Functor>
 void MyBandLan(const Functor &H,
-               // std::vector<std::vector<Cont> > &qs,
-               // std::vector<std::vector<Cont> > &bandH,
-               std::vector<Cont> &qs, std::vector<std::vector<Cont> > &bandH,
+               std::vector<Cont> &qs, std::vector<Cont> &bandH,
                int &nLanIts, int nbands, int N, double thres = 1.E-6,
                bool print = false) {
   // BAND LANCZOS ROUTINE. TAKES AS INPUT THE HAMILTONIAN H, INITIAL VECTORS qs
@@ -152,22 +160,19 @@ void MyBandLan(const Functor &H,
   // STOPPING IF THE NORM OF ANY NEW KRYLOV VECTOR IS BELOW thres. IF LANCZOS IS
   // STOPPED PREMATURELY , nLanIts IS OVERWRITTEN WITH THE ACTUAL NUMBER OF
   // ITERATIONS! THE qs VECTOR IS ERASED AT THE END OF THE CALCULATION
+  using dbl = std::numeric_limits<double>;
   bandH.clear();
-  bandH.resize(nLanIts, std::vector<Cont>(nLanIts, 0.));
+  bandH.resize(nLanIts * nLanIts, 0.);
 
   // MAKE SPACE FOR 2 * nbands VECTORS
-  // qs.resize(2 * nbands, std::vector<Cont>(qs[0].size(), 0.));
   qs.resize(2 * nbands * N);
-  // std::vector<Cont> temp(qs[0].size(), 0.);
   std::vector<Cont> temp(N, 0.);
   if(print) {
     for(int i = 0; i < nbands; i++) {
       std::ofstream ofile("lanvec_" + std::to_string(i + 1) + ".dat",
                           std::ios::out);
       ofile.precision(dbl::max_digits10);
-      // for(size_t el = 0; el < qs[i].size(); el++)
       for(size_t el = 0; el < N; el++)
-        // ofile << std::scientific << qs[i][el] << std::endl;
         ofile << std::scientific << qs[el + i * N] << std::endl;
       ofile.close();
     }
@@ -183,8 +188,6 @@ void MyBandLan(const Functor &H,
   for(int it = 1; it <= nLanIts; it++) {
     int band_indx_i =
         true_indx[it];  // TO WHAT ELEMENT OF THE VECTOR SET DO WE APPLY THIS
-    // H.operator_action( 1, 1., qs[band_indx_i].data(), temp.size(), 0.,
-    // temp.data(), temp.size() );
     H.operator_action(1, 1., qs.data() + band_indx_i * N, N, 0., temp.data(),
                       N);
     if(print) {
@@ -200,53 +203,45 @@ void MyBandLan(const Functor &H,
       int band_indx_j = true_indx[jt];
 #pragma omp parallel for
       for(size_t coeff = 0; coeff < temp.size(); coeff++)
-        // temp[coeff] -= bandH[it - 1][jt - 1] * qs[band_indx_j][coeff];
-        temp[coeff] -= bandH[it - 1][jt - 1] * qs[N * band_indx_j + coeff];
+        temp[coeff] -= bandH[(it - 1) * nLanIts + jt - 1] * qs[N * band_indx_j + coeff];
     }
     for(int jt = it; jt <= std::min(it + nbands - 1, nLanIts); jt++) {
       int band_indx_j = true_indx[jt];
-      // bandH[it - 1][jt - 1] = MyInnProd(temp, qs[band_indx_j]);
-      bandH[it - 1][jt - 1] =
+      bandH[(it - 1) * nLanIts + jt - 1] =
           blas::dot(N, temp.data(), 1, qs.data() + band_indx_j * N, 1);
-      bandH[jt - 1][it - 1] = bandH[it - 1][jt - 1];
+      bandH[(jt - 1) * nLanIts + it - 1] = bandH[(it - 1 ) * nLanIts + jt - 1];
 #pragma omp parallel for
       for(size_t coeff = 0; coeff < temp.size(); coeff++)
-        // temp[coeff] -= bandH[it - 1][jt - 1] * qs[band_indx_j][coeff];
-        temp[coeff] -= bandH[it - 1][jt - 1] * qs[N * band_indx_j + coeff];
+        temp[coeff] -= bandH[(it - 1 ) * nLanIts + jt - 1] * qs[N * band_indx_j + coeff];
     }
     if(it + nbands <= nLanIts) {
-      bandH[it - 1][it + nbands - 1] =
+      bandH[(it - 1 ) * nLanIts + it + nbands - 1] =
           std::sqrt(std::real(MyInnProd(temp, temp)));
-      bandH[it + nbands - 1][it - 1] = bandH[it - 1][it + nbands - 1];
+      bandH[(it + nbands - 1 ) * nLanIts + it - 1] = bandH[(it - 1 ) * nLanIts + it + nbands - 1];
       true_indx[it + nbands] = next_indx;
-      if(std::abs(bandH[it - 1][it + nbands - 1]) < thres) {
+      if(std::abs(bandH[(it - 1 ) * nLanIts + it + nbands - 1]) < thres) {
         std::cout
             << "BAND LANCZOS STOPPED PREMATURELY DUE TO SMALL NORM! NAMELY "
-            << bandH[it - 1][it + nbands - 1]
+            << bandH[(it - 1 ) * nLanIts + it + nbands - 1]
             << ", STOPPED AT ITERATION: " << it << std::endl;
         nLanIts = it;
-        for(int i = 0; i < nLanIts; i++) bandH[i].resize(nLanIts);
-        bandH.resize(nLanIts);
+        bandH.resize(nLanIts * nLanIts);
         break;
 #pragma omp parallel for
         for(size_t coeff = 0; coeff < temp.size(); coeff++)
-          // qs[true_indx[it + nbands]][coeff] = 0.;
           qs[true_indx[it + nbands] * N + coeff] = 0.;
         std::cout << "FOUND A ZERO VECTOR AT POSITION " << next_indx
                   << std::endl;
       } else {
 #pragma omp parallel for
         for(size_t coeff = 0; coeff < temp.size(); coeff++)
-          // qs[true_indx[it + nbands]][coeff] =
           qs[true_indx[it + nbands] * N + coeff] =
-              temp[coeff] / bandH[it - 1][it + nbands - 1];
+              temp[coeff] / bandH[(it - 1 ) * nLanIts + it + nbands - 1];
         if(print) {
           std::ofstream ofile("lanvec_" + std::to_string(it + nbands) + ".dat",
                               std::ios::out);
           ofile.precision(dbl::max_digits10);
-          // for(size_t el = 0; el < qs[true_indx[it + nbands]].size(); el++)
           for(size_t el = 0; el < N; el++)
-            // ofile << std::scientific << qs[true_indx[it + nbands]][el]
             ofile << std::scientific << qs[true_indx[it + nbands] * N + el]
                   << std::endl;
           ofile.close();
@@ -265,11 +260,11 @@ void MyBandLan(const Functor &H,
  *
  * @param[in] const sparsex::dist_sparse_matrix<sparsexx::csr_matrix<double,
  * int32_t> > &H: Hamiltonian operator.
- * @param[in] std::vector<std::vector<double> > &vecs: Vectors for which to
- * compute the resolvent matrix elements.
+ * @param[in] std::vector<double> &vecs: Vectors for which to
+ * compute the resolvent matrix elements in format res[freq.][iorb1 * norbs + iorb2].
  * @param[in] std::vector<std::complex<double> > &ws: Frequency grid over which
  * to evaluate the resolvent.
- * @param[out] std::vector<std::vector<std::vector<std::complex<double> > > >
+ * @param[out] std::vector<std::vector<std::complex<double> > >
  * &res: On exit, resolvent elements.
  * @param[in] int nLanIts: Max number of iterations.
  * @param[in] double E0: Ground state energy, for shifting the resolvent.
@@ -283,10 +278,10 @@ void MyBandLan(const Functor &H,
 void BandResolvent(
     const sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double, int32_t> >
         &H,
-    std::vector<std::vector<double> > &vecs,
+    std::vector<double> &vecs,
     const std::vector<std::complex<double> > &ws,
-    std::vector<std::vector<std::vector<std::complex<double> > > > &res,
-    int nLanIts, double E0, bool ispart, bool print = false,
-    bool saveGFmats = false);
+    std::vector<std::vector<std::complex<double> > > &res,
+    int nLanIts, double E0, bool ispart, int nvecs, 
+    int len_vec, bool print = false, bool saveGFmats = false);
 
 }  // namespace macis

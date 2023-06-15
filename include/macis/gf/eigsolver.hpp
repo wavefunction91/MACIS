@@ -21,10 +21,6 @@
 
 namespace macis {
 
-typedef Eigen::VectorXd VectorXd;
-typedef Eigen::MatrixXd eigMatD;
-typedef Eigen::SparseMatrix<double, Eigen::RowMajor> SpMatD;
-
 /**
  * @brief Computes the eigenvalues and eigenvectors of a tridiagonal, symmetric
  * matrix using Lapack.
@@ -38,7 +34,7 @@ typedef Eigen::SparseMatrix<double, Eigen::RowMajor> SpMatD;
  * @date 05/04/2021
  */
 void Hste_v(const std::vector<double> &alphas, const std::vector<double> &betas,
-            Eigen::VectorXd &eigvals, eigMatD &eigvecs);
+            Eigen::VectorXd &eigvals, Eigen::MatrixXd &eigvecs);
 
 /**
  * @brief Computes the eigenvalues and eigenvectors of a tridiagonal, symmetric
@@ -52,6 +48,6 @@ void Hste_v(const std::vector<double> &alphas, const std::vector<double> &betas,
  * @author Carlos Mejuto Zaera
  * @date 05/04/2021
  */
-void Hsyev(const eigMatD &H, Eigen::VectorXd &eigvals, eigMatD &eigvecs);
+void Hsyev(const Eigen::MatrixXd &H, Eigen::VectorXd &eigvals, Eigen::MatrixXd &eigvecs);
 
 }  // namespace macis
