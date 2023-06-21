@@ -223,7 +223,7 @@ void BandResolvent(
   std::cout << "BAND LANCZOS ...";
   SparseMatrixOperator Hop(H);
   int nbands = nvecs;
-  MyBandLan<double>(Hop, vecs, bandH, nLanIts, nbands, nvecs, 1.E-6, print);
+  BandLan<double>(Hop, vecs, bandH, nLanIts, nbands, nvecs, 1.E-6, print);
   std::cout << "DONE! ";
   if(print) {
     std::ofstream ofile("BLH.dat", std::ios::out);

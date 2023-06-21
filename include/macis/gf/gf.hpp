@@ -123,7 +123,7 @@ void GF_Diag(const Eigen::VectorXd &state_0, const MatOp &H,
   double tol = 1.E-6;
   std::vector<double> alphas, betas;
 
-  MyLanczos(state_0, H, nLanIts, alphas, betas, tol);
+  Lanczos(state_0, H, nLanIts, alphas, betas, tol);
 
   int kry_size = 0;
   for(int i = 1; i < nLanIts; i++) {
@@ -427,13 +427,7 @@ auto BuildWfn4Lanczos(const Eigen::VectorXd &base_wfn,
   // CHECK WHETHER ANY OF THE VECTORS IS EXACTLY ZERO. IF SO, TAKE IT OUT!
   todelete.clear();
   for(int orb_indx = 0; orb_indx < GF_orbs.size(); orb_indx++) {
-    double st_nrm = 0.;
-#pragma omp declare reduction(Vsum:double                   \
-                              : omp_out = omp_out + omp_in) \
-    initializer(omp_priv = 0.)
-#pragma omp parallel for reduction(Vsum : st_nrm)
-    for(size_t iii = 0; iii < nterms; iii++)
-      st_nrm += wfns[orb_indx * nterms + iii] * wfns[orb_indx * nterms + iii];
+    double st_nrm = blas::dot( nterms, wfns.data() + orb_indx * nterms, 1, wfns.data() + orb_indx * nterms, 1 );
     if(abs(st_nrm) <= zero_thresh) todelete.push_back(orb_indx);
   }
   int nvecs = GF_orbs.size() - todelete.size();

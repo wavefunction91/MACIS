@@ -22,7 +22,6 @@
 #include <sparsexx/spblas/spmbv.hpp>
 
 #include "macis/gf/eigsolver.hpp"
-#include "macis/gf/inn_prods.hpp"
 
 namespace macis {
 
@@ -200,12 +199,23 @@ class SparsexDistSpMatOp {
  * @date 05/04/2021
  */
 template <class MatOp>
-void MyLanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
-               int64_t nLanIts, std::vector<double> &alphas,
-               std::vector<double> &betas, double tol) {
+void Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
+             int64_t nLanIts, std::vector<double> &alphas,
+             std::vector<double> &betas, double tol) {
   // LANCZOS ROUTINE USING TEMPLATED MATRIX
   // CLASS. ONLY NEEDS TO PROVIDE A MATRIX
   // VECTOR PRODUCT.
+  //
+  // SOME LAMBDAS
+  auto VecNorm = []( const Eigen::VectorXd & vec )->double
+  {
+    return std::sqrt( blas::dot( vec.size(), vec.data(), 1, vec.data(), 1 ) );
+  };
+  auto InnProd = []( const Eigen::VectorXd &Lvec, const Eigen::VectorXd &Rvec )->double
+  {
+    return blas::dot( Lvec.size(), Lvec.data(), 1, Rvec.data(), 1 );
+  };
+  // INITIALIZATIONS
   int64_t n = start_vec.rows();
   Eigen::VectorXd qold = Eigen::VectorXd::Zero(n);
   Eigen::VectorXd qtemp = Eigen::VectorXd::Zero(n);
@@ -216,17 +226,17 @@ void MyLanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
   alphas.resize(nLanIts, 0.);
   betas.resize(nLanIts + 1, 0.);
 
-  double normpsi = sqrt(MyInnProd(start_vec, start_vec));
+  double normpsi = VecNorm(start_vec);
   int64_t nlan = -1, itermax = nLanIts;
 
   nlan++;
   qold = start_vec / normpsi;
 
   qnew = H.dot(qold);
-  alphas[0] = MyInnProd(qold, qnew);
+  alphas[0] = InnProd(qold, qnew);
   qnew -= alphas[0] * qold;
   betas[0] = normpsi;
-  betas[1] = sqrt(MyInnProd(qnew, qnew));
+  betas[1] = VecNorm(qnew);
   if(abs(betas[1]) <= tol) itermax = 1;
   for(size_t iter = 1; iter < itermax; iter++) {
     nlan++;
@@ -237,9 +247,9 @@ void MyLanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
     qtemp = H.dot(qold);
 
     qnew += qtemp;
-    alphas[iter] = MyInnProd(qold, qnew);
+    alphas[iter] = InnProd(qold, qnew);
     qnew -= alphas[iter] * qold;
-    betas[iter + 1] = sqrt(MyInnProd(qnew, qnew));
+    betas[iter + 1] = VecNorm(qnew);
 
     if(abs(betas[iter + 1]) <= tol) {
       itermax = iter;
@@ -266,11 +276,22 @@ void MyLanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
  * @date 05/04/2021
  */
 template <class MatOp>
-void MyLanczos_BackProj(const Eigen::VectorXd &start_vec, const MatOp &H,
-                        int64_t nLanIts, Eigen::VectorXd &vec_P,
-                        Eigen::VectorXd &vec_BP) {
+void Lanczos_BackProj(const Eigen::VectorXd &start_vec, const MatOp &H,
+                      int64_t nLanIts, Eigen::VectorXd &vec_P,
+                      Eigen::VectorXd &vec_BP) {
   // REBUILD THE EIGENVECTOR FROM A PREVIOUS LANZOS
   // CALCULATION.
+  //
+  // SOME LAMBDAS
+  auto VecNorm = []( const Eigen::VectorXd & vec )->double
+  {
+    return std::sqrt( blas::dot( vec.size(), vec.data(), 1, vec.data(), 1 ) );
+  };
+  auto InnProd = []( const Eigen::VectorXd &Lvec, const Eigen::VectorXd &Rvec )->double
+  {
+    return blas::dot( Lvec.size(), Lvec.data(), 1, Rvec.data(), 1 );
+  };
+  // INITIALIZATIONS
   int64_t n = start_vec.rows();
   Eigen::VectorXd qold = Eigen::VectorXd::Zero(n);
   Eigen::VectorXd qtemp = Eigen::VectorXd::Zero(n);
@@ -279,7 +300,7 @@ void MyLanczos_BackProj(const Eigen::VectorXd &start_vec, const MatOp &H,
   std::vector<double> alphas(nLanIts, 0.);
   std::vector<double> betas(nLanIts + 1, 0.);
 
-  double normpsi = sqrt(MyInnProd(start_vec, start_vec));
+  double normpsi = VecNorm(start_vec);
   int64_t nlan = -1, itermax = nLanIts;
 
   vec_BP = Eigen::VectorXd::Zero(n);
@@ -289,10 +310,10 @@ void MyLanczos_BackProj(const Eigen::VectorXd &start_vec, const MatOp &H,
   vec_BP = vec_P(0) * qold;
 
   qnew = H.dot(qold);
-  alphas[0] = MyInnProd(qold, qnew);
+  alphas[0] = InnProd(qold, qnew);
   qnew -= alphas[0] * qold;
   betas[0] = normpsi;
-  betas[1] = sqrt(MyInnProd(qnew, qnew));
+  betas[1] = VecNorm(qnew);
   for(size_t iter = 1; iter < itermax; iter++) {
     nlan++;
     qtemp = qold;
@@ -303,9 +324,9 @@ void MyLanczos_BackProj(const Eigen::VectorXd &start_vec, const MatOp &H,
     qtemp = H.dot(qold);
 
     qnew += qtemp;
-    alphas[iter] = MyInnProd(qold, qnew);
+    alphas[iter] = InnProd(qold, qnew);
     qnew -= alphas[iter] * qold;
-    betas[iter + 1] = sqrt(MyInnProd(qnew, qnew));
+    betas[iter + 1] = VecNorm(qnew);
   }
   alphas.clear();
   betas.clear();
@@ -334,6 +355,17 @@ int64_t GetGSEn_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
   // COMPUTE LOWEST EIGENVALUE OF MATRIX H
   // USING LANCZOS. RETURNS EIGENVECTOR IN
   // THE BASIS OF KRYLOV VECTORS
+  //
+  // SOME LAMBDAS
+  auto VecNorm = []( const Eigen::VectorXd & vec )->double
+  {
+    return std::sqrt( blas::dot( vec.size(), vec.data(), 1, vec.data(), 1 ) );
+  };
+  auto InnProd = []( const Eigen::VectorXd &Lvec, const Eigen::VectorXd &Rvec )->double
+  {
+    return blas::dot( Lvec.size(), Lvec.data(), 1, Rvec.data(), 1 );
+  };
+  // INITIALIZATIONS
   auto w = std::setw(15);
   double Lantol = settings.Lantol;
   double E0tol = settings.E0tol;
@@ -349,17 +381,17 @@ int64_t GetGSEn_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
   std::vector<double> alphas, betas;
   double currE0, prevE0;
 
-  double normpsi = sqrt(MyInnProd(start_vec, start_vec));
+  double normpsi = VecNorm(start_vec);
   int64_t nlan = -1;
 
   nlan++;
   qold = start_vec / normpsi;
 
   qnew = H.dot(qold);
-  alphas.push_back(MyInnProd(qold, qnew));
+  alphas.push_back(InnProd(qold, qnew));
   qnew -= alphas[0] * qold;
   betas.push_back(normpsi);
-  betas.push_back(sqrt(MyInnProd(qnew, qnew)));
+  betas.push_back(VecNorm(qnew));
   prevE0 = alphas[0];
 
   if(print) {
@@ -387,9 +419,9 @@ int64_t GetGSEn_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
     qtemp = H.dot(qold);
 
     qnew += qtemp;
-    alphas.push_back(MyInnProd(qold, qnew));
+    alphas.push_back(InnProd(qold, qnew));
     qnew -= alphas[iter] * qold;
-    betas.push_back(sqrt(MyInnProd(qnew, qnew)));
+    betas.push_back(VecNorm(qnew));
     // GET EIGENVALUES OF CURRENT TRI-DIAG MATRIX
     Hste_v(alphas, betas, eigvals, eigvecs);
     currE0 = eigvals(0);
@@ -454,6 +486,17 @@ void GetGSEnVec_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
                         const LanczosSettings &settings) {
   // COMPUTE LOWEST EIGENVALUE AND EIGENVECTOR
   // OF MATRIX H USING LANCZOS.
+  //
+  // SOME LAMBDAS
+  auto VecNorm = []( const Eigen::VectorXd & vec )->double
+  {
+    return std::sqrt( blas::dot( vec.size(), vec.data(), 1, vec.data(), 1 ) );
+  };
+  auto InnProd = []( const Eigen::VectorXd &Lvec, const Eigen::VectorXd &Rvec )->double
+  {
+    return blas::dot( Lvec.size(), Lvec.data(), 1, Rvec.data(), 1 );
+  };
+  // INITIALIZATIONS
   double Lantol = settings.Lantol;
   double E0tol = settings.E0tol;
   bool print = settings.print;
@@ -469,7 +512,7 @@ void GetGSEnVec_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
   std::vector<double> alphas, betas;
   double currE0, prevE0;
 
-  double normpsi = sqrt(MyInnProd(start_vec, start_vec));
+  double normpsi = VecNorm(start_vec);
   int64_t nlan = -1;
 
   nlan++;
@@ -477,10 +520,10 @@ void GetGSEnVec_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
   kry_vecs.push_back(qold);
 
   qnew = H.dot(qold);
-  alphas.push_back(MyInnProd(qold, qnew));
+  alphas.push_back(InnProd(qold, qnew));
   qnew -= alphas[0] * qold;
   betas.push_back(normpsi);
-  betas.push_back(sqrt(MyInnProd(qnew, qnew)));
+  betas.push_back(VecNorm(qnew));
   prevE0 = alphas[0];
 
   if(abs(betas[1]) <= Lantol) {
@@ -497,9 +540,9 @@ void GetGSEnVec_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
     qtemp = H.dot(qold);
 
     qnew += qtemp;
-    alphas.push_back(MyInnProd(qold, qnew));
+    alphas.push_back(InnProd(qold, qnew));
     qnew -= alphas[iter] * qold;
-    betas.push_back(sqrt(MyInnProd(qnew, qnew)));
+    betas.push_back(VecNorm(qnew));
     // GET EIGENVALUES OF CURRENT TRI-DIAG MATRIX
     Hste_v(alphas, betas, eigvals, eigvecs);
     currE0 = eigvals(0);
@@ -572,7 +615,7 @@ void GetGS(const MatOp &H, double &E0, Eigen::VectorXd &psi0,
   Eigen::VectorXd psi0_Lan;
   int64_t nLanIts = GetGSEn_Lanczos(start_psi, H, E0, psi0_Lan, settings);
   // Reconstruct the eigenvector
-  MyLanczos_BackProj(start_psi, H, nLanIts, psi0_Lan, psi0);
+  Lanczos_BackProj(start_psi, H, nLanIts, psi0_Lan, psi0);
   start_psi = psi0;
   GetGSEnVec_Lanczos(start_psi, H, E0, psi0, settings);
 }
