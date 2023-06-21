@@ -427,7 +427,8 @@ auto BuildWfn4Lanczos(const Eigen::VectorXd &base_wfn,
   // CHECK WHETHER ANY OF THE VECTORS IS EXACTLY ZERO. IF SO, TAKE IT OUT!
   todelete.clear();
   for(int orb_indx = 0; orb_indx < GF_orbs.size(); orb_indx++) {
-    double st_nrm = blas::dot( nterms, wfns.data() + orb_indx * nterms, 1, wfns.data() + orb_indx * nterms, 1 );
+    double st_nrm = blas::dot(nterms, wfns.data() + orb_indx * nterms, 1,
+                              wfns.data() + orb_indx * nterms, 1);
     if(abs(st_nrm) <= zero_thresh) todelete.push_back(orb_indx);
   }
   int nvecs = GF_orbs.size() - todelete.size();

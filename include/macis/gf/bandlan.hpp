@@ -143,9 +143,9 @@ bool GetEigsysBand(std::vector<double> &mat, int nSupDiag,
  * @date 25/04/2022
  */
 template <class Cont, class Functor>
-void BandLan(const Functor &H, std::vector<Cont> &qs,
-             std::vector<Cont> &bandH, int &nLanIts, int nbands, int N,
-             double thres = 1.E-6, bool print = false) {
+void BandLan(const Functor &H, std::vector<Cont> &qs, std::vector<Cont> &bandH,
+             int &nLanIts, int nbands, int N, double thres = 1.E-6,
+             bool print = false) {
   // BAND LANCZOS ROUTINE. TAKES AS INPUT THE HAMILTONIAN H, INITIAL VECTORS qs
   // AND RETURNS THE BAND HAMILTONIAN bandH. IT PERFORMS nLanIts ITERATIONS,
   // STOPPING IF THE NORM OF ANY NEW KRYLOV VECTOR IS BELOW thres. IF LANCZOS IS
@@ -155,9 +155,9 @@ void BandLan(const Functor &H, std::vector<Cont> &qs,
   bandH.clear();
   bandH.resize(nLanIts * nLanIts, 0.);
 
-  auto VecNorm = []( const std::vector<Cont> &vec )->double
-  {
-    return std::sqrt(std::real(blas::dot( vec.size(), vec.data(), 1, vec.data(), 1 )));
+  auto VecNorm = [](const std::vector<Cont> &vec) -> double {
+    return std::sqrt(
+        std::real(blas::dot(vec.size(), vec.data(), 1, vec.data(), 1)));
   };
 
   // MAKE SPACE FOR 2 * nbands VECTORS
@@ -197,17 +197,19 @@ void BandLan(const Functor &H, std::vector<Cont> &qs,
     for(int jt = std::max(1, it - nbands); jt <= std::min(it - 1, nLanIts);
         jt++) {
       int band_indx_j = true_indx[jt];
-      blas::axpy( N, -1. * bandH[(it-1) * nLanIts + jt - 1], qs.data() + N * band_indx_j, 1, temp.data(), 1 );
+      blas::axpy(N, -1. * bandH[(it - 1) * nLanIts + jt - 1],
+                 qs.data() + N * band_indx_j, 1, temp.data(), 1);
     }
     for(int jt = it; jt <= std::min(it + nbands - 1, nLanIts); jt++) {
       int band_indx_j = true_indx[jt];
       bandH[(it - 1) * nLanIts + jt - 1] =
           blas::dot(N, temp.data(), 1, qs.data() + band_indx_j * N, 1);
       bandH[(jt - 1) * nLanIts + it - 1] = bandH[(it - 1) * nLanIts + jt - 1];
-      blas::axpy( N, -1. * bandH[(it-1) * nLanIts + jt - 1], qs.data() + N * band_indx_j, 1, temp.data(), 1 );
+      blas::axpy(N, -1. * bandH[(it - 1) * nLanIts + jt - 1],
+                 qs.data() + N * band_indx_j, 1, temp.data(), 1);
     }
     if(it + nbands <= nLanIts) {
-      bandH[(it - 1) * nLanIts + it + nbands - 1] = VecNorm( temp );
+      bandH[(it - 1) * nLanIts + it + nbands - 1] = VecNorm(temp);
       bandH[(it + nbands - 1) * nLanIts + it - 1] =
           bandH[(it - 1) * nLanIts + it + nbands - 1];
       true_indx[it + nbands] = next_indx;
@@ -219,12 +221,14 @@ void BandLan(const Functor &H, std::vector<Cont> &qs,
         nLanIts = it;
         bandH.resize(nLanIts * nLanIts);
         break;
-	blas::scal( N, 0., qs.data() + true_indx[it + nbands] * N, 1 );
+        blas::scal(N, 0., qs.data() + true_indx[it + nbands] * N, 1);
         std::cout << "FOUND A ZERO VECTOR AT POSITION " << next_indx
                   << std::endl;
       } else {
-	blas::copy( N, temp.data(), 1, qs.data() + true_indx[it + nbands] * N, 1 );
-	blas::scal( N, 1. / bandH[(it-1) * nLanIts + it + nbands - 1], qs.data() + true_indx[it + nbands] * N, 1 );
+        blas::copy(N, temp.data(), 1, qs.data() + true_indx[it + nbands] * N,
+                   1);
+        blas::scal(N, 1. / bandH[(it - 1) * nLanIts + it + nbands - 1],
+                   qs.data() + true_indx[it + nbands] * N, 1);
         if(print) {
           std::ofstream ofile("lanvec_" + std::to_string(it + nbands) + ".dat",
                               std::ios::out);

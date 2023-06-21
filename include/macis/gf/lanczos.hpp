@@ -199,21 +199,20 @@ class SparsexDistSpMatOp {
  * @date 05/04/2021
  */
 template <class MatOp>
-void Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
-             int64_t nLanIts, std::vector<double> &alphas,
-             std::vector<double> &betas, double tol) {
+void Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H, int64_t nLanIts,
+             std::vector<double> &alphas, std::vector<double> &betas,
+             double tol) {
   // LANCZOS ROUTINE USING TEMPLATED MATRIX
   // CLASS. ONLY NEEDS TO PROVIDE A MATRIX
   // VECTOR PRODUCT.
   //
   // SOME LAMBDAS
-  auto VecNorm = []( const Eigen::VectorXd & vec )->double
-  {
-    return std::sqrt( blas::dot( vec.size(), vec.data(), 1, vec.data(), 1 ) );
+  auto VecNorm = [](const Eigen::VectorXd &vec) -> double {
+    return std::sqrt(blas::dot(vec.size(), vec.data(), 1, vec.data(), 1));
   };
-  auto InnProd = []( const Eigen::VectorXd &Lvec, const Eigen::VectorXd &Rvec )->double
-  {
-    return blas::dot( Lvec.size(), Lvec.data(), 1, Rvec.data(), 1 );
+  auto InnProd = [](const Eigen::VectorXd &Lvec,
+                    const Eigen::VectorXd &Rvec) -> double {
+    return blas::dot(Lvec.size(), Lvec.data(), 1, Rvec.data(), 1);
   };
   // INITIALIZATIONS
   int64_t n = start_vec.rows();
@@ -283,13 +282,12 @@ void Lanczos_BackProj(const Eigen::VectorXd &start_vec, const MatOp &H,
   // CALCULATION.
   //
   // SOME LAMBDAS
-  auto VecNorm = []( const Eigen::VectorXd & vec )->double
-  {
-    return std::sqrt( blas::dot( vec.size(), vec.data(), 1, vec.data(), 1 ) );
+  auto VecNorm = [](const Eigen::VectorXd &vec) -> double {
+    return std::sqrt(blas::dot(vec.size(), vec.data(), 1, vec.data(), 1));
   };
-  auto InnProd = []( const Eigen::VectorXd &Lvec, const Eigen::VectorXd &Rvec )->double
-  {
-    return blas::dot( Lvec.size(), Lvec.data(), 1, Rvec.data(), 1 );
+  auto InnProd = [](const Eigen::VectorXd &Lvec,
+                    const Eigen::VectorXd &Rvec) -> double {
+    return blas::dot(Lvec.size(), Lvec.data(), 1, Rvec.data(), 1);
   };
   // INITIALIZATIONS
   int64_t n = start_vec.rows();
@@ -357,13 +355,12 @@ int64_t GetGSEn_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
   // THE BASIS OF KRYLOV VECTORS
   //
   // SOME LAMBDAS
-  auto VecNorm = []( const Eigen::VectorXd & vec )->double
-  {
-    return std::sqrt( blas::dot( vec.size(), vec.data(), 1, vec.data(), 1 ) );
+  auto VecNorm = [](const Eigen::VectorXd &vec) -> double {
+    return std::sqrt(blas::dot(vec.size(), vec.data(), 1, vec.data(), 1));
   };
-  auto InnProd = []( const Eigen::VectorXd &Lvec, const Eigen::VectorXd &Rvec )->double
-  {
-    return blas::dot( Lvec.size(), Lvec.data(), 1, Rvec.data(), 1 );
+  auto InnProd = [](const Eigen::VectorXd &Lvec,
+                    const Eigen::VectorXd &Rvec) -> double {
+    return blas::dot(Lvec.size(), Lvec.data(), 1, Rvec.data(), 1);
   };
   // INITIALIZATIONS
   auto w = std::setw(15);
@@ -488,13 +485,12 @@ void GetGSEnVec_Lanczos(const Eigen::VectorXd &start_vec, const MatOp &H,
   // OF MATRIX H USING LANCZOS.
   //
   // SOME LAMBDAS
-  auto VecNorm = []( const Eigen::VectorXd & vec )->double
-  {
-    return std::sqrt( blas::dot( vec.size(), vec.data(), 1, vec.data(), 1 ) );
+  auto VecNorm = [](const Eigen::VectorXd &vec) -> double {
+    return std::sqrt(blas::dot(vec.size(), vec.data(), 1, vec.data(), 1));
   };
-  auto InnProd = []( const Eigen::VectorXd &Lvec, const Eigen::VectorXd &Rvec )->double
-  {
-    return blas::dot( Lvec.size(), Lvec.data(), 1, Rvec.data(), 1 );
+  auto InnProd = [](const Eigen::VectorXd &Lvec,
+                    const Eigen::VectorXd &Rvec) -> double {
+    return blas::dot(Lvec.size(), Lvec.data(), 1, Rvec.data(), 1);
   };
   // INITIALIZATIONS
   double Lantol = settings.Lantol;
