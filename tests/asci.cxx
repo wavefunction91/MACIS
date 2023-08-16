@@ -254,6 +254,7 @@ TEST_CASE("ASCI") {
       asci_settings, mcscf_settings, E0, std::move(dets), std::move(C), ham_gen,
       norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
+  std::cout << E0 - -8.542926243842e+01 << std::endl;
   REQUIRE(E0 == Approx(-8.542926243842e+01));
   REQUIRE(dets.size() == 10000);
   REQUIRE(C.size() == 10000);

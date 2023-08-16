@@ -27,7 +27,7 @@ template <typename WfnT>
 struct asci_contrib_topk_comparator {
   using type = asci_contrib<WfnT>;
   constexpr bool operator()(const type& a, const type& b) const {
-    return std::abs(a.rv) > std::abs(b.rv);
+    return std::abs(a.rv()) > std::abs(b.rv());
   }
 };
 
@@ -122,7 +122,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
       // Remove small contributions
       auto it = std::partition(
           asci_pairs.begin(), asci_pairs.end(), [=](const auto& x) {
-            return std::abs(x.rv) > asci_settings.rv_prune_tol;
+            return std::abs(x.rv()) > asci_settings.rv_prune_tol;
           });
       asci_pairs.erase(it, asci_pairs.end());
       logger->info("  * Pruning at DET = {} NSZ = {}", i, asci_pairs.size());
@@ -356,7 +356,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         // Remove small contributions
         auto it = std::partition(
             asci_pairs.begin(), asci_pairs.end(), [=](const auto& x) {
-              return std::abs(x.rv) > asci_settings.rv_prune_tol;
+              return std::abs(x.rv()) > asci_settings.rv_prune_tol;
             });
         asci_pairs.erase(it, asci_pairs.end());
 
@@ -527,7 +527,10 @@ std::vector<wfn_t<N>> asci_search(
 
   auto keep_large_st = clock_type::now();
   // Finalize scores
-  for(auto& x : asci_pairs) x.rv = -std::abs(x.rv);
+  for(auto& x : asci_pairs) {
+    x.c_times_matel = -std::abs(x.c_times_matel);
+    x.h_diag        =  std::abs(x.h_diag);
+  }
 
   // Insert all dets with their coefficients as seeds
   for(size_t i = 0; i < ncdets; ++i) {
@@ -540,7 +543,7 @@ std::vector<wfn_t<N>> asci_search(
   keep_only_largest_copy_asci_pairs(asci_pairs);
 
   asci_pairs.erase(std::partition(asci_pairs.begin(), asci_pairs.end(),
-                                  [](const auto& p) { return p.rv < 0.0; }),
+                                  [](const auto& p) { return p.rv() < 0.0; }),
                    asci_pairs.end());
 
   // Only do top-K on (ndets_max - ncdets) b/c CDETS will be added later
@@ -569,7 +572,7 @@ std::vector<wfn_t<N>> asci_search(
       // Strip scores
       std::vector<double> scores(asci_pairs.size());
       std::transform(asci_pairs.begin(), asci_pairs.end(), scores.begin(),
-                     [](const auto& p) { return std::abs(p.rv); });
+                     [](const auto& p) { return std::abs(p.rv()); });
 
       // Determine kth-ranked scores
       auto kth_score =
@@ -579,8 +582,8 @@ std::vector<wfn_t<N>> asci_search(
       // Partition local pairs into less / eq batches
       auto [g_begin, e_begin, l_begin, _end] = leg_partition(
           asci_pairs.begin(), asci_pairs.end(), kth_score,
-          [=](const auto& p, const auto& s) { return std::abs(p.rv) > s; },
-          [=](const auto& p, const auto& s) { return std::abs(p.rv) == s; });
+          [=](const auto& p, const auto& s) { return std::abs(p.rv()) > s; },
+          [=](const auto& p, const auto& s) { return std::abs(p.rv()) == s; });
 
       // Determine local counts
       size_t n_greater = std::distance(g_begin, e_begin);

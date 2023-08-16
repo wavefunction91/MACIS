@@ -65,8 +65,8 @@ PairIterator sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
 
     // Accumulate
     else {
-      cur_it->rv += it->rv;
-      it->rv = 0;  // Zero out to expose potential bugs
+      cur_it->c_times_matel += it->c_times_matel;
+      it->c_times_matel = 0;  // Zero out to expose potential bugs
     }
   }
 
@@ -108,7 +108,7 @@ void keep_only_largest_copy_asci_pairs(
 
     // Keep only max value
     else {
-      cur_it->rv = std::max(cur_it->rv, it->rv);
+      cur_it->c_times_matel = std::max(cur_it->c_times_matel, it->c_times_matel);
     }
   }
 
