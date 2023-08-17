@@ -529,7 +529,7 @@ std::vector<wfn_t<N>> asci_search(
   // Finalize scores
   for(auto& x : asci_pairs) {
     x.c_times_matel = -std::abs(x.c_times_matel);
-    x.h_diag        =  std::abs(x.h_diag);
+    x.h_diag = std::abs(x.h_diag);
   }
 
   // Insert all dets with their coefficients as seeds

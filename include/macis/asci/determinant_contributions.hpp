@@ -18,7 +18,7 @@ struct asci_contrib {
   WfnT state;
   double c_times_matel;
   double h_diag;
- 
+
   auto rv() const { return c_times_matel / h_diag; }
 };
 
@@ -60,7 +60,7 @@ void append_singles_asci_contributions(
       // Calculate fast diagonal matrix element
       auto h_diag =
           ham_gen.fast_diag_single(eps_same[i], eps_same[a], i, a, root_diag);
-      //h_el /= (E0 - h_diag);
+      // h_el /= (E0 - h_diag);
 
       // Append to return values
       asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
@@ -113,7 +113,7 @@ void append_ss_doubles_asci_contributions(
           auto h_diag =
               ham_gen.fast_diag_ss_double(eps_same[i], eps_same[j], eps_same[a],
                                           eps_same[b], i, j, a, b, root_diag);
-          //h_el /= (E0 - h_diag);
+          // h_el /= (E0 - h_diag);
 
           // Append {det, c*h_el}
           asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
@@ -155,7 +155,7 @@ void append_os_doubles_asci_contributions(
           auto h_diag = ham_gen.fast_diag_os_double(eps_alpha[i], eps_beta[j],
                                                     eps_alpha[a], eps_beta[b],
                                                     i, j, a, b, root_diag);
-          //h_el /= (E0 - h_diag);
+          // h_el /= (E0 - h_diag);
 
           asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
         }  // BJ loop
