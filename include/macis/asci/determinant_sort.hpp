@@ -66,7 +66,7 @@ PairIterator sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
     // Accumulate
     else {
       cur_it->c_times_matel += it->c_times_matel;
-      it->c_times_matel = 0;  // Zero out to expose potential bugs
+      it->c_times_matel = NAN;  // Zero out to expose potential bugs
     }
   }
 

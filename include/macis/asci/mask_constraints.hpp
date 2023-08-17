@@ -258,11 +258,11 @@ void generate_constraint_singles_contributions_ss(
   const size_t LDV2 = LDV * LDV;
   for(int ii = 0; ii < no; ++ii) {
     const auto i = fls(o);
-    o.flip(i);
+    o.flip(i); // Disable "i"-bit so it's not used in FLS next iteration
     auto v_cpy = v;
     for(int aa = 0; aa < nv; ++aa) {
       const auto a = fls(v_cpy);
-      v_cpy.flip(a);
+      v_cpy.flip(a); // Disable "a"-bit so it's not used in FLS next iteration
 
       double h_el = T_pq[a + i * LDT];
       const double* G_ov = G_kpq + a * LDG + i * LDG2;

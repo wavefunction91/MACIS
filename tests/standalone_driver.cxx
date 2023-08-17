@@ -16,6 +16,7 @@
 #include <iostream>
 #include <macis/asci/grow.hpp>
 #include <macis/asci/refine.hpp>
+#include <macis/asci/pt2.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/util/cas.hpp>
 #include <macis/util/detail/rdm_files.hpp>
@@ -277,7 +278,9 @@ int main(int argc, char** argv) {
     std::vector<double> active_ordm(n_active * n_active);
     std::vector<double> active_trdm(active_ordm.size() * active_ordm.size());
 
+    bool pt2 = true;
     double E0 = 0;
+    double EPT2 = 0;
 
     // CI
     if(job == Job::CI) {
@@ -378,9 +381,22 @@ int main(int argc, char** argv) {
           sparsexx::write_dist_mm("ham.mtx", H, 1);
         }
 #endif
+        if(pt2) {
+          EPT2 = macis::asci_pt2_constraint( dets.begin(), dets.end(), E0 -(E_inactive + E_core), C, n_active,
+            ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),ham_gen.G(), ham_gen.V(), 
+            ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));
+        }
       }
 
-      // MCSCF
+      console->info("E(CI)     = {:.12f} Eh", E0);
+
+      if(pt2) {
+        console->info("E(PT2)    = {:.12f} Eh", EPT2);
+        console->info("E(CI+PT2) = {:.12f} Eh", E0 + EPT2);
+      }
+
+
+    // MCSCF
     } else if(job == Job::MCSCF) {
       // Possibly read active RDMs
       if(rdm_fname.size()) {
@@ -410,9 +426,9 @@ int main(int argc, char** argv) {
           NumVirtual(n_virtual), E_core, T.data(), norb, V.data(), norb,
           active_ordm.data(), n_active, active_trdm.data(),
           n_active MACIS_MPI_CODE(, MPI_COMM_WORLD));
-    }
 
-    console->info("E(CI)  = {:.12f} Eh", E0);
+      console->info("E(CASSCF)  = {:.12f} Eh", E0);
+    }
 
     // Write FCIDUMP file if requested
     if(fci_out_fname.size())
