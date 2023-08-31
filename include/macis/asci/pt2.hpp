@@ -26,8 +26,8 @@ double asci_pt2_constraint(
 
   auto logger = spdlog::get("asci_search");
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
-  std::cout << "NDETS PT = " << ncdets <<  " " << C.size() << std::endl;
-  std::cout << "PT E0    = " << E_ASCI << std::endl;
+  //std::cout << "NDETS PT = " << ncdets <<  " " << C.size() << std::endl;
+  //std::cout << "PT E0    = " << E_ASCI << std::endl;
 
   std::vector<uint32_t> occ_alpha, vir_alpha;
   std::vector<uint32_t> occ_beta, vir_beta;
@@ -225,6 +225,8 @@ double asci_pt2_constraint(
     EPT2 += EPT2_local;
   }  // Constraint Loop
   }
+
+  EPT2 = allreduce(EPT2, MPI_SUM, comm);
 
   return EPT2;
 }
