@@ -49,7 +49,7 @@ double compute_casci_rdms(
                  rank4_span<double>(V, no, no, no, no));
 
   // Compute Lowest Energy Eigenvalue (ED)
-  auto dets = generate_hilbert_space<nbits>(norb.get(), nalpha, nbeta);
+  auto dets = generate_hilbert_space<std::bitset<nbits>>(norb.get(), nalpha, nbeta);
   double E0 =
       selected_ci_diag(dets.begin(), dets.end(), ham_gen, settings.ci_matel_tol,
                        settings.ci_max_subspace, settings.ci_res_tol, C,

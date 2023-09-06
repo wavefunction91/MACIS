@@ -63,6 +63,7 @@ int main(int argc, char** argv) {
   spdlog::set_pattern("[%n] %v");
 
   constexpr size_t nwfn_bits = 64;
+  using wfn_type = macis::wfn_t<nwfn_bits>;
 
   MACIS_MPI_CODE(MPI_Init(&argc, &argv);)
 
@@ -300,7 +301,7 @@ int main(int argc, char** argv) {
                                 : spdlog::stdout_color_mt("determinants");
           det_logger->info("Print leading determinants > {:.12f}",
                            determinants_threshold);
-          auto dets = macis::generate_hilbert_space<generator_t::nbits>(
+          auto dets = macis::generate_hilbert_space<wfn_type>(
               n_active, nalpha, nbeta);
           for(size_t i = 0; i < dets.size(); ++i) {
             if(std::abs(C_local[i]) > determinants_threshold) {
@@ -317,7 +318,7 @@ int main(int argc, char** argv) {
             macis::rank4_span<double>(V_active.data(), n_active, n_active,
                                       n_active, n_active));
 
-        std::vector<macis::wfn_t<nwfn_bits>> dets;
+        std::vector<wfn_type> dets;
         std::vector<double> C;
         if(asci_wfn_fname.size()) {
           // Read wave function from standard file
