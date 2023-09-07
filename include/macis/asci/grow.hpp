@@ -119,7 +119,7 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 #endif
 
       // Regenerate intermediates
-      ham_gen.generate_integral_intermediates(ham_gen.V_pqrs_);
+      ham_gen.generate_integral_intermediates();
 
       logger->trace("  * Rediagonalizing");
       auto rdg_st = hrt_t::now();

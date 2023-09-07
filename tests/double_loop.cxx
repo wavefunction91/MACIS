@@ -12,6 +12,8 @@
 #include <macis/util/fcidump.hpp>
 #include <macis/wavefunction_io.hpp>
 
+#include <blas.hh>
+
 #include "ut_common.hpp"
 
 TEST_CASE("Double Loop") {

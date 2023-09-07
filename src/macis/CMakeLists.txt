@@ -15,6 +15,8 @@ add_library( macis
   orbital_rotation_utilities.cxx
   orbital_hessian.cxx
   orbital_steps.cxx
+
+  hamiltonian_generator/base.cxx
 )
 
 target_include_directories( macis PUBLIC 

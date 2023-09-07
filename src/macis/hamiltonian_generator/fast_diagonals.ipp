@@ -11,8 +11,8 @@
 
 namespace macis {
 
-template <typename WfnType>
-double HamiltonianGenerator<WfnType>::single_orbital_en(
+template <typename Scalar>
+double HamiltonianGeneratorBase<Scalar>::single_orbital_en(
     uint32_t orb, const std::vector<uint32_t>& ss_occ,
     const std::vector<uint32_t>& os_occ) const {
   // One electron component
@@ -28,8 +28,8 @@ double HamiltonianGenerator<WfnType>::single_orbital_en(
   return orb_en;
 }
 
-template <typename WfnType>
-std::vector<double> HamiltonianGenerator<WfnType>::single_orbital_ens(
+template <typename Scalar>
+std::vector<double> HamiltonianGeneratorBase<Scalar>::single_orbital_ens(
     size_t norb, const std::vector<uint32_t>& ss_occ,
     const std::vector<uint32_t>& os_occ) const {
   std::vector<double> ens(norb);
@@ -50,8 +50,8 @@ std::vector<double> HamiltonianGenerator<WfnType>::single_orbital_ens(
   return ens;
 }
 
-template <typename WfnType>
-double HamiltonianGenerator<WfnType>::fast_diag_single(
+template <typename Scalar>
+double HamiltonianGeneratorBase<Scalar>::fast_diag_single(
     // These refer to original determinant
     double hol_en, double par_en, uint32_t orb_hol, uint32_t orb_par,
     double orig_det_Hii) const {
@@ -59,8 +59,8 @@ double HamiltonianGenerator<WfnType>::fast_diag_single(
          G2_red_(orb_hol, orb_par);
 }
 
-template <typename WfnType>
-double HamiltonianGenerator<WfnType>::fast_diag_single(
+template <typename Scalar>
+double HamiltonianGeneratorBase<Scalar>::fast_diag_single(
     // These refer to original determinant
     const std::vector<uint32_t>& ss_occ, const std::vector<uint32_t>& os_occ,
     uint32_t orb_hol, uint32_t orb_par, double orig_det_Hii) const {
@@ -69,8 +69,8 @@ double HamiltonianGenerator<WfnType>::fast_diag_single(
   return fast_diag_single(hol_en, par_en, orb_hol, orb_par, orig_det_Hii);
 }
 
-template <typename WfnType>
-double HamiltonianGenerator<WfnType>::fast_diag_ss_double(
+template <typename Scalar>
+double HamiltonianGeneratorBase<Scalar>::fast_diag_ss_double(
     // These refer to original determinant
     double hol1_en, double hol2_en, double par1_en, double par2_en,
     uint32_t orb_hol1, uint32_t orb_hol2, uint32_t orb_par1, uint32_t orb_par2,
@@ -84,8 +84,8 @@ double HamiltonianGenerator<WfnType>::fast_diag_ss_double(
          G2_red_(orb_par2, orb_hol2) - G2_red_(orb_hol2, orb_par2);
 }
 
-template <typename WfnType>
-double HamiltonianGenerator<WfnType>::fast_diag_ss_double(
+template <typename Scalar>
+double HamiltonianGeneratorBase<Scalar>::fast_diag_ss_double(
     // These refer to original determinant
     const std::vector<uint32_t>& ss_occ, const std::vector<uint32_t>& os_occ,
     uint32_t orb_hol1, uint32_t orb_hol2, uint32_t orb_par1, uint32_t orb_par2,
@@ -98,8 +98,8 @@ double HamiltonianGenerator<WfnType>::fast_diag_ss_double(
                              orb_hol2, orb_par1, orb_par2, orig_det_Hii);
 }
 
-template <typename WfnType>
-double HamiltonianGenerator<WfnType>::fast_diag_os_double(
+template <typename Scalar>
+double HamiltonianGeneratorBase<Scalar>::fast_diag_os_double(
     // These refer to original determinant
     double en_holu, double en_hold, double en_paru, double en_pard,
     uint32_t orb_holu, uint32_t orb_hold, uint32_t orb_paru, uint32_t orb_pard,
@@ -111,8 +111,8 @@ double HamiltonianGenerator<WfnType>::fast_diag_os_double(
          V2_red_(orb_paru, orb_hold) - V2_red_(orb_holu, orb_pard);
 }
 
-template <typename WfnType>
-double HamiltonianGenerator<WfnType>::fast_diag_os_double(
+template <typename Scalar>
+double HamiltonianGeneratorBase<Scalar>::fast_diag_os_double(
     // These refer to original determinant
     const std::vector<uint32_t>& ss_occ, const std::vector<uint32_t>& os_occ,
     uint32_t orb_holu, uint32_t orb_hold, uint32_t orb_paru, uint32_t orb_pard,

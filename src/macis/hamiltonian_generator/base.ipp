@@ -7,7 +7,8 @@
  */
 
 #pragma once
-#include <macis/hamiltonian_generator.hpp>
+#include <macis/hamiltonian_generator/base.hpp>
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <blas.hh>
@@ -16,17 +17,77 @@
 
 namespace macis {
 
-template <typename WfnType>
-void HamiltonianGenerator<WfnType>::rotate_hamiltonian_ordm(const double* ordm) {
+template <typename Scalar>
+HamiltonianGeneratorBase<Scalar>::HamiltonianGeneratorBase(matrix_span_t T,
+                                              rank4_span_t V)
+    : norb_(T.extent(0)),
+      norb2_(norb_ * norb_),
+      norb3_(norb2_ * norb_),
+      T_pq_(T),
+      V_pqrs_(V) {
+  generate_integral_intermediates_(V_pqrs_);
+}
+
+template <typename Scalar>
+void HamiltonianGeneratorBase<Scalar>::generate_integral_intermediates_(rank4_span_t V) {
+  if(V.extent(0) != norb_ or V.extent(1) != norb_ or V.extent(2) != norb_ or
+     V.extent(3) != norb_)
+    throw std::runtime_error("V has incorrect dimensions");
+
+  size_t no = norb_;
+  size_t no2 = no * no;
+  size_t no3 = no2 * no;
+  size_t no4 = no3 * no;
+
+  // G(i,j,k,l) = V(i,j,k,l) - V(i,l,k,j)
+  G_pqrs_data_ = std::vector<Scalar>(begin(V), end(V));
+  G_pqrs_ = rank4_span_t(G_pqrs_data_.data(), no, no, no, no);
+  for(auto i = 0ul; i < no; ++i)
+    for(auto j = 0ul; j < no; ++j)
+      for(auto k = 0ul; k < no; ++k)
+        for(auto l = 0ul; l < no; ++l) {
+          G_pqrs_(i, j, k, l) -= V(i, l, k, j);
+        }
+
+  // G_red(i,j,k) = G(i,j,k,k) = G(k,k,i,j)
+  // V_red(i,j,k) = V(i,j,k,k) = V(k,k,i,j)
+  G_red_data_.resize(no3);
+  V_red_data_.resize(no3);
+  G_red_ = rank3_span_t(G_red_data_.data(), no, no, no);
+  V_red_ = rank3_span_t(V_red_data_.data(), no, no, no);
+  for(auto j = 0ul; j < no; ++j)
+    for(auto i = 0ul; i < no; ++i)
+      for(auto k = 0ul; k < no; ++k) {
+        G_red_(k, i, j) = G_pqrs_(k, k, i, j);
+        V_red_(k, i, j) = V(k, k, i, j);
+      }
+
+  // G2_red(i,j) = 0.5 * G(i,i,j,j)
+  // V2_red(i,j) = V(i,i,j,j)
+  G2_red_data_.resize(no2);
+  V2_red_data_.resize(no2);
+  G2_red_ = matrix_span<Scalar>(G2_red_data_.data(), no, no);
+  V2_red_ = matrix_span<Scalar>(V2_red_data_.data(), no, no);
+  for(auto j = 0ul; j < no; ++j)
+    for(auto i = 0ul; i < no; ++i) {
+      G2_red_(i, j) = 0.5 * G_pqrs_(i, i, j, j);
+      V2_red_(i, j) = V(i, i, j, j);
+    }
+}
+
+
+
+template <typename Scalar>
+void HamiltonianGeneratorBase<Scalar>::rotate_hamiltonian_ordm(const Scalar* ordm) {
   // SVD on ordm to get natural orbitals
-  std::vector<double> natural_orbitals(ordm, ordm + norb2_);
-  std::vector<double> S(norb_);
+  std::vector<Scalar> natural_orbitals(ordm, ordm + norb2_);
+  std::vector<Scalar> S(norb_);
   lapack::gesvd(lapack::Job::OverwriteVec, lapack::Job::NoVec, norb_, norb_,
                 natural_orbitals.data(), norb_, S.data(), NULL, 1, NULL, 1);
 
 #if 0
   {
-    std::vector<double> tmp(norb2_);
+    std::vector<Scalar> tmp(norb2_);
     blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
       norb_, norb_, norb_, 1., natural_orbitals.data(), norb_,
       natural_orbitals.data(), norb_, 0., tmp.data(), norb_ );
@@ -34,7 +95,7 @@ void HamiltonianGenerator<WfnType>::rotate_hamiltonian_ordm(const double* ordm) 
     std::cout << "MAX = " << *std::max_element(tmp.begin(),tmp.end(),
       []( auto x, auto y ){ return std::abs(x) < std::abs(y); } ) << std::endl;
 
-    double max_diff = 0.;
+    Scalar max_diff = 0.;
     for( auto i = 0; i < norb_; ++i )
     for( auto j = i+1; j < norb_; ++j ) {
       max_diff = std::max( max_diff, 
@@ -44,7 +105,7 @@ void HamiltonianGenerator<WfnType>::rotate_hamiltonian_ordm(const double* ordm) 
   }
 #endif
 
-  std::vector<double> tmp(norb3_ * norb_), tmp2(norb3_ * norb_);
+  std::vector<Scalar> tmp(norb3_ * norb_), tmp2(norb3_ * norb_);
 
   // Transform T
   // T <- N**H * T * N
@@ -95,7 +156,8 @@ void HamiltonianGenerator<WfnType>::rotate_hamiltonian_ordm(const double* ordm) 
              natural_orbitals.data(), norb_, 0., V_pqrs_.data_handle(), norb3_);
 
   // Regenerate intermediates
-  generate_integral_intermediates(V_pqrs_);
+  generate_integral_intermediates_(V_pqrs_);
 }
 
 }  // namespace macis
+
