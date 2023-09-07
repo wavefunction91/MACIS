@@ -18,12 +18,12 @@
 #include <sparsexx/matrix_types/csr_matrix.hpp>
 namespace macis {
 
-// Base implementation of bitset CSR generation
-template <typename index_t, size_t N>
+// Base implementation of CSR hamiltonian generation
+template <typename index_t, typename WfnType, typename WfnIterator>
 sparsexx::csr_matrix<double, index_t> make_csr_hamiltonian_block(
-    wavefunction_iterator_t<N> bra_begin, wavefunction_iterator_t<N> bra_end,
-    wavefunction_iterator_t<N> ket_begin, wavefunction_iterator_t<N> ket_end,
-    HamiltonianGenerator<N>& ham_gen, double H_thresh) {
+    WfnIterator bra_begin, WfnIterator bra_end,
+    WfnIterator ket_begin, WfnIterator ket_end,
+    HamiltonianGenerator<WfnType>& ham_gen, double H_thresh) {
   size_t nbra = std::distance(bra_begin, bra_end);
   size_t nket = std::distance(ket_begin, ket_end);
 
@@ -35,21 +35,20 @@ sparsexx::csr_matrix<double, index_t> make_csr_hamiltonian_block(
   }
 }
 
-template <typename index_t, size_t N>
+template <typename index_t, typename WfnType, typename WfnIterator>
 sparsexx::csr_matrix<double, index_t> make_csr_hamiltonian(
-    wavefunction_iterator_t<N> sd_begin, wavefunction_iterator_t<N> sd_end,
-    HamiltonianGenerator<N>& ham_gen, double H_thresh) {
+    WfnIterator sd_begin, WfnIterator sd_end,
+    HamiltonianGenerator<WfnType>& ham_gen, double H_thresh) {
   return make_csr_hamiltonian_block<index_t>(sd_begin, sd_end, sd_begin, sd_end,
                                              ham_gen, H_thresh);
 }
 
 #ifdef MACIS_ENABLE_MPI
 // Base implementation of dist-CSR H construction for bitsets
-template <typename index_t, size_t N>
+template <typename index_t, typename WfnType, typename WfnIterator>
 sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double, index_t>>
-make_dist_csr_hamiltonian(MPI_Comm comm, wavefunction_iterator_t<N> sd_begin,
-                          wavefunction_iterator_t<N> sd_end,
-                          HamiltonianGenerator<N>& ham_gen,
+make_dist_csr_hamiltonian(MPI_Comm comm, WfnIterator sd_begin, WfnIterator sd_end,
+                          HamiltonianGenerator<WfnType>& ham_gen,
                           const double H_thresh) {
   using namespace sparsexx;
   using namespace sparsexx::detail;
@@ -69,7 +68,7 @@ make_dist_csr_hamiltonian(MPI_Comm comm, wavefunction_iterator_t<N> sd_begin,
 
   if(world_size > 1) {
     // Create a copy of SD's with local bra dets zero'd out
-    std::vector<std::bitset<N>> sds_offdiag(sd_begin, sd_end);
+    std::vector<WfnType> sds_offdiag(sd_begin, sd_end);
     for(auto i = bra_st; i < bra_en; ++i) sds_offdiag[i] = 0ul;
 
     // Build off-diagonal part

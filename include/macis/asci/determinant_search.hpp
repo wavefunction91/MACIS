@@ -56,7 +56,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs, HamiltonianGenerator<N>& ham_gen) {
+    const double* V_pqrs, HamiltonianGenerator<wfn_t<N>>& ham_gen) {
   auto logger = spdlog::get("asci_search");
 
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
@@ -147,7 +147,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs, HamiltonianGenerator<N>& ham_gen, MPI_Comm comm) {
+    const double* V_pqrs, HamiltonianGenerator<wfn_t<N>>& ham_gen, MPI_Comm comm) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
 
@@ -183,7 +183,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
     beta_coeff_data(double c, size_t norb,
                     const std::vector<uint32_t>& occ_alpha, wfn_t<N> w,
-                    const HamiltonianGenerator<N>& ham_gen) {
+                    const HamiltonianGenerator<wfn_t<N>>& ham_gen) {
       coeff = c;
 
       // Compute Beta string
@@ -399,7 +399,7 @@ std::vector<wfn_t<N>> asci_search(
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
     const double* V_pqrs,
-    HamiltonianGenerator<N>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
+    HamiltonianGenerator<wfn_t<N>>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
 

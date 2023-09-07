@@ -32,7 +32,7 @@ TEST_CASE("Davidson") {
   macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
   macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
-  using generator_type = macis::DoubleLoopHamiltonianGenerator<64>;
+  using generator_type = macis::DoubleLoopHamiltonianGenerator<macis::wfn_t<64>>;
 
 #if 0
   generator_type ham_gen(norb, V.data(), T.data());
@@ -85,7 +85,7 @@ TEST_CASE("Parallel Davidson") {
   macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
   macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
-  using generator_type = macis::DoubleLoopHamiltonianGenerator<64>;
+  using generator_type = macis::DoubleLoopHamiltonianGenerator<macis::wfn_t<64>>;
 
 #if 0
   generator_type ham_gen(norb, V.data(), T.data());

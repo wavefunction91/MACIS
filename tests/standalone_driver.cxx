@@ -285,7 +285,7 @@ int main(int argc, char** argv) {
 
     // CI
     if(job == Job::CI) {
-      using generator_t = macis::DoubleLoopHamiltonianGenerator<nwfn_bits>;
+      using generator_t = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
       if(ci_exp == CIExpansion::CAS) {
         std::vector<double> C_local;
         // TODO: VERIFY MPI + CAS

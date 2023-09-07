@@ -34,8 +34,8 @@ double compute_casci_rdms(
     MCSCFSettings settings, NumOrbital norb, size_t nalpha, size_t nbeta,
     double* T, double* V, double* ORDM, double* TRDM,
     std::vector<double>& C MACIS_MPI_CODE(, MPI_Comm comm)) {
-  constexpr auto nbits = HamGen::nbits;
 
+  using wfn_type = typename HamGen::full_det_t;
 #ifdef MACIS_ENABLE_MPI
   int rank;
   MPI_Comm_rank(comm, &rank);
@@ -49,9 +49,9 @@ double compute_casci_rdms(
                  rank4_span<double>(V, no, no, no, no));
 
   // Compute Lowest Energy Eigenvalue (ED)
-  auto dets = generate_hilbert_space<std::bitset<nbits>>(norb.get(), nalpha, nbeta);
+  auto dets = generate_hilbert_space<wfn_type>(norb.get(), nalpha, nbeta);
   double E0 =
-      selected_ci_diag(dets.begin(), dets.end(), ham_gen, settings.ci_matel_tol,
+      selected_ci_diag<int32_t>(dets.begin(), dets.end(), ham_gen, settings.ci_matel_tol,
                        settings.ci_max_subspace, settings.ci_res_tol, C,
                        MACIS_MPI_CODE(comm, ) true);
 

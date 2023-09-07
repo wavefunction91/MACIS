@@ -7,35 +7,31 @@
  */
 
 #pragma once
-#include <macis/bitset_operations.hpp>
 #include <macis/sd_operations.hpp>
 #include <macis/types.hpp>
 #include <sparsexx/matrix_types/csr_matrix.hpp>
 
 namespace macis {
 
-template <size_t N = 64>
+template <typename WfnType>
 class HamiltonianGenerator {
-  static_assert(N % 2 == 0, "N Must Be Even");
 
  public:
-  constexpr static size_t nbits = N;
 
-  using full_det_t = std::bitset<N>;
-  using spin_det_t = std::bitset<N / 2>;
+  using full_det_t = WfnType;
+  using spin_det_t = spin_wfn_t<WfnType>;
 
   template <typename index_t>
   using sparse_matrix_type = sparsexx::csr_matrix<double, index_t>;
 
-  using full_det_iterator = wavefunction_iterator_t<N>;
+  using full_det_container = std::vector<WfnType>;
+  using full_det_iterator = typename full_det_container::iterator;
 
   using matrix_span_t = matrix_span<double>;
   using rank3_span_t = rank3_span<double>;
   using rank4_span_t = rank4_span<double>;
 
  public:
-  inline spin_det_t alpha_string(full_det_t str) { return bitset_lo_word(str); }
-  inline spin_det_t beta_string(full_det_t str) { return bitset_hi_word(str); }
 
   size_t norb_;
   size_t norb2_;
@@ -184,7 +180,7 @@ class HamiltonianGenerator {
 
   virtual void SetJustSingles(bool /*_js*/) {}
   virtual bool GetJustSingles() { return false; }
-  virtual size_t GetNimp() const { return N / 2; }
+  //virtual size_t GetNimp() const { return N / 2; }
 };
 
 }  // namespace macis

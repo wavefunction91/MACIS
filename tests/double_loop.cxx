@@ -28,7 +28,7 @@ TEST_CASE("Double Loop") {
   macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
   macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
-  using generator_type = macis::DoubleLoopHamiltonianGenerator<64>;
+  using generator_type = macis::DoubleLoopHamiltonianGenerator<macis::wfn_t<64>>;
 
 #if 0
   generator_type ham_gen(norb, V.data(), T.data());
@@ -194,7 +194,7 @@ TEST_CASE("RDMS") {
   macis::rank4_span<double> V_span(V.data(), norb, norb, norb, norb);
   macis::rank4_span<double> trdm_span(trdm.data(), norb, norb, norb, norb);
 
-  using generator_type = macis::DoubleLoopHamiltonianGenerator<128>;
+  using generator_type = macis::DoubleLoopHamiltonianGenerator<macis::wfn_t<128>>;
   generator_type ham_gen(T_span, V_span);
 
   auto abs_sum = [](auto a, auto b) { return a + std::abs(b); };

@@ -11,8 +11,8 @@
 
 namespace macis {
 
-template <size_t N>
-HamiltonianGenerator<N>::HamiltonianGenerator(matrix_span<double> T,
+template <typename WfnType>
+HamiltonianGenerator<WfnType>::HamiltonianGenerator(matrix_span<double> T,
                                               rank4_span_t V)
     : norb_(T.extent(0)),
       norb2_(norb_ * norb_),
@@ -22,8 +22,8 @@ HamiltonianGenerator<N>::HamiltonianGenerator(matrix_span<double> T,
   generate_integral_intermediates(V_pqrs_);
 }
 
-template <size_t N>
-void HamiltonianGenerator<N>::generate_integral_intermediates(rank4_span_t V) {
+template <typename WfnType>
+void HamiltonianGenerator<WfnType>::generate_integral_intermediates(rank4_span_t V) {
   if(V.extent(0) != norb_ or V.extent(1) != norb_ or V.extent(2) != norb_ or
      V.extent(3) != norb_)
     throw std::runtime_error("V has incorrect dimensions");

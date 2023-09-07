@@ -33,7 +33,7 @@ void append_singles_asci_contributions(
     const std::vector<uint32_t>& occ_othr, const double* eps_same,
     const double* T_pq, const size_t LDT, const double* G_kpq, const size_t LDG,
     const double* V_kpq, const size_t LDV, double h_el_tol, double root_diag,
-    double E0, HamiltonianGenerator<2 * N>& ham_gen,
+    double E0, HamiltonianGenerator<wfn_t<2 * N>>& ham_gen,
     asci_contrib_container<wfn_t<2 * N>>& asci_contributions) {
   const auto LDG2 = LDG * LDG;
   const auto LDV2 = LDV * LDV;
@@ -74,7 +74,7 @@ void append_ss_doubles_asci_contributions(
     const std::vector<uint32_t>& ss_occ, const std::vector<uint32_t>& vir,
     const std::vector<uint32_t>& os_occ, const double* eps_same,
     const double* G, size_t LDG, double h_el_tol, double root_diag, double E0,
-    HamiltonianGenerator<2 * N>& ham_gen,
+    HamiltonianGenerator<wfn_t<2 * N>>& ham_gen,
     asci_contrib_container<wfn_t<2 * N>>& asci_contributions) {
   const size_t nocc = ss_occ.size();
   const size_t nvir = vir.size();
@@ -130,7 +130,7 @@ void append_os_doubles_asci_contributions(
     const std::vector<uint32_t>& vir_alpha,
     const std::vector<uint32_t>& vir_beta, const double* eps_alpha,
     const double* eps_beta, const double* V, size_t LDV, double h_el_tol,
-    double root_diag, double E0, HamiltonianGenerator<2 * N>& ham_gen,
+    double root_diag, double E0, HamiltonianGenerator<wfn_t<2 * N>>& ham_gen,
     asci_contrib_container<wfn_t<2 * N>>& asci_contributions) {
   const size_t LDV2 = LDV * LDV;
   for(auto i : occ_alpha)

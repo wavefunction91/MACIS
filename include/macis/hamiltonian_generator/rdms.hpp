@@ -16,8 +16,8 @@
 
 namespace macis {
 
-template <size_t N>
-void HamiltonianGenerator<N>::rotate_hamiltonian_ordm(const double* ordm) {
+template <typename WfnType>
+void HamiltonianGenerator<WfnType>::rotate_hamiltonian_ordm(const double* ordm) {
   // SVD on ordm to get natural orbitals
   std::vector<double> natural_orbitals(ordm, ordm + norb2_);
   std::vector<double> S(norb_);

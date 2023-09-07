@@ -231,7 +231,7 @@ TEST_CASE("ASCI") {
   macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
   // Hamiltonian Genereator
-  using generator_t = macis::DoubleLoopHamiltonianGenerator<64>;
+  using generator_t = macis::DoubleLoopHamiltonianGenerator<macis::wfn_t<64>>;
   generator_t ham_gen(
       macis::matrix_span<double>(T.data(), norb, norb),
       macis::rank4_span<double>(V.data(), norb, norb, norb, norb));

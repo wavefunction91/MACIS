@@ -14,7 +14,7 @@ namespace macis {
 template <size_t N, typename index_t = int32_t>
 auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                  double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X,
-                 HamiltonianGenerator<N>& ham_gen,
+                 HamiltonianGenerator<wfn_t<N>>& ham_gen,
                  size_t norb MACIS_MPI_CODE(, MPI_Comm comm)) {
   auto logger = spdlog::get("asci_refine");
 #ifdef MACIS_ENABLE_MPI

@@ -247,7 +247,7 @@ void generate_constraint_singles_contributions_ss(
     const std::vector<uint32_t>& occ_othr, const double* eps,
     const double* T_pq, const size_t LDT, const double* G_kpq, const size_t LDG,
     const double* V_kpq, const size_t LDV, double h_el_tol, double root_diag,
-    double E0, HamiltonianGenerator<N>& ham_gen,
+    double E0, HamiltonianGenerator<wfn_t<N>>& ham_gen,
     asci_contrib_container<wfn_t<N>>& asci_contributions) {
   auto [o, v] = generate_constraint_single_excitations(det, T, O, B);
   const auto no = o.count();
@@ -296,7 +296,7 @@ void generate_constraint_doubles_contributions_ss(
     wfn_t<N> os_det, const std::vector<uint32_t>& occ_same,
     const std::vector<uint32_t>& occ_othr, const double* eps, const double* G,
     const size_t LDG, double h_el_tol, double root_diag, double E0,
-    HamiltonianGenerator<N>& ham_gen,
+    HamiltonianGenerator<wfn_t<N>>& ham_gen,
     asci_contrib_container<wfn_t<N>>& asci_contributions) {
   auto [O, V] = generate_constraint_double_excitations(det, T, O_mask, B);
   const auto no_pairs = O.size();
@@ -350,7 +350,7 @@ void generate_constraint_doubles_contributions_os(
     const std::vector<uint32_t>& occ_othr,
     const std::vector<uint32_t>& vir_othr, const double* eps_same,
     const double* eps_othr, const double* V, const size_t LDV, double h_el_tol,
-    double root_diag, double E0, HamiltonianGenerator<N>& ham_gen,
+    double root_diag, double E0, HamiltonianGenerator<wfn_t<N>>& ham_gen,
     asci_contrib_container<wfn_t<N>>& asci_contributions) {
   // Generate Single Excitations that Satisfy the Constraint
   auto [o, v] = generate_constraint_single_excitations(det, T, O, B);

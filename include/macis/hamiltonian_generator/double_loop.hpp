@@ -13,10 +13,10 @@
 
 namespace macis {
 
-template <size_t N>
-class DoubleLoopHamiltonianGenerator : public HamiltonianGenerator<N> {
+template <typename WfnType>
+class DoubleLoopHamiltonianGenerator : public HamiltonianGenerator<WfnType> {
  public:
-  using base_type = HamiltonianGenerator<N>;
+  using base_type = HamiltonianGenerator<WfnType>;
   using full_det_t = typename base_type::full_det_t;
   using spin_det_t = typename base_type::spin_det_t;
   using full_det_iterator = typename base_type::full_det_iterator;
@@ -49,8 +49,8 @@ class DoubleLoopHamiltonianGenerator : public HamiltonianGenerator<N> {
       size_t nrow = 0;
       if(bra.count()) {
         // Separate out into alpha/beta components
-        spin_det_t bra_alpha = bitset_lo_word(bra);
-        spin_det_t bra_beta = bitset_hi_word(bra);
+        spin_det_t bra_alpha = alpha_string(bra);
+        spin_det_t bra_beta = beta_string(bra);
 
         // Get occupied indices
         bits_to_indices(bra_alpha, bra_occ_alpha);
@@ -60,13 +60,13 @@ class DoubleLoopHamiltonianGenerator : public HamiltonianGenerator<N> {
         for(size_t j = 0; j < nket_dets; ++j) {
           const auto ket = *(ket_begin + j);
           if(ket.count()) {
-            spin_det_t ket_alpha = bitset_lo_word(ket);
-            spin_det_t ket_beta = bitset_hi_word(ket);
+            spin_det_t ket_alpha = alpha_string(ket);
+            spin_det_t ket_beta = beta_string(ket);
 
             full_det_t ex_total = bra ^ ket;
             if(ex_total.count() <= 4) {
-              spin_det_t ex_alpha = bitset_lo_word(ex_total);
-              spin_det_t ex_beta = bitset_hi_word(ex_total);
+              spin_det_t ex_alpha = alpha_string(ex_total);
+              spin_det_t ex_beta = beta_string(ex_total);
 
               // Compute Matrix Element
               const auto h_el = this->matrix_element(
@@ -128,8 +128,8 @@ class DoubleLoopHamiltonianGenerator : public HamiltonianGenerator<N> {
       // if( (i%1000) == 0 ) std::cout << i  << std::endl;
       if(bra.count()) {
         // Separate out into alpha/beta components
-        spin_det_t bra_alpha = bitset_lo_word(bra);
-        spin_det_t bra_beta = bitset_hi_word(bra);
+        spin_det_t bra_alpha = alpha_string(bra);
+        spin_det_t bra_beta = beta_string(bra);
 
         // Get occupied indices
         bits_to_indices(bra_alpha, bra_occ_alpha);
@@ -139,13 +139,13 @@ class DoubleLoopHamiltonianGenerator : public HamiltonianGenerator<N> {
         for(size_t j = 0; j < nket_dets; ++j) {
           const auto ket = *(ket_begin + j);
           if(ket.count()) {
-            spin_det_t ket_alpha = bitset_lo_word(ket);
-            spin_det_t ket_beta = bitset_hi_word(ket);
+            spin_det_t ket_alpha = alpha_string(ket);
+            spin_det_t ket_beta = beta_string(ket);
 
             full_det_t ex_total = bra ^ ket;
             if(ex_total.count() <= 4) {
-              spin_det_t ex_alpha = bitset_lo_word(ex_total);
-              spin_det_t ex_beta = bitset_hi_word(ex_total);
+              spin_det_t ex_alpha = alpha_string(ex_total);
+              spin_det_t ex_beta = beta_string(ex_total);
 
               const double val = C[i] * C[j];
 
@@ -167,7 +167,7 @@ class DoubleLoopHamiltonianGenerator : public HamiltonianGenerator<N> {
  public:
   template <typename... Args>
   DoubleLoopHamiltonianGenerator(Args &&...args)
-      : HamiltonianGenerator<N>(std::forward<Args>(args)...) {}
+      : HamiltonianGenerator<WfnType>(std::forward<Args>(args)...) {}
 };
 
 }  // namespace macis
