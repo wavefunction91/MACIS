@@ -240,16 +240,16 @@ size_t constraint_histogram(wfn_t<N> det, size_t n_os_singles,
   return ndet;
 }
 
-template <size_t N>
+template <typename WfnType>
 void generate_constraint_singles_contributions_ss(
-    double coeff, wfn_t<N> det, wfn_t<N> T, wfn_t<N> O, wfn_t<N> B,
-    wfn_t<N> os_det, const std::vector<uint32_t>& occ_same,
+    double coeff, WfnType det, WfnType T, WfnType O, WfnType B,
+    const std::vector<uint32_t>& occ_same,
     const std::vector<uint32_t>& occ_othr, const double* eps,
     const double* T_pq, const size_t LDT, const double* G_kpq, const size_t LDG,
     const double* V_kpq, const size_t LDV, double h_el_tol, double root_diag,
-    double E0, HamiltonianGenerator<wfn_t<N>>& ham_gen,
-    asci_contrib_container<wfn_t<N>>& asci_contributions) {
-  auto [o, v] = generate_constraint_single_excitations(det, T, O, B);
+    double E0, HamiltonianGeneratorBase<double>& ham_gen,
+    asci_contrib_container<WfnType>& asci_contributions) {
+  auto [o, v] = generate_constraint_single_excitations(alpha_string(det), alpha_string(T), alpha_string(O), alpha_string(B));
   const auto no = o.count();
   const auto nv = v.count();
   if(!no or !nv) return;
@@ -274,8 +274,8 @@ void generate_constraint_singles_contributions_ss(
       if(std::abs(coeff * h_el) < h_el_tol) continue;
 
       // Calculate Excited Determinant
-      auto ex_det = det | os_det;
-      ex_det.flip(i).flip(a);
+      auto ex_det = single_excitation_spin<Spin::Alpha>(det, i, a );
+      
 
       // Compute Sign in a Canonical Way
       auto sign = single_excitation_sign(det, a, i);
@@ -290,15 +290,15 @@ void generate_constraint_singles_contributions_ss(
   }
 }
 
-template <size_t N>
+template <typename WfnType>
 void generate_constraint_doubles_contributions_ss(
-    double coeff, wfn_t<N> det, wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B,
-    wfn_t<N> os_det, const std::vector<uint32_t>& occ_same,
+    double coeff, WfnType det, WfnType T, WfnType O_mask, WfnType B,
+    const std::vector<uint32_t>& occ_same,
     const std::vector<uint32_t>& occ_othr, const double* eps, const double* G,
     const size_t LDG, double h_el_tol, double root_diag, double E0,
-    HamiltonianGenerator<wfn_t<N>>& ham_gen,
-    asci_contrib_container<wfn_t<N>>& asci_contributions) {
-  auto [O, V] = generate_constraint_double_excitations(det, T, O_mask, B);
+    HamiltonianGeneratorBase<double>& ham_gen,
+    asci_contrib_container<WfnType>& asci_contributions) {
+  auto [O, V] = generate_constraint_double_excitations(alpha_string(det), alpha_string(T), alpha_string(O_mask), alpha_string(B));
   const auto no_pairs = O.size();
   const auto nv_pairs = V.size();
   if(!no_pairs or !nv_pairs) return;
@@ -309,7 +309,7 @@ void generate_constraint_doubles_contributions_ss(
     const auto i = ffs(ij) - 1;
     const auto j = fls(ij);
     const auto G_ij = G + (j + i * LDG2) * LDG;
-    const auto ex_ij = det ^ ij;
+    const auto ex_ij = single_excitation_spin<Spin::Alpha>(det,i,j); // det ^ ij;
     for(int _ab = 0; _ab < nv_pairs; ++_ab) {
       const auto ab = V[_ab];
       const auto a = ffs(ab) - 1;
@@ -321,14 +321,14 @@ void generate_constraint_doubles_contributions_ss(
       if(std::abs(coeff * G_aibj) < h_el_tol) continue;
 
       // Calculate Excited Determinant (spin)
-      const auto full_ex_spin = ij | ab;
-      const auto ex_det_spin = ex_ij | ab;
+      const auto full_ex_spin = single_excitation_spin<Spin::Alpha>(ij,a,b);   // ij | ab;
+      const auto ex_det_spin = single_excitation_spin<Spin::Alpha>(ex_ij,a,b); // ex_ij | ab;
 
       // Compute Sign in a Canonical Way
-      auto sign = doubles_sign(det, ex_det_spin, full_ex_spin);
+      auto sign = doubles_sign(alpha_string(det), alpha_string(ex_det_spin), full_ex_spin);
 
       // Calculate Full Excited Determinant
-      const auto full_ex = ex_det_spin | os_det;
+      const auto full_ex = ex_det_spin;// | os_det;
 
       // Update Sign of Matrix Element
       auto h_el = sign * G_aibj;
@@ -343,17 +343,17 @@ void generate_constraint_doubles_contributions_ss(
   }
 }
 
-template <size_t N>
+template <typename WfnType>
 void generate_constraint_doubles_contributions_os(
-    double coeff, wfn_t<N> det, wfn_t<N> T, wfn_t<N> O, wfn_t<N> B,
-    wfn_t<N> os_det, const std::vector<uint32_t>& occ_same,
+    double coeff, WfnType det, WfnType T, WfnType O, WfnType B,
+    const std::vector<uint32_t>& occ_same,
     const std::vector<uint32_t>& occ_othr,
     const std::vector<uint32_t>& vir_othr, const double* eps_same,
     const double* eps_othr, const double* V, const size_t LDV, double h_el_tol,
-    double root_diag, double E0, HamiltonianGenerator<wfn_t<N>>& ham_gen,
-    asci_contrib_container<wfn_t<N>>& asci_contributions) {
+    double root_diag, double E0, HamiltonianGeneratorBase<double>& ham_gen,
+    asci_contrib_container<WfnType>& asci_contributions) {
   // Generate Single Excitations that Satisfy the Constraint
-  auto [o, v] = generate_constraint_single_excitations(det, T, O, B);
+  auto [o, v] = generate_constraint_single_excitations(alpha_string(det), alpha_string(T), alpha_string(O), alpha_string(B));
   const auto no = o.count();
   const auto nv = v.count();
   if(!no or !nv) return;
@@ -381,12 +381,14 @@ void generate_constraint_doubles_contributions_os(
           // double sign_othr = single_excitation_sign( os_det >> (N/2),  b, j
           // );
           double sign_othr =
-              single_excitation_sign(bitset_hi_word(os_det), b, j);
+              single_excitation_sign(beta_string(det), b, j);
           double sign = sign_same * sign_othr;
 
           // Compute Excited Determinant
-          auto ex_det = det | os_det;
-          ex_det.flip(i).flip(a).flip(j + N / 2).flip(b + N / 2);
+          //auto ex_det = det | os_det;
+          //ex_det.flip(i).flip(a).flip(j + N / 2).flip(b + N / 2);
+          auto ex_det = single_excitation_spin<Spin::Alpha>(det,i,a);
+          ex_det = single_excitation_spin<Spin::Beta>(ex_det,j,b);
 
           // Finalize Matrix Element
           auto h_el = sign * V_aibj;

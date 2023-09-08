@@ -145,7 +145,7 @@ double asci_pt2_constraint(
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         generate_constraint_singles_contributions_ss(
-            coeff, det, C, O, B, beta, occ_alpha, occ_beta,
+            coeff, det|beta, C, O, B, occ_alpha, occ_beta,
             orb_ens_alpha.data(), T_pq, norb, G_red, norb, V_red, norb,
             h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
       }
@@ -158,7 +158,7 @@ double asci_pt2_constraint(
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         generate_constraint_doubles_contributions_ss(
-            coeff, det, C, O, B, beta, occ_alpha, occ_beta,
+            coeff, det|beta, C, O, B, occ_alpha, occ_beta,
             orb_ens_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
             ham_gen, asci_pairs);
       }
@@ -173,7 +173,7 @@ double asci_pt2_constraint(
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         const auto& orb_ens_beta = bcd.orb_ens_beta;
         generate_constraint_doubles_contributions_os(
-            coeff, det, C, O, B, beta, occ_alpha, occ_beta, vir_beta,
+            coeff, det|beta, C, O, B, occ_alpha, occ_beta, vir_beta,
             orb_ens_alpha.data(), orb_ens_beta.data(), V_pqrs, norb, h_el_tol,
             h_diag, E_ASCI, ham_gen, asci_pairs);
       }
