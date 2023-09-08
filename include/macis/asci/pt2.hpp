@@ -190,16 +190,17 @@ double asci_pt2_constraint(
           const auto& eps_beta = bcd.orb_ens_beta;
 
           const auto state = det | beta;
-          const auto state_beta = bitset_hi_word(beta);
+          const auto state_alpha = alpha_string(state);
+          const auto state_beta  = beta_string(beta);
           // BB Excitations
-          append_singles_asci_contributions<(N / 2), (N / 2)>(
+          append_singles_asci_contributions<Spin::Beta>(
               coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
               eps_beta.data(), T_pq, norb, G_red, norb, V_red, norb, h_el_tol,
               h_diag, E_ASCI, ham_gen, asci_pairs);
 
           // BBBB Excitations
-          append_ss_doubles_asci_contributions<N / 2, N / 2>(
-              coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
+          append_ss_doubles_asci_contributions<Spin::Beta>(
+              coeff, state, state_beta, state_alpha, occ_beta, vir_beta, occ_alpha,
               eps_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
               asci_pairs);
 

@@ -13,6 +13,7 @@
 #include <macis/asci/determinant_contributions.hpp>
 #include <macis/asci/grow.hpp>
 #include <macis/asci/refine.hpp>
+#include <macis/asci/pt2.hpp>
 #include <macis/bitset_operations.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/sd_operations.hpp>
@@ -254,8 +255,8 @@ TEST_CASE("ASCI") {
       asci_settings, mcscf_settings, E0, std::move(dets), std::move(C), ham_gen,
       norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
-  std::cout << E0 - -8.542926243842e+01 << std::endl;
-  REQUIRE(E0 == Approx(-8.542926243842e+01));
+  //std::cout << E0 - -8.542926243842e+01 << std::endl;
+  REQUIRE(std::abs(E0 - -8.542926243842e+01) < 1e-11);
   REQUIRE(dets.size() == 10000);
   REQUIRE(C.size() == 10000);
   REQUIRE(std::inner_product(C.begin(), C.end(), C.begin(), 0.0) ==
@@ -266,11 +267,20 @@ TEST_CASE("ASCI") {
       asci_settings, mcscf_settings, E0, std::move(dets), std::move(C), ham_gen,
       norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
-  REQUIRE(E0 == Approx(-8.542925964708e+01));
+  REQUIRE(std::abs(E0 - -8.542925964708e+01) < 1e-11);
   REQUIRE(dets.size() == 10000);
   REQUIRE(C.size() == 10000);
   REQUIRE(std::inner_product(C.begin(), C.end(), C.begin(), 0.0) ==
           Approx(1.0));
+
+  // ASCI-PT2
+  auto EPT2 = macis::asci_pt2_constraint( dets.begin(), dets.end(), E0, C, norb,
+    ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),ham_gen.G(), ham_gen.V(), 
+    ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+  std::cout << std::scientific << std::setprecision(12);
+  std::cout << EPT2 << std::endl;
+  REQUIRE(std::abs(EPT2 - -5.701585096318e-03) < 1e-10);
 
   MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
   spdlog::drop_all();

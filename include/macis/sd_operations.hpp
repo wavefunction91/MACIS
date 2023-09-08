@@ -64,12 +64,18 @@ void bitset_to_occ_vir(size_t norb, std::bitset<N> state,
 
 template <typename WfnType>
 struct spin_wavefunction_type;
+
 template <size_t N>
 struct spin_wavefunction_type<std::bitset<N>> {
   using type = std::bitset<N/2>;
 };
 template <typename WfnType>
 using spin_wfn_t = typename spin_wavefunction_type<WfnType>::type;
+
+enum class Spin {
+  Alpha,
+  Beta
+};
 
 template <size_t N>
 auto create_no_check(std::bitset<N> state, unsigned p) {
@@ -81,9 +87,27 @@ auto single_excitation(std::bitset<N> state, unsigned p, unsigned q) {
   return state.flip(p).flip(q);
 }
 
+template <Spin Sigma, size_t N>
+auto single_excitation_spin(std::bitset<N> state, unsigned p, unsigned q) {
+  static_assert(N%2 == 0, "Num Bits Must Be Even");
+  if constexpr (Sigma == Spin::Alpha) 
+    return single_excitation(state,p,q);
+  else
+    return single_excitation(state,p+N/2,q+N/2);
+}
+
 template <size_t N>
 auto double_excitation(std::bitset<N> state, unsigned p, unsigned q, unsigned r, unsigned s) {
   return state.flip(p).flip(q).flip(r).flip(s);
+}
+
+template <Spin Sigma, size_t N>
+auto double_excitation_spin(std::bitset<N> state, unsigned p, unsigned q, unsigned r, unsigned s) {
+  static_assert(N%2 == 0, "Num Bits Must Be Even");
+  if constexpr (Sigma == Spin::Alpha) 
+    return double_excitation(state,p,q,r,s);
+  else
+    return double_excitation(state,p+N/2,q+N/2,r+N/2,s+N/2);
 }
 
 template <size_t N>
@@ -95,6 +119,14 @@ std::bitset<2*N> from_spin(std::bitset<N> alpha, std::bitset<N> beta) {
   auto alpha_expand = expand_bitset<2*N>(alpha);
   auto beta_expand  = expand_bitset<2*N>(beta) << N;
   return alpha_expand | beta_expand;
+}
+
+template <Spin Sigma, typename SpinWfnType>
+auto from_spin_safe(SpinWfnType s1, SpinWfnType s2) {
+  if constexpr (Sigma == Spin::Alpha)
+    return from_spin(s1,s2);
+  else
+    return from_spin(s2,s1);
 }
 
 
