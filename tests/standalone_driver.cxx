@@ -18,10 +18,10 @@
 #include <macis/asci/refine.hpp>
 #include <macis/asci/pt2.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
-#include <macis/util/cas.hpp>
 #include <macis/util/detail/rdm_files.hpp>
 #include <macis/util/fcidump.hpp>
-#include <macis/util/fock_matrices.hpp>
+#include <macis/mcscf/cas.hpp>
+#include <macis/mcscf/fock_matrices.hpp>
 #include <macis/util/memory.hpp>
 #include <macis/util/moller_plesset.hpp>
 #include <macis/util/mpi.hpp>

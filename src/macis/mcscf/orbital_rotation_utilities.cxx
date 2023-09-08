@@ -6,7 +6,7 @@
  * See LICENSE.txt for details
  */
 
-#include <macis/util/orbital_rotation_utilities.hpp>
+#include <macis/mcscf/orbital_rotation_utilities.hpp>
 
 namespace macis {
 

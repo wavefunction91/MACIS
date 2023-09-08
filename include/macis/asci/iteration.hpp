@@ -9,7 +9,7 @@
 #pragma once
 #include <macis/asci/determinant_search.hpp>
 #include <macis/solvers/selected_ci_diag.hpp>
-#include <macis/util/mcscf.hpp>
+#include <macis/mcscf/mcscf.hpp>
 
 namespace macis {
 

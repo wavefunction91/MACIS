@@ -9,7 +9,7 @@
 #include <blas.hh>
 #include <iomanip>
 #include <iostream>
-#include <macis/util/orbital_hessian.hpp>
+#include <macis/mcscf/orbital_hessian.hpp>
 #include <vector>
 
 namespace macis {

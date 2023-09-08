@@ -7,9 +7,9 @@
  */
 
 #include <macis/hamiltonian_generator/double_loop.hpp>
-#include <macis/util/cas.hpp>
-#include <macis/util/mcscf.hpp>
-#include <macis/util/mcscf_impl.hpp>
+#include <macis/mcscf/cas.hpp>
+#include <macis/mcscf/mcscf.hpp>
+#include <macis/mcscf/mcscf_impl.hpp>
 
 namespace macis {
 
