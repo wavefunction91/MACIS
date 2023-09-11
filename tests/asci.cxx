@@ -232,7 +232,9 @@ TEST_CASE("ASCI") {
   macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
   // Hamiltonian Genereator
-  using generator_t = macis::DoubleLoopHamiltonianGenerator<macis::wfn_t<64>>;
+  using wfn_type = macis::wfn_t<64>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
+  using generator_t = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
   generator_t ham_gen(
       macis::matrix_span<double>(T.data(), norb, norb),
       macis::rank4_span<double>(V.data(), norb, norb, norb, norb));
@@ -243,8 +245,8 @@ TEST_CASE("ASCI") {
   macis::MCSCFSettings mcscf_settings;
 
   // HF guess
-  std::vector<macis::wfn_t<64>> dets = {
-      macis::canonical_hf_determinant<64>(nalpha, nbeta)};
+  std::vector<wfn_type> dets = {
+      wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
   ;
   std::vector<double> C = {1.0};
   double E0 = ham_gen.matrix_element(dets[0], dets[0]);

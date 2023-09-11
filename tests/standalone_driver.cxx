@@ -64,6 +64,7 @@ int main(int argc, char** argv) {
 
   constexpr size_t nwfn_bits = 64;
   using wfn_type = macis::wfn_t<nwfn_bits>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
 
   MACIS_MPI_CODE(MPI_Init(&argc, &argv);)
 
@@ -342,7 +343,7 @@ int main(int argc, char** argv) {
         } else {
           // HF Guess
           console->info("Generating HF Guess for ASCI");
-          dets = {macis::canonical_hf_determinant<nwfn_bits>(nalpha, nalpha)};
+          dets = {wfn_traits::canonical_hf_determinant(nalpha, nalpha)};
           // std::cout << dets[0].to_ullong() << std::endl;
           E0 = ham_gen.matrix_element(dets[0], dets[0]);
           C = {1.0};

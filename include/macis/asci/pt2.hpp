@@ -23,6 +23,7 @@ double asci_pt2_constraint(
 
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
+  using wfn_traits = wavefunction_traits<wfn_t<N>>;
 
   auto logger = spdlog::get("asci_search");
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
@@ -69,7 +70,7 @@ double asci_pt2_constraint(
       h_diag = ham_gen.matrix_element(w, w);
 
       // Compute occ/vir for beta string
-      bitset_to_occ_vir(norb, beta_shift, occ_beta, vir_beta);
+      wfn_traits::state_to_occ_vir(norb, beta_shift, occ_beta, vir_beta);
 
       // Precompute orbital energies
       orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
@@ -85,7 +86,7 @@ double asci_pt2_constraint(
   for(auto i = 0; i < nuniq_alpha; ++i) {
     const auto wfn_a = uniq_alpha_wfn[i];
     std::vector<uint32_t> occ_alpha, vir_alpha;
-    bitset_to_occ_vir(norb, wfn_a, occ_alpha, vir_alpha);
+    wfn_traits::state_to_occ_vir(norb, wfn_a, occ_alpha, vir_alpha);
     for(auto j = 0; j < ncdets; ++j) {
       const auto w = *(cdets_begin + j);
       if((w & full_mask<N / 2, N>()) == wfn_a) {
@@ -97,7 +98,7 @@ double asci_pt2_constraint(
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
 
-  const auto n_occ_alpha = uniq_alpha_wfn[0].count();
+  const auto n_occ_alpha = wfn_traits::count(uniq_alpha_wfn[0]);
   const auto n_vir_alpha = norb - n_occ_alpha;
   const auto n_sing_alpha = n_occ_alpha * n_vir_alpha;
   const auto n_doub_alpha = (n_sing_alpha * (n_sing_alpha - norb + 1)) / 4;
@@ -190,8 +191,8 @@ double asci_pt2_constraint(
           const auto& eps_beta = bcd.orb_ens_beta;
 
           const auto state = det | beta;
-          const auto state_alpha = alpha_string(state);
-          const auto state_beta  = beta_string(beta);
+          const auto state_alpha = wfn_traits::alpha_string(state);
+          const auto state_beta  = wfn_traits::beta_string(beta);
           // BB Excitations
           append_singles_asci_contributions<Spin::Beta>(
               coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,

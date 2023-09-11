@@ -57,6 +57,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
     const double* V_pqrs, HamiltonianGenerator<wfn_t<N>>& ham_gen) {
+  using wfn_traits = wavefunction_traits<wfn_t<N>>;
+  using spin_wfn_type = spin_wfn_t<wfn_t<N>>;
+  using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
   auto logger = spdlog::get("asci_search");
 
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
@@ -68,13 +71,13 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
   for(size_t i = 0; i < ncdets; ++i) {
     // Alias state data
     auto state = *(cdets_begin + i);
-    auto state_alpha = bitset_lo_word(state);
-    auto state_beta = bitset_hi_word(state);
+    auto state_alpha = wfn_traits::alpha_string(state);
+    auto state_beta  = wfn_traits::beta_string(state);
     auto coeff = C[i];
 
     // Get occupied and virtual indices
-    bitset_to_occ_vir(norb, state_alpha, occ_alpha, vir_alpha);
-    bitset_to_occ_vir(norb, state_beta, occ_beta, vir_beta);
+    spin_wfn_traits::state_to_occ_vir(norb, state_alpha, occ_alpha, vir_alpha);
+    spin_wfn_traits::state_to_occ_vir(norb, state_beta, occ_beta, vir_beta);
 
     // Precompute orbital energies
     auto eps_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
@@ -150,6 +153,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     const double* V_pqrs, HamiltonianGenerator<wfn_t<N>>& ham_gen, MPI_Comm comm) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
+  using wfn_traits    = wavefunction_traits<wfn_t<N>>;
+  using spin_wfn_type = spin_wfn_t<wfn_t<N>>;
+  using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
 
   auto logger = spdlog::get("asci_search");
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
@@ -195,7 +201,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       h_diag = ham_gen.matrix_element(w, w);
 
       // Compute occ/vir for beta string
-      bitset_to_occ_vir(norb, beta_shift, occ_beta, vir_beta);
+      wfn_traits::state_to_occ_vir(norb, beta_shift, occ_beta, vir_beta);
 
       // Precompute orbital energies
       orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
@@ -211,7 +217,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   for(auto i = 0; i < nuniq_alpha; ++i) {
     const auto wfn_a = uniq_alpha_wfn[i];
     std::vector<uint32_t> occ_alpha, vir_alpha;
-    bitset_to_occ_vir(norb, wfn_a, occ_alpha, vir_alpha);
+    wfn_traits::state_to_occ_vir(norb, wfn_a, occ_alpha, vir_alpha);
     for(auto j = 0; j < ncdets; ++j) {
       const auto w = *(cdets_begin + j);
       if((w & full_mask<N / 2, N>()) == wfn_a) {
@@ -223,7 +229,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
 
-  const auto n_occ_alpha = uniq_alpha_wfn[0].count();
+  const auto n_occ_alpha = wfn_traits::count(uniq_alpha_wfn[0]);
   const auto n_vir_alpha = norb - n_occ_alpha;
   const auto n_sing_alpha = n_occ_alpha * n_vir_alpha;
   const auto n_doub_alpha = (n_sing_alpha * (n_sing_alpha - norb + 1)) / 4;
@@ -335,8 +341,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
           const auto& eps_beta = bcd.orb_ens_beta;
 
           const auto state = det | beta;
-          const auto state_alpha = alpha_string(state);
-          const auto state_beta  = beta_string(beta);
+          const auto state_alpha = wfn_traits::alpha_string(state);
+          const auto state_beta  = wfn_traits::beta_string(beta);
           // BB Excitations
           append_singles_asci_contributions<Spin::Beta>(
               coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
