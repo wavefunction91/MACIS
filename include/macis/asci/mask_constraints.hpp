@@ -22,47 +22,20 @@ struct wfn_constraint {
 };
 
 template <size_t N>
-auto make_triplet(unsigned i, unsigned j, unsigned k) {
-  wfn_constraint<N> con;
-
-  con.C = 0;
-  con.C.flip(i).flip(j).flip(k);
-  con.B = 1;
-  con.B <<= k;
-  con.B = con.B.to_ullong() - 1;
-  con.C_min = k;
-
-  return con;
-}
-
-template <size_t N>
-auto make_quad(unsigned i, unsigned j, unsigned k, unsigned l) {
-  wfn_constraint<N> con;
-
-  con.C = 0;
-  con.C.flip(i).flip(j).flip(k).flip(l);
-  con.B = 1;
-  con.B <<= l;
-  con.B = con.B.to_ullong() - 1;
-  con.C_min = l;
-
-  return con;
-}
-
-template <size_t N>
-bool satisfies_constraint(wfn_t<N> det, wfn_t<N> C, unsigned C_min) {
+bool satisfies_constraint(wfn_t<N> det, wfn_constraint<N> constraint) {
+  auto C = constraint.C; auto C_min = constraint.C_min;
   return (det & C).count() == C.count() and ((det ^ C) >> C_min).count() == 0;
 }
 
 template <size_t N>
-auto generate_constraint_single_excitations(wfn_t<N> det, wfn_t<N> C,
-                                            wfn_t<N> O_mask, wfn_t<N> B) {
+auto generate_constraint_single_excitations(wfn_t<N> det, wfn_constraint<N> constraint) {
+  const auto C = constraint.C; const auto B = constraint.B;
   if((det & C).count() <
      (C.count() - 1))  // need to have at most one different from the constraint
     return std::make_pair(wfn_t<N>(0), wfn_t<N>(0));
 
   auto o = det ^ C;
-  auto v = (~det) & O_mask & B;
+  auto v = (~det) & B;
 
   if((o & C).count() ==
      1) {  // don't have to change this necessarily, but more clear without >=
@@ -78,15 +51,15 @@ auto generate_constraint_single_excitations(wfn_t<N> det, wfn_t<N> C,
 }
 
 template <size_t N>
-auto generate_constraint_double_excitations(wfn_t<N> det, wfn_t<N> C,
-                                            wfn_t<N> O_mask, wfn_t<N> B) {
+auto generate_constraint_double_excitations(wfn_t<N> det, wfn_constraint<N> constraint) {
+  const auto C = constraint.C; const auto B = constraint.B;
   // Occ/Vir pairs to generate excitations
   std::vector<wfn_t<N>> O, V;
 
   if((det & C) == 0) return std::make_tuple(O, V);
 
   auto o = det ^ C;
-  auto v = (~det) & O_mask & B;
+  auto v = (~det) & B;
 
   if((o & C).count() >= 3) return std::make_tuple(O, V);
 
@@ -130,9 +103,9 @@ auto generate_constraint_double_excitations(wfn_t<N> det, wfn_t<N> C,
 }
 
 template <size_t N>
-void generate_constraint_singles(wfn_t<N> det, wfn_t<N> T, wfn_t<N> O_mask,
-                                 wfn_t<N> B, std::vector<wfn_t<N>>& t_singles) {
-  auto [o, v] = generate_constraint_single_excitations(det, T, O_mask, B);
+void generate_constraint_singles(wfn_t<N> det, wfn_constraint<N> constraint, 
+                                 std::vector<wfn_t<N>>& t_singles) {
+  auto [o, v] = generate_constraint_single_excitations(det, constraint);
   const auto oc = o.count();
   const auto vc = v.count();
   if(!oc or !vc) return;
@@ -156,9 +129,9 @@ unsigned count_constraint_singles(Args&&... args) {
 }
 
 template <size_t N>
-void generate_constraint_doubles(wfn_t<N> det, wfn_t<N> T, wfn_t<N> O_mask,
-                                 wfn_t<N> B, std::vector<wfn_t<N>>& t_doubles) {
-  auto [O, V] = generate_constraint_double_excitations(det, T, O_mask, B);
+void generate_constraint_doubles(wfn_t<N> det, wfn_constraint<N> constraint, 
+                                 std::vector<wfn_t<N>>& t_doubles) {
+  auto [O, V] = generate_constraint_double_excitations(det, constraint);
 
   t_doubles.clear();
   for(auto ij : O) {
@@ -172,16 +145,15 @@ void generate_constraint_doubles(wfn_t<N> det, wfn_t<N> T, wfn_t<N> O_mask,
 /**
  *  @param[in]  det Input root determinant
  *  @param[in]  T   Triplet constraint mask
- *  @param[in]  O   Overfill mask (full mask 0 -> norb)
  *  @param[in]  B   B mask (?)
  */
 template <size_t N>
-unsigned count_constraint_doubles(wfn_t<N> det, wfn_t<N> C, wfn_t<N> O,
-                                  wfn_t<N> B) {
+unsigned count_constraint_doubles(wfn_t<N> det, wfn_constraint<N> constraint) {
+  const auto C = constraint.C; const auto B = constraint.B;
   if((det & C) == 0) return 0;
 
   auto o = det ^ C;
-  auto v = (~det) & O & B;
+  auto v = (~det) & B;
 
   if((o & C).count() >= 3) return 0;
 
@@ -223,26 +195,24 @@ unsigned count_constraint_doubles(wfn_t<N> det, wfn_t<N> C, wfn_t<N> O,
 
 template <size_t N, typename... Args>
 size_t constraint_histogram(wfn_t<N> det, size_t n_os_singles,
-                            size_t n_os_doubles, wfn_t<N> T, wfn_t<N> O_mask,
-                            wfn_t<N> B) {
-  auto ns = count_constraint_singles(det, T, O_mask, B);
-  auto nd = count_constraint_doubles(det, T, O_mask, B);
+                            size_t n_os_doubles, wfn_constraint<N> constraint){ 
+  auto ns = count_constraint_singles(det, constraint);
+  auto nd = count_constraint_doubles(det, constraint);
 
   size_t ndet = 0;
   ndet += ns;                 // AA
   ndet += nd;                 // AAAA
   ndet += ns * n_os_singles;  // AABB
-  auto T_min = ffs(T) - 1;
-  if(satisfies_constraint(det, T, T_min)) {
+  if(satisfies_constraint(det, constraint)) {
     ndet += n_os_singles + n_os_doubles + 1;  // BB + BBBB + No Excitations
   }
 
   return ndet;
 }
 
-template <typename WfnType>
+template <typename WfnType, typename ConType>
 void generate_constraint_singles_contributions_ss(
-    double coeff, WfnType det, WfnType T, WfnType O, WfnType B,
+    double coeff, WfnType det, ConType constraint,
     const std::vector<uint32_t>& occ_same,
     const std::vector<uint32_t>& occ_othr, const double* eps,
     const double* T_pq, const size_t LDT, const double* G_kpq, const size_t LDG,
@@ -250,7 +220,7 @@ void generate_constraint_singles_contributions_ss(
     double E0, HamiltonianGeneratorBase<double>& ham_gen,
     asci_contrib_container<WfnType>& asci_contributions) {
   using wfn_traits = wavefunction_traits<WfnType>;
-  auto [o, v] = generate_constraint_single_excitations(wfn_traits::alpha_string(det), wfn_traits::alpha_string(T), wfn_traits::alpha_string(O), wfn_traits::alpha_string(B));
+  auto [o, v] = generate_constraint_single_excitations(wfn_traits::alpha_string(det), constraint);
   const auto no = o.count();
   const auto nv = v.count();
   if(!no or !nv) return;
@@ -291,9 +261,9 @@ void generate_constraint_singles_contributions_ss(
   }
 }
 
-template <typename WfnType>
+template <typename WfnType, typename ConType>
 void generate_constraint_doubles_contributions_ss(
-    double coeff, WfnType det, WfnType T, WfnType O_mask, WfnType B,
+    double coeff, WfnType det, ConType constraint,
     const std::vector<uint32_t>& occ_same,
     const std::vector<uint32_t>& occ_othr, const double* eps, const double* G,
     const size_t LDG, double h_el_tol, double root_diag, double E0,
@@ -301,7 +271,7 @@ void generate_constraint_doubles_contributions_ss(
     asci_contrib_container<WfnType>& asci_contributions) {
   using wfn_traits = wavefunction_traits<WfnType>;
   using spin_wfn_traits = wavefunction_traits<spin_wfn_t<WfnType>>;
-  auto [O, V] = generate_constraint_double_excitations(wfn_traits::alpha_string(det), wfn_traits::alpha_string(T), wfn_traits::alpha_string(O_mask), wfn_traits::alpha_string(B));
+  auto [O, V] = generate_constraint_double_excitations(wfn_traits::alpha_string(det), constraint);
   const auto no_pairs = O.size();
   const auto nv_pairs = V.size();
   if(!no_pairs or !nv_pairs) return;
@@ -346,9 +316,9 @@ void generate_constraint_doubles_contributions_ss(
   }
 }
 
-template <typename WfnType>
+template <typename WfnType, typename ConType>
 void generate_constraint_doubles_contributions_os(
-    double coeff, WfnType det, WfnType T, WfnType O, WfnType B,
+    double coeff, WfnType det, ConType constraint,
     const std::vector<uint32_t>& occ_same,
     const std::vector<uint32_t>& occ_othr,
     const std::vector<uint32_t>& vir_othr, const double* eps_same,
@@ -357,7 +327,7 @@ void generate_constraint_doubles_contributions_os(
     asci_contrib_container<WfnType>& asci_contributions) {
   using wfn_traits = wavefunction_traits<WfnType>;
   // Generate Single Excitations that Satisfy the Constraint
-  auto [o, v] = generate_constraint_single_excitations(wfn_traits::alpha_string(det), wfn_traits::alpha_string(T), wfn_traits::alpha_string(O), wfn_traits::alpha_string(B));
+  auto [o, v] = generate_constraint_single_excitations(wfn_traits::alpha_string(det), constraint);
   const auto no = o.count();
   const auto nv = v.count();
   if(!no or !nv) return;
@@ -488,6 +458,21 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 }
 #endif
 
+
+template <size_t N>
+auto make_triplet(unsigned i, unsigned j, unsigned k) {
+  wfn_constraint<N> con;
+
+  con.C = 0;
+  con.C.flip(i).flip(j).flip(k);
+  con.B = 1;
+  con.B <<= k;
+  con.B = con.B.to_ullong() - 1;
+  con.C_min = k;
+
+  return con;
+}
+
 #ifdef MACIS_ENABLE_MPI
 template <size_t N>
 auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
@@ -497,7 +482,7 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
 
-  wfn_t<N> O = full_mask<N>(norb);
+  //wfn_t<N> O = full_mask<N>(norb);
 
   // Global workloads
   std::vector<size_t> workloads(world_size, 0);
@@ -514,7 +499,7 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
 
         size_t nw = 0;
         for(const auto& alpha : unique_alpha) {
-          nw += constraint_histogram(alpha, ns_othr, nd_othr, T, O, B);
+          nw += constraint_histogram(alpha, ns_othr, nd_othr, constraint);
         }
         if(nw) constraint_sizes.emplace_back(constraint, nw);
         total_work += nw;
@@ -553,8 +538,7 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
         size_t nw = 0;
 
         for(const auto& alpha : unique_alpha) {
-          nw += constraint_histogram(alpha, ns_othr, nd_othr, c_next.C, O,
-                                     c_next.B);
+          nw += constraint_histogram(alpha, ns_othr, nd_othr, c_next); 
         }
         if(nw) constraint_sizes.emplace_back(c_next, nw);
         total_work += nw;

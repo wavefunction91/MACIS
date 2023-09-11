@@ -281,7 +281,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
     const double h_el_tol = asci_settings.h_el_tol;
     const auto& [C, B, C_min] = con;
-    wfn_t<N> O = full_mask<N>(norb);
+    wfn_constraint<N/2> alpha_con{ wfn_traits::alpha_string(C), wfn_traits::alpha_string(B), C_min};
+    //wfn_t<N> O = full_mask<N>(norb);
 
     // Loop over unique alpha strings
     for(size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
@@ -296,7 +297,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         generate_constraint_singles_contributions_ss(
-            coeff, det|beta, C, O, B, occ_alpha, occ_beta,
+            coeff, det|beta, alpha_con, occ_alpha, occ_beta,
             orb_ens_alpha.data(), T_pq, norb, G_red, norb, V_red, norb,
             h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
       }
@@ -309,7 +310,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         generate_constraint_doubles_contributions_ss(
-            coeff, det|beta, C, O, B, occ_alpha, occ_beta,
+            coeff, det|beta, alpha_con, occ_alpha, occ_beta,
             orb_ens_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
             ham_gen, asci_pairs);
       }
@@ -324,14 +325,14 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         const auto& orb_ens_beta = bcd.orb_ens_beta;
         generate_constraint_doubles_contributions_os(
-            coeff, det|beta, C, O, B, occ_alpha, occ_beta, vir_beta,
+            coeff, det|beta, alpha_con, occ_alpha, occ_beta, vir_beta,
             orb_ens_alpha.data(), orb_ens_beta.data(), V_pqrs, norb, h_el_tol,
             h_diag, E_ASCI, ham_gen, asci_pairs);
       }
 
       // If the alpha determinant satisfies the constraint,
       // append BB and BBBB excitations
-      if(satisfies_constraint(det, C, C_min)) {
+      if(satisfies_constraint(det, con)) {
         for(const auto& bcd : uad[i_alpha].bcd) {
           const auto& beta = bcd.beta_string;
           const auto& coeff = bcd.coeff;

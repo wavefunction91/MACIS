@@ -45,6 +45,20 @@ size_t top_set_ordinal(std::bitset<NBits> word, size_t NSet) {
   return ord;
 }
 
+template <size_t N>
+auto make_quad(unsigned i, unsigned j, unsigned k, unsigned l) {
+  macis::wfn_constraint<N> con;
+
+  con.C = 0;
+  con.C.flip(i).flip(j).flip(k).flip(l);
+  con.B = 1;
+  con.B <<= l;
+  con.B = con.B.to_ullong() - 1;
+  con.C_min = l;
+
+  return con;
+}
+
 TEST_CASE("Triplets") {
   constexpr size_t num_bits = 64;
   size_t norb = 32;
@@ -159,12 +173,11 @@ TEST_CASE("Triplets") {
         triplets.emplace_back(i, j, k);
       }
 
-  const auto overfill = macis::full_mask<num_bits>(norb);
 
   std::vector<size_t> new_triplet_hist(triplet_hist.size(), 0);
   for(auto [i, j, k] : triplets) {
     const auto label = i * 32 * 32 + j * 32 + k;
-    auto [T, B, T_min] = macis::make_triplet<num_bits>(i, j, k);
+    auto constraint = macis::make_triplet<num_bits>(i, j, k);
 
     for(auto det : wfn_a_uniq) {
       const size_t nocc = det.count();
@@ -173,7 +186,7 @@ TEST_CASE("Triplets") {
       const size_t n_doubles = (n_singles * (n_singles - nocc - nvir + 1)) / 4;
 
       new_triplet_hist[label] += macis::constraint_histogram(
-          det, n_singles, n_doubles, T, overfill, B);
+          det, n_singles, n_doubles, constraint);
     }
   }
 
@@ -191,7 +204,7 @@ TEST_CASE("Triplets") {
   for(auto [i, j, k, l] : quads) {
     const size_t label =
         i * 32ul * 32ul * 32ul + j * 32ul * 32ul + k * 32ul + l;
-    auto [Q, B, Q_min] = macis::make_quad<num_bits>(i, j, k, l);
+    auto constraint = make_quad<num_bits>(i, j, k, l);
 
     for(auto det : wfn_a_uniq) {
       const size_t nocc = det.count();
@@ -200,7 +213,7 @@ TEST_CASE("Triplets") {
       const size_t n_doubles = (n_singles * (n_singles - nocc - nvir + 1)) / 4;
 
       new_quad_hist[label] += macis::constraint_histogram(
-          det, n_singles, n_doubles, Q, overfill, B);
+          det, n_singles, n_doubles, constraint);
     }
   }
 
