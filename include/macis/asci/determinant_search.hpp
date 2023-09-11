@@ -539,12 +539,12 @@ std::vector<wfn_t<N>> asci_search(
   // and keep only the duplicate with positive coefficient.
   keep_only_largest_copy_asci_pairs(asci_pairs);
 
-  //asci_pairs.erase(std::partition(asci_pairs.begin(), asci_pairs.end(),
-  //                                [](const auto& p) { return p.rv < 0.0; }),
-  //                 asci_pairs.end());
+  // asci_pairs.erase(std::partition(asci_pairs.begin(), asci_pairs.end(),
+  //                                 [](const auto& p) { return p.rv < 0.0; }),
+  //                  asci_pairs.end());
 
   // Only do top-K on (ndets_max - ncdets) b/c CDETS will be added later
-  //const size_t top_k_elements = ndets_max - ncdets;
+  // const size_t top_k_elements = ndets_max - ncdets;
   const size_t top_k_elements = ndets_max;
 
   auto keep_large_en = clock_type::now();
@@ -651,7 +651,7 @@ std::vector<wfn_t<N>> asci_search(
                  [](auto x) { return x.state; });
 
   // Insert the CDETS back in
-  //new_dets.insert(new_dets.end(), cdets_begin, cdets_end);
+  // new_dets.insert(new_dets.end(), cdets_begin, cdets_end);
   new_dets.shrink_to_fit();
 
   logger->info("  * New Dets Mem = {:.2e} GiB", to_gib(new_dets));

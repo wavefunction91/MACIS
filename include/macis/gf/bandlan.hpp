@@ -214,13 +214,13 @@ void BandLan(const Functor &H, std::vector<Cont> &qs, std::vector<Cont> &bandH,
           bandH[(it - 1) * nLanIts + it + nbands - 1];
       true_indx[it + nbands] = next_indx;
       if(std::abs(bandH[(it - 1) * nLanIts + it + nbands - 1]) < thres) {
-        //std::cout
-        //    << "BAND LANCZOS STOPPED PREMATURELY DUE TO SMALL NORM! NAMELY "
-        //    << bandH[(it - 1) * nLanIts + it + nbands - 1]
-        //    << ", STOPPED AT ITERATION: " << it << std::endl;
-        //nLanIts = it;
-        //bandH.resize(nLanIts * nLanIts);
-        //break;
+        // std::cout
+        //     << "BAND LANCZOS STOPPED PREMATURELY DUE TO SMALL NORM! NAMELY "
+        //     << bandH[(it - 1) * nLanIts + it + nbands - 1]
+        //     << ", STOPPED AT ITERATION: " << it << std::endl;
+        // nLanIts = it;
+        // bandH.resize(nLanIts * nLanIts);
+        // break;
         blas::scal(N, 0., qs.data() + true_indx[it + nbands] * N, 1);
         std::cout << "FOUND A ZERO VECTOR AT POSITION " << next_indx
                   << std::endl;
