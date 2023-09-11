@@ -347,15 +347,15 @@ int main(int argc, char** argv) {
           OPT_KEYWORD("GF.SAVEGFMATS", gf_settings.saveGFmats, bool);
           gf_settings.GF_orbs_basis = std::vector<int>(n_active, 0);
           for(int i = 0; i < n_active; i++) gf_settings.GF_orbs_basis[i] = i;
-          gf_settings.GF_orbs_comp = std::vector<int>(2, 0);
-          for(int i = 0; i < 2; i++) gf_settings.GF_orbs_comp[i] = i;
+          gf_settings.GF_orbs_comp = std::vector<int>(n_active, 0);
+          for(int i = 0; i < n_active; i++) gf_settings.GF_orbs_comp[i] = i;
           gf_settings.is_up_basis = std::vector<bool>(n_active, true);
-          gf_settings.is_up_comp = std::vector<bool>(2, true);
+          gf_settings.is_up_comp = std::vector<bool>(n_active, true);
 
           // GF vector
           std::vector<std::vector<std::complex<double>>> GF(
               nws, std::vector<std::complex<double>>(
-                       1, std::complex<double>(0., 0.)));
+                       n_active * n_active, std::complex<double>(0., 0.)));
 
           // Occupation numbers
           std::vector<double> occs(n_active, 1.);

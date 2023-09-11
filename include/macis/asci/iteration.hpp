@@ -64,6 +64,7 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   X = std::move(X_local);  // Serial
 #endif
 
+  if(wfn.size() > 1) reorder_ci_on_coeff(wfn, X);
   return std::make_tuple(E, wfn, X);
 }
 
