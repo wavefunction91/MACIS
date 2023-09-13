@@ -12,33 +12,29 @@
 #include <macis/util/mpi.hpp>
 #include <variant>
 
+#include <macis/asci/alpha_constraint.hpp>
+
 namespace macis {
 
-template <size_t N>
-struct wfn_constraint {
-  wfn_t<N> C;
-  wfn_t<N> B;
-  unsigned C_min;
-};
 
-template <size_t N>
-bool satisfies_constraint(wfn_t<N> det, wfn_constraint<N> constraint) {
-  auto C = constraint.C; auto C_min = constraint.C_min;
-  return (det & C).count() == C.count() and ((det ^ C) >> C_min).count() == 0;
+template <size_t N, typename ConType>
+bool satisfies_constraint(wfn_t<N> det, ConType C) {
+  return C.satisfies_constraint(det);
 }
 
-template <size_t N>
-auto generate_constraint_single_excitations(wfn_t<N> det, wfn_constraint<N> constraint) {
-  const auto C = constraint.C; const auto B = constraint.B;
-  if((det & C).count() <
-     (C.count() - 1))  // need to have at most one different from the constraint
+template <size_t N, typename ConType>
+auto generate_constraint_single_excitations(wfn_t<N> det, ConType constraint) {
+  using spin_wfn_traits = typename ConType::spin_wfn_traits;
+  const auto C = constraint.C(); const auto B = constraint.B();
+
+  // need to have at most one different from the constraint
+  if(constraint.overlap(det) < (constraint.count()-1))
     return std::make_pair(wfn_t<N>(0), wfn_t<N>(0));
 
   auto o = det ^ C;
   auto v = (~det) & B;
 
-  if((o & C).count() ==
-     1) {  // don't have to change this necessarily, but more clear without >=
+  if((o & C).count() == 1) {  
     v = o & C;
     o ^= v;
   }
@@ -50,9 +46,9 @@ auto generate_constraint_single_excitations(wfn_t<N> det, wfn_constraint<N> cons
   return std::make_pair(o, v);
 }
 
-template <size_t N>
-auto generate_constraint_double_excitations(wfn_t<N> det, wfn_constraint<N> constraint) {
-  const auto C = constraint.C; const auto B = constraint.B;
+template <size_t N, typename ConType>
+auto generate_constraint_double_excitations(wfn_t<N> det, ConType constraint) {
+  const auto C = constraint.C(); const auto B = constraint.B();
   // Occ/Vir pairs to generate excitations
   std::vector<wfn_t<N>> O, V;
 
@@ -102,8 +98,8 @@ auto generate_constraint_double_excitations(wfn_t<N> det, wfn_constraint<N> cons
   return std::make_tuple(O, V);
 }
 
-template <size_t N>
-void generate_constraint_singles(wfn_t<N> det, wfn_constraint<N> constraint, 
+template <size_t N, typename ConType>
+void generate_constraint_singles(wfn_t<N> det, ConType constraint, 
                                  std::vector<wfn_t<N>>& t_singles) {
   auto [o, v] = generate_constraint_single_excitations(det, constraint);
   const auto oc = o.count();
@@ -128,8 +124,8 @@ unsigned count_constraint_singles(Args&&... args) {
   return o.count() * v.count();
 }
 
-template <size_t N>
-void generate_constraint_doubles(wfn_t<N> det, wfn_constraint<N> constraint, 
+template <size_t N, typename ConType >
+void generate_constraint_doubles(wfn_t<N> det, ConType constraint, 
                                  std::vector<wfn_t<N>>& t_doubles) {
   auto [O, V] = generate_constraint_double_excitations(det, constraint);
 
@@ -147,9 +143,9 @@ void generate_constraint_doubles(wfn_t<N> det, wfn_constraint<N> constraint,
  *  @param[in]  T   Triplet constraint mask
  *  @param[in]  B   B mask (?)
  */
-template <size_t N>
-unsigned count_constraint_doubles(wfn_t<N> det, wfn_constraint<N> constraint) {
-  const auto C = constraint.C; const auto B = constraint.B;
+template <size_t N, typename ConType>
+unsigned count_constraint_doubles(wfn_t<N> det, ConType constraint) {
+  const auto C = constraint.C(); const auto B = constraint.B();
   if((det & C) == 0) return 0;
 
   auto o = det ^ C;
@@ -193,9 +189,9 @@ unsigned count_constraint_doubles(wfn_t<N> det, wfn_constraint<N> constraint) {
   return no_pairs * nv_pairs;
 }
 
-template <size_t N, typename... Args>
+template <size_t N, typename ConType>
 size_t constraint_histogram(wfn_t<N> det, size_t n_os_singles,
-                            size_t n_os_doubles, wfn_constraint<N> constraint){ 
+                            size_t n_os_doubles, ConType constraint){ 
   auto ns = count_constraint_singles(det, constraint);
   auto nd = count_constraint_doubles(det, constraint);
 
@@ -461,16 +457,18 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 
 template <size_t N>
 auto make_triplet(unsigned i, unsigned j, unsigned k) {
-  wfn_constraint<N> con;
+  using wfn_type = wfn_t<N>;
+  using wfn_traits = wavefunction_traits<wfn_type>;
+  using constraint_type = alpha_constraint<wfn_traits>;
+  using string_type     = typename constraint_type::constraint_type;
 
-  con.C = 0;
-  con.C.flip(i).flip(j).flip(k);
-  con.B = 1;
-  con.B <<= k;
-  con.B = con.B.to_ullong() - 1;
-  con.C_min = k;
+  string_type C = 0;
+  C.flip(i).flip(j).flip(k);
+  string_type B = 1;
+  B <<= k;
+  B = B.to_ullong() - 1;
 
-  return con;
+  return constraint_type(C,B,k);
 }
 
 #ifdef MACIS_ENABLE_MPI
@@ -479,6 +477,10 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
                              size_t nd_othr,
                              const std::vector<wfn_t<N>>& unique_alpha,
                              MPI_Comm comm) {
+  using wfn_type = wfn_t<N>;
+  using wfn_traits = wavefunction_traits<wfn_type>;
+  using constraint_type = alpha_constraint<wfn_traits>;
+  using string_type     = typename constraint_type::constraint_type;
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
 
@@ -488,18 +490,17 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
   std::vector<size_t> workloads(world_size, 0);
 
   // Generate triplets + heuristic
-  std::vector<std::pair<wfn_constraint<N>, size_t>> constraint_sizes;
+  std::vector<std::pair<constraint_type, size_t>> constraint_sizes;
   constraint_sizes.reserve(norb * norb * norb);
   size_t total_work = 0;
   for(int t_i = 0; t_i < norb; ++t_i)
     for(int t_j = 0; t_j < t_i; ++t_j)
       for(int t_k = 0; t_k < t_j; ++t_k) {
         auto constraint = make_triplet<N>(t_i, t_j, t_k);
-        const auto& [T, B, _] = constraint;
 
         size_t nw = 0;
         for(const auto& alpha : unique_alpha) {
-          nw += constraint_histogram(alpha, ns_othr, nd_othr, constraint);
+          nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr, nd_othr, constraint);
         }
         if(nw) constraint_sizes.emplace_back(constraint, nw);
         total_work += nw;
@@ -509,7 +510,7 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
 
   for(size_t ilevel = 0; ilevel < nlevels; ++ilevel) {
     // Select constraints larger than average to be broken apart
-    std::vector<std::pair<wfn_constraint<N>, size_t>> tps_to_next;
+    std::vector<std::pair<constraint_type, size_t>> tps_to_next;
     {
       auto it = std::partition(
           constraint_sizes.begin(), constraint_sizes.end(),
@@ -525,20 +526,20 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
 
     // Break apart constraints
     for(auto [c, nw_trip] : tps_to_next) {
-      const auto C_min = c.C_min;
+      const auto C_min = c.C_min();
 
       // Loop over possible constraints with one more element
       for(auto q_l = 0; q_l < C_min; ++q_l) {
         // Generate masks / counts
-        wfn_constraint<N> c_next = c;
-        c_next.C.flip(q_l);
-        c_next.B >>= (C_min - q_l);
-        c_next.C_min = q_l;
+        string_type cn_C = c.C();
+        cn_C.flip(q_l);
+        string_type cn_B = c.B() >> (C_min - q_l);
+        constraint_type c_next(cn_C, cn_B, q_l);
 
         size_t nw = 0;
 
         for(const auto& alpha : unique_alpha) {
-          nw += constraint_histogram(alpha, ns_othr, nd_othr, c_next); 
+          nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr, nd_othr, c_next); 
         }
         if(nw) constraint_sizes.emplace_back(c_next, nw);
         total_work += nw;
@@ -569,7 +570,7 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
             [](const auto& a, const auto& b) { return a.second > b.second; });
 
   // Assign work
-  std::vector<wfn_constraint<N>> constraints;
+  std::vector<constraint_type> constraints;
   constraints.reserve(constraint_sizes.size() / world_size);
 
   for(auto [c, nw] : constraint_sizes) {

@@ -47,16 +47,18 @@ size_t top_set_ordinal(std::bitset<NBits> word, size_t NSet) {
 
 template <size_t N>
 auto make_quad(unsigned i, unsigned j, unsigned k, unsigned l) {
-  macis::wfn_constraint<N> con;
+  using wfn_type = macis::wfn_t<N>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
+  using constraint_type = macis::alpha_constraint<wfn_traits>;
+  using string_type     = typename constraint_type::constraint_type;
 
-  con.C = 0;
-  con.C.flip(i).flip(j).flip(k).flip(l);
-  con.B = 1;
-  con.B <<= l;
-  con.B = con.B.to_ullong() - 1;
-  con.C_min = l;
+  string_type C = 0;
+  C.flip(i).flip(j).flip(k).flip(l);
+  string_type B = 1;
+  B <<= l;
+  B = B.to_ullong() - 1;
 
-  return con;
+  return constraint_type(C,B,l);
 }
 
 TEST_CASE("Triplets") {
@@ -64,6 +66,8 @@ TEST_CASE("Triplets") {
   size_t norb = 32;
 
   using wfn_less_comparator = macis::bitset_less_comparator<num_bits>;
+  using wfn_type = macis::wfn_t<num_bits>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
 
   // Generate ficticious wfns
   std::vector<macis::wfn_t<num_bits>> wfn_a = {
@@ -186,7 +190,7 @@ TEST_CASE("Triplets") {
       const size_t n_doubles = (n_singles * (n_singles - nocc - nvir + 1)) / 4;
 
       new_triplet_hist[label] += macis::constraint_histogram(
-          det, n_singles, n_doubles, constraint);
+          wfn_traits::alpha_string(det), n_singles, n_doubles, constraint);
     }
   }
 
@@ -213,7 +217,7 @@ TEST_CASE("Triplets") {
       const size_t n_doubles = (n_singles * (n_singles - nocc - nvir + 1)) / 4;
 
       new_quad_hist[label] += macis::constraint_histogram(
-          det, n_singles, n_doubles, constraint);
+          wfn_traits::alpha_string(det), n_singles, n_doubles, constraint);
     }
   }
 

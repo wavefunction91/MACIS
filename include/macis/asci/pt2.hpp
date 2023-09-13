@@ -130,8 +130,6 @@ double asci_pt2_constraint(
     const auto& con = constraints[ic];
     //std::cout << std::distance(&constraints[0], &con) << "/" << constraints.size() << std::endl;
     const double h_el_tol = 1e-16;
-    const auto& [C, B, C_min] = con;
-    wfn_constraint<N/2> alpha_con{ wfn_traits::alpha_string(C), wfn_traits::alpha_string(B), C_min};
 
     // Loop over unique alpha strings
     for(size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
@@ -146,7 +144,7 @@ double asci_pt2_constraint(
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         generate_constraint_singles_contributions_ss(
-            coeff, det|beta, alpha_con, occ_alpha, occ_beta,
+            coeff, det|beta, con, occ_alpha, occ_beta,
             orb_ens_alpha.data(), T_pq, norb, G_red, norb, V_red, norb,
             h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
       }
@@ -159,7 +157,7 @@ double asci_pt2_constraint(
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         generate_constraint_doubles_contributions_ss(
-            coeff, det|beta, alpha_con, occ_alpha, occ_beta,
+            coeff, det|beta, con, occ_alpha, occ_beta,
             orb_ens_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
             ham_gen, asci_pairs);
       }
@@ -174,14 +172,14 @@ double asci_pt2_constraint(
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         const auto& orb_ens_beta = bcd.orb_ens_beta;
         generate_constraint_doubles_contributions_os(
-            coeff, det|beta, alpha_con, occ_alpha, occ_beta, vir_beta,
+            coeff, det|beta, con, occ_alpha, occ_beta, vir_beta,
             orb_ens_alpha.data(), orb_ens_beta.data(), V_pqrs, norb, h_el_tol,
             h_diag, E_ASCI, ham_gen, asci_pairs);
       }
 
       // If the alpha determinant satisfies the constraint,
       // append BB and BBBB excitations
-      if(satisfies_constraint(det, con)) {
+      if(satisfies_constraint(wfn_traits::alpha_string(det), con)) {
         for(const auto& bcd : uad[i_alpha].bcd) {
           const auto& beta = bcd.beta_string;
           const auto& coeff = bcd.coeff;
