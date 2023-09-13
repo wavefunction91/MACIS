@@ -7,8 +7,8 @@
  */
 
 #include <Eigen/Core>
-#include <macis/util/fock_matrices.hpp>
-#include <macis/util/orbital_gradient.hpp>
+#include <macis/mcscf/fock_matrices.hpp>
+#include <macis/mcscf/orbital_gradient.hpp>
 #include <macis/util/transform.hpp>
 #include <unsupported/Eigen/MatrixFunctions>
 

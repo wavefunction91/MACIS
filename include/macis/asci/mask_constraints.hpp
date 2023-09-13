@@ -12,60 +12,29 @@
 #include <macis/util/mpi.hpp>
 #include <variant>
 
+#include <macis/asci/alpha_constraint.hpp>
+
 namespace macis {
 
-template <size_t N>
-struct wfn_constraint {
-  wfn_t<N> C;
-  wfn_t<N> B;
-  unsigned C_min;
-};
 
-template <size_t N>
-auto make_triplet(unsigned i, unsigned j, unsigned k) {
-  wfn_constraint<N> con;
-
-  con.C = 0;
-  con.C.flip(i).flip(j).flip(k);
-  con.B = 1;
-  con.B <<= k;
-  con.B = con.B.to_ullong() - 1;
-  con.C_min = k;
-
-  return con;
+template <size_t N, typename ConType>
+bool satisfies_constraint(wfn_t<N> det, ConType C) {
+  return C.satisfies_constraint(det);
 }
 
-template <size_t N>
-auto make_quad(unsigned i, unsigned j, unsigned k, unsigned l) {
-  wfn_constraint<N> con;
+template <size_t N, typename ConType>
+auto generate_constraint_single_excitations(wfn_t<N> det, ConType constraint) {
+  using spin_wfn_traits = typename ConType::spin_wfn_traits;
+  const auto C = constraint.C(); const auto B = constraint.B();
 
-  con.C = 0;
-  con.C.flip(i).flip(j).flip(k).flip(l);
-  con.B = 1;
-  con.B <<= l;
-  con.B = con.B.to_ullong() - 1;
-  con.C_min = l;
-
-  return con;
-}
-
-template <size_t N>
-bool satisfies_constraint(wfn_t<N> det, wfn_t<N> C, unsigned C_min) {
-  return (det & C).count() == C.count() and ((det ^ C) >> C_min).count() == 0;
-}
-
-template <size_t N>
-auto generate_constraint_single_excitations(wfn_t<N> det, wfn_t<N> C,
-                                            wfn_t<N> O_mask, wfn_t<N> B) {
-  if((det & C).count() <
-     (C.count() - 1))  // need to have at most one different from the constraint
+  // need to have at most one different from the constraint
+  if(constraint.overlap(det) < (constraint.count()-1))
     return std::make_pair(wfn_t<N>(0), wfn_t<N>(0));
 
   auto o = det ^ C;
-  auto v = (~det) & O_mask & B;
+  auto v = (~det) & B;
 
-  if((o & C).count() ==
-     1) {  // don't have to change this necessarily, but more clear without >=
+  if((o & C).count() == 1) {  
     v = o & C;
     o ^= v;
   }
@@ -77,16 +46,16 @@ auto generate_constraint_single_excitations(wfn_t<N> det, wfn_t<N> C,
   return std::make_pair(o, v);
 }
 
-template <size_t N>
-auto generate_constraint_double_excitations(wfn_t<N> det, wfn_t<N> C,
-                                            wfn_t<N> O_mask, wfn_t<N> B) {
+template <size_t N, typename ConType>
+auto generate_constraint_double_excitations(wfn_t<N> det, ConType constraint) {
+  const auto C = constraint.C(); const auto B = constraint.B();
   // Occ/Vir pairs to generate excitations
   std::vector<wfn_t<N>> O, V;
 
   if((det & C) == 0) return std::make_tuple(O, V);
 
   auto o = det ^ C;
-  auto v = (~det) & O_mask & B;
+  auto v = (~det) & B;
 
   if((o & C).count() >= 3) return std::make_tuple(O, V);
 
@@ -129,10 +98,10 @@ auto generate_constraint_double_excitations(wfn_t<N> det, wfn_t<N> C,
   return std::make_tuple(O, V);
 }
 
-template <size_t N>
-void generate_constraint_singles(wfn_t<N> det, wfn_t<N> T, wfn_t<N> O_mask,
-                                 wfn_t<N> B, std::vector<wfn_t<N>>& t_singles) {
-  auto [o, v] = generate_constraint_single_excitations(det, T, O_mask, B);
+template <size_t N, typename ConType>
+void generate_constraint_singles(wfn_t<N> det, ConType constraint, 
+                                 std::vector<wfn_t<N>>& t_singles) {
+  auto [o, v] = generate_constraint_single_excitations(det, constraint);
   const auto oc = o.count();
   const auto vc = v.count();
   if(!oc or !vc) return;
@@ -155,10 +124,10 @@ unsigned count_constraint_singles(Args&&... args) {
   return o.count() * v.count();
 }
 
-template <size_t N>
-void generate_constraint_doubles(wfn_t<N> det, wfn_t<N> T, wfn_t<N> O_mask,
-                                 wfn_t<N> B, std::vector<wfn_t<N>>& t_doubles) {
-  auto [O, V] = generate_constraint_double_excitations(det, T, O_mask, B);
+template <size_t N, typename ConType >
+void generate_constraint_doubles(wfn_t<N> det, ConType constraint, 
+                                 std::vector<wfn_t<N>>& t_doubles) {
+  auto [O, V] = generate_constraint_double_excitations(det, constraint);
 
   t_doubles.clear();
   for(auto ij : O) {
@@ -172,16 +141,15 @@ void generate_constraint_doubles(wfn_t<N> det, wfn_t<N> T, wfn_t<N> O_mask,
 /**
  *  @param[in]  det Input root determinant
  *  @param[in]  T   Triplet constraint mask
- *  @param[in]  O   Overfill mask (full mask 0 -> norb)
  *  @param[in]  B   B mask (?)
  */
-template <size_t N>
-unsigned count_constraint_doubles(wfn_t<N> det, wfn_t<N> C, wfn_t<N> O,
-                                  wfn_t<N> B) {
+template <size_t N, typename ConType>
+unsigned count_constraint_doubles(wfn_t<N> det, ConType constraint) {
+  const auto C = constraint.C(); const auto B = constraint.B();
   if((det & C) == 0) return 0;
 
   auto o = det ^ C;
-  auto v = (~det) & O & B;
+  auto v = (~det) & B;
 
   if((o & C).count() >= 3) return 0;
 
@@ -221,35 +189,34 @@ unsigned count_constraint_doubles(wfn_t<N> det, wfn_t<N> C, wfn_t<N> O,
   return no_pairs * nv_pairs;
 }
 
-template <size_t N, typename... Args>
+template <size_t N, typename ConType>
 size_t constraint_histogram(wfn_t<N> det, size_t n_os_singles,
-                            size_t n_os_doubles, wfn_t<N> T, wfn_t<N> O_mask,
-                            wfn_t<N> B) {
-  auto ns = count_constraint_singles(det, T, O_mask, B);
-  auto nd = count_constraint_doubles(det, T, O_mask, B);
+                            size_t n_os_doubles, ConType constraint){ 
+  auto ns = count_constraint_singles(det, constraint);
+  auto nd = count_constraint_doubles(det, constraint);
 
   size_t ndet = 0;
   ndet += ns;                 // AA
   ndet += nd;                 // AAAA
   ndet += ns * n_os_singles;  // AABB
-  auto T_min = ffs(T) - 1;
-  if(satisfies_constraint(det, T, T_min)) {
+  if(satisfies_constraint(det, constraint)) {
     ndet += n_os_singles + n_os_doubles + 1;  // BB + BBBB + No Excitations
   }
 
   return ndet;
 }
 
-template <size_t N>
+template <typename WfnType, typename ConType>
 void generate_constraint_singles_contributions_ss(
-    double coeff, wfn_t<N> det, wfn_t<N> T, wfn_t<N> O, wfn_t<N> B,
-    wfn_t<N> os_det, const std::vector<uint32_t>& occ_same,
+    double coeff, WfnType det, ConType constraint,
+    const std::vector<uint32_t>& occ_same,
     const std::vector<uint32_t>& occ_othr, const double* eps,
     const double* T_pq, const size_t LDT, const double* G_kpq, const size_t LDG,
     const double* V_kpq, const size_t LDV, double h_el_tol, double root_diag,
-    double E0, HamiltonianGenerator<N>& ham_gen,
-    asci_contrib_container<wfn_t<N>>& asci_contributions) {
-  auto [o, v] = generate_constraint_single_excitations(det, T, O, B);
+    double E0, HamiltonianGeneratorBase<double>& ham_gen,
+    asci_contrib_container<WfnType>& asci_contributions) {
+  using wfn_traits = wavefunction_traits<WfnType>;
+  auto [o, v] = generate_constraint_single_excitations(wfn_traits::alpha_string(det), constraint);
   const auto no = o.count();
   const auto nv = v.count();
   if(!no or !nv) return;
@@ -258,11 +225,11 @@ void generate_constraint_singles_contributions_ss(
   const size_t LDV2 = LDV * LDV;
   for(int ii = 0; ii < no; ++ii) {
     const auto i = fls(o);
-    o.flip(i);
+    o.flip(i);  // Disable "i"-bit so it's not used in FLS next iteration
     auto v_cpy = v;
     for(int aa = 0; aa < nv; ++aa) {
       const auto a = fls(v_cpy);
-      v_cpy.flip(a);
+      v_cpy.flip(a);  // Disable "a"-bit so it's not used in FLS next iteration
 
       double h_el = T_pq[a + i * LDT];
       const double* G_ov = G_kpq + a * LDG + i * LDG2;
@@ -274,8 +241,8 @@ void generate_constraint_singles_contributions_ss(
       if(std::abs(coeff * h_el) < h_el_tol) continue;
 
       // Calculate Excited Determinant
-      auto ex_det = det | os_det;
-      ex_det.flip(i).flip(a);
+      auto ex_det = wfn_traits::template single_excitation_no_check<Spin::Alpha>(det, i, a );
+      
 
       // Compute Sign in a Canonical Way
       auto sign = single_excitation_sign(det, a, i);
@@ -283,22 +250,24 @@ void generate_constraint_singles_contributions_ss(
 
       // Compute Fast Diagonal Matrix Element
       auto h_diag = ham_gen.fast_diag_single(eps[i], eps[a], i, a, root_diag);
-      h_el /= (E0 - h_diag);
+      // h_el /= (E0 - h_diag);
 
-      asci_contributions.push_back({ex_det, coeff * h_el});
+      asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
     }
   }
 }
 
-template <size_t N>
+template <typename WfnType, typename ConType>
 void generate_constraint_doubles_contributions_ss(
-    double coeff, wfn_t<N> det, wfn_t<N> T, wfn_t<N> O_mask, wfn_t<N> B,
-    wfn_t<N> os_det, const std::vector<uint32_t>& occ_same,
+    double coeff, WfnType det, ConType constraint,
+    const std::vector<uint32_t>& occ_same,
     const std::vector<uint32_t>& occ_othr, const double* eps, const double* G,
     const size_t LDG, double h_el_tol, double root_diag, double E0,
-    HamiltonianGenerator<N>& ham_gen,
-    asci_contrib_container<wfn_t<N>>& asci_contributions) {
-  auto [O, V] = generate_constraint_double_excitations(det, T, O_mask, B);
+    HamiltonianGeneratorBase<double>& ham_gen,
+    asci_contrib_container<WfnType>& asci_contributions) {
+  using wfn_traits = wavefunction_traits<WfnType>;
+  using spin_wfn_traits = wavefunction_traits<spin_wfn_t<WfnType>>;
+  auto [O, V] = generate_constraint_double_excitations(wfn_traits::alpha_string(det), constraint);
   const auto no_pairs = O.size();
   const auto nv_pairs = V.size();
   if(!no_pairs or !nv_pairs) return;
@@ -309,7 +278,7 @@ void generate_constraint_doubles_contributions_ss(
     const auto i = ffs(ij) - 1;
     const auto j = fls(ij);
     const auto G_ij = G + (j + i * LDG2) * LDG;
-    const auto ex_ij = det ^ ij;
+    const auto ex_ij = wfn_traits::template single_excitation_no_check<Spin::Alpha>(det,i,j); // det ^ ij;
     for(int _ab = 0; _ab < nv_pairs; ++_ab) {
       const auto ab = V[_ab];
       const auto a = ffs(ab) - 1;
@@ -321,14 +290,14 @@ void generate_constraint_doubles_contributions_ss(
       if(std::abs(coeff * G_aibj) < h_el_tol) continue;
 
       // Calculate Excited Determinant (spin)
-      const auto full_ex_spin = ij | ab;
-      const auto ex_det_spin = ex_ij | ab;
+      const auto full_ex_spin = spin_wfn_traits::template single_excitation_no_check<Spin::Alpha>(ij,a,b);   // ij | ab;
+      const auto ex_det_spin = wfn_traits::template single_excitation_no_check<Spin::Alpha>(ex_ij,a,b); // ex_ij | ab;
 
       // Compute Sign in a Canonical Way
-      auto sign = doubles_sign(det, ex_det_spin, full_ex_spin);
+      auto sign = doubles_sign(wfn_traits::alpha_string(det), wfn_traits::alpha_string(ex_det_spin), full_ex_spin);
 
       // Calculate Full Excited Determinant
-      const auto full_ex = ex_det_spin | os_det;
+      const auto full_ex = ex_det_spin;// | os_det;
 
       // Update Sign of Matrix Element
       auto h_el = sign * G_aibj;
@@ -336,24 +305,25 @@ void generate_constraint_doubles_contributions_ss(
       // Evaluate fast diagonal matrix element
       auto h_diag = ham_gen.fast_diag_ss_double(eps[i], eps[j], eps[a], eps[b],
                                                 i, j, a, b, root_diag);
-      h_el /= (E0 - h_diag);
+      // h_el /= (E0 - h_diag);
 
-      asci_contributions.push_back({full_ex, coeff * h_el});
+      asci_contributions.push_back({full_ex, coeff * h_el, E0 - h_diag});
     }
   }
 }
 
-template <size_t N>
+template <typename WfnType, typename ConType>
 void generate_constraint_doubles_contributions_os(
-    double coeff, wfn_t<N> det, wfn_t<N> T, wfn_t<N> O, wfn_t<N> B,
-    wfn_t<N> os_det, const std::vector<uint32_t>& occ_same,
+    double coeff, WfnType det, ConType constraint,
+    const std::vector<uint32_t>& occ_same,
     const std::vector<uint32_t>& occ_othr,
     const std::vector<uint32_t>& vir_othr, const double* eps_same,
     const double* eps_othr, const double* V, const size_t LDV, double h_el_tol,
-    double root_diag, double E0, HamiltonianGenerator<N>& ham_gen,
-    asci_contrib_container<wfn_t<N>>& asci_contributions) {
+    double root_diag, double E0, HamiltonianGeneratorBase<double>& ham_gen,
+    asci_contrib_container<WfnType>& asci_contributions) {
+  using wfn_traits = wavefunction_traits<WfnType>;
   // Generate Single Excitations that Satisfy the Constraint
-  auto [o, v] = generate_constraint_single_excitations(det, T, O, B);
+  auto [o, v] = generate_constraint_single_excitations(wfn_traits::alpha_string(det), constraint);
   const auto no = o.count();
   const auto nv = v.count();
   if(!no or !nv) return;
@@ -381,12 +351,14 @@ void generate_constraint_doubles_contributions_os(
           // double sign_othr = single_excitation_sign( os_det >> (N/2),  b, j
           // );
           double sign_othr =
-              single_excitation_sign(bitset_hi_word(os_det), b, j);
+              single_excitation_sign(wfn_traits::beta_string(det), b, j);
           double sign = sign_same * sign_othr;
 
           // Compute Excited Determinant
-          auto ex_det = det | os_det;
-          ex_det.flip(i).flip(a).flip(j + N / 2).flip(b + N / 2);
+          //auto ex_det = det | os_det;
+          //ex_det.flip(i).flip(a).flip(j + N / 2).flip(b + N / 2);
+          auto ex_det = wfn_traits::template single_excitation_no_check<Spin::Alpha>(det,i,a);
+          ex_det = wfn_traits::template single_excitation_no_check<Spin::Beta>(ex_det,j,b);
 
           // Finalize Matrix Element
           auto h_el = sign * V_aibj;
@@ -394,9 +366,9 @@ void generate_constraint_doubles_contributions_os(
           auto h_diag =
               ham_gen.fast_diag_os_double(eps_same[i], eps_othr[j], eps_same[a],
                                           eps_othr[b], i, j, a, b, root_diag);
-          h_el /= (E0 - h_diag);
+          // h_el /= (E0 - h_diag);
 
-          asci_contributions.push_back({ex_det, coeff * h_el});
+          asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
         }  // BJ
 
     }  // A
@@ -482,33 +454,53 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 }
 #endif
 
+
+template <size_t N>
+auto make_triplet(unsigned i, unsigned j, unsigned k) {
+  using wfn_type = wfn_t<N>;
+  using wfn_traits = wavefunction_traits<wfn_type>;
+  using constraint_type = alpha_constraint<wfn_traits>;
+  using string_type     = typename constraint_type::constraint_type;
+
+  string_type C = 0;
+  C.flip(i).flip(j).flip(k);
+  string_type B = 1;
+  B <<= k;
+  B = B.to_ullong() - 1;
+
+  return constraint_type(C,B,k);
+}
+
 #ifdef MACIS_ENABLE_MPI
 template <size_t N>
 auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
                              size_t nd_othr,
                              const std::vector<wfn_t<N>>& unique_alpha,
                              MPI_Comm comm) {
+  using wfn_type = wfn_t<N>;
+  using wfn_traits = wavefunction_traits<wfn_type>;
+  using constraint_type = alpha_constraint<wfn_traits>;
+  using string_type     = typename constraint_type::constraint_type;
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
 
-  wfn_t<N> O = full_mask<N>(norb);
+  //wfn_t<N> O = full_mask<N>(norb);
 
   // Global workloads
   std::vector<size_t> workloads(world_size, 0);
 
   // Generate triplets + heuristic
-  std::vector<std::pair<wfn_constraint<N>, size_t>> constraint_sizes;
+  std::vector<std::pair<constraint_type, size_t>> constraint_sizes;
   constraint_sizes.reserve(norb * norb * norb);
   size_t total_work = 0;
   for(int t_i = 0; t_i < norb; ++t_i)
     for(int t_j = 0; t_j < t_i; ++t_j)
       for(int t_k = 0; t_k < t_j; ++t_k) {
         auto constraint = make_triplet<N>(t_i, t_j, t_k);
-        const auto& [T, B, _] = constraint;
 
         size_t nw = 0;
         for(const auto& alpha : unique_alpha) {
-          nw += constraint_histogram(alpha, ns_othr, nd_othr, T, O, B);
+          nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr, nd_othr, constraint);
         }
         if(nw) constraint_sizes.emplace_back(constraint, nw);
         total_work += nw;
@@ -518,7 +510,7 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
 
   for(size_t ilevel = 0; ilevel < nlevels; ++ilevel) {
     // Select constraints larger than average to be broken apart
-    std::vector<std::pair<wfn_constraint<N>, size_t>> tps_to_next;
+    std::vector<std::pair<constraint_type, size_t>> tps_to_next;
     {
       auto it = std::partition(
           constraint_sizes.begin(), constraint_sizes.end(),
@@ -534,21 +526,20 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
 
     // Break apart constraints
     for(auto [c, nw_trip] : tps_to_next) {
-      const auto C_min = c.C_min;
+      const auto C_min = c.C_min();
 
       // Loop over possible constraints with one more element
       for(auto q_l = 0; q_l < C_min; ++q_l) {
         // Generate masks / counts
-        wfn_constraint<N> c_next = c;
-        c_next.C.flip(q_l);
-        c_next.B >>= (C_min - q_l);
-        c_next.C_min = q_l;
+        string_type cn_C = c.C();
+        cn_C.flip(q_l);
+        string_type cn_B = c.B() >> (C_min - q_l);
+        constraint_type c_next(cn_C, cn_B, q_l);
 
         size_t nw = 0;
 
         for(const auto& alpha : unique_alpha) {
-          nw += constraint_histogram(alpha, ns_othr, nd_othr, c_next.C, O,
-                                     c_next.B);
+          nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr, nd_othr, c_next); 
         }
         if(nw) constraint_sizes.emplace_back(c_next, nw);
         total_work += nw;
@@ -579,7 +570,7 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
             [](const auto& a, const auto& b) { return a.second > b.second; });
 
   // Assign work
-  std::vector<wfn_constraint<N>> constraints;
+  std::vector<constraint_type> constraints;
   constraints.reserve(constraint_sizes.size() / world_size);
 
   for(auto [c, nw] : constraint_sizes) {

@@ -9,7 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <macis/util/fcidump.hpp>
-#include <macis/util/orbital_energies.hpp>
+#include <macis/mcscf/orbital_energies.hpp>
 
 #include "ut_common.hpp"
 

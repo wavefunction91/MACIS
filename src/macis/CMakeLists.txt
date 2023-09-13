@@ -6,15 +6,18 @@
 
 add_library( macis
   fcidump.cxx
-  fock_matrices.cxx
   transform.cxx
-  orbital_gradient.cxx
-  casscf.cxx
   moller_plesset.cxx
-  orbital_energies.cxx
-  orbital_rotation_utilities.cxx
-  orbital_hessian.cxx
-  orbital_steps.cxx
+
+  mcscf/fock_matrices.cxx
+  mcscf/casscf.cxx
+  mcscf/orbital_gradient.cxx
+  mcscf/orbital_energies.cxx
+  mcscf/orbital_rotation_utilities.cxx
+  mcscf/orbital_hessian.cxx
+  mcscf/orbital_steps.cxx
+
+  hamiltonian_generator/base.cxx
 )
 
 target_include_directories( macis PUBLIC 

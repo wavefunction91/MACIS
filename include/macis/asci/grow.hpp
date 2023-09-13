@@ -16,7 +16,7 @@ namespace macis {
 template <size_t N, typename index_t = int32_t>
 auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X,
-               HamiltonianGenerator<N>& ham_gen,
+               HamiltonianGenerator<wfn_t<N>>& ham_gen,
                size_t norb MACIS_MPI_CODE(, MPI_Comm comm)) {
 #ifdef MACIS_ENABLE_MPI
   auto world_rank = comm_rank(comm);
@@ -119,12 +119,12 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 #endif
 
       // Regenerate intermediates
-      ham_gen.generate_integral_intermediates(ham_gen.V_pqrs_);
+      ham_gen.generate_integral_intermediates();
 
       logger->trace("  * Rediagonalizing");
       auto rdg_st = hrt_t::now();
       std::vector<double> X_local;
-      selected_ci_diag(
+      selected_ci_diag<index_t>(
           wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
           mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol,
           X_local MACIS_MPI_CODE(, comm));

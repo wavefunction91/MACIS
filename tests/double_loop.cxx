@@ -12,6 +12,8 @@
 #include <macis/util/fcidump.hpp>
 #include <macis/wavefunction_io.hpp>
 
+#include <blas.hh>
+
 #include "ut_common.hpp"
 
 TEST_CASE("Double Loop") {
@@ -28,7 +30,9 @@ TEST_CASE("Double Loop") {
   macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
   macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
-  using generator_type = macis::DoubleLoopHamiltonianGenerator<64>;
+  using wfn_type = macis::wfn_t<64>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
+  using generator_type = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
 
 #if 0
   generator_type ham_gen(norb, V.data(), T.data());
@@ -37,7 +41,7 @@ TEST_CASE("Double Loop") {
       macis::matrix_span<double>(T.data(), norb, norb),
       macis::rank4_span<double>(V.data(), norb, norb, norb, norb));
 #endif
-  const auto hf_det = macis::canonical_hf_determinant<64>(nocc, nocc);
+  const auto hf_det = wfn_traits::canonical_hf_determinant(nocc, nocc);
 
   std::vector<double> eps(norb);
   for(auto p = 0ul; p < norb; ++p) {
@@ -91,7 +95,7 @@ TEST_CASE("Double Loop") {
     for(size_t i = 0; i < nocc; ++i)
       for(size_t a = nocc; a < norb; ++a) {
         // Generate excited determinant
-        std::bitset<64> state = hf_det;
+        wfn_type state = hf_det;
         state.flip(i).flip(a);
         auto el_1 = ham_gen.matrix_element(hf_det, state);
         auto el_2 = ham_gen.matrix_element(state, hf_det);
@@ -103,7 +107,7 @@ TEST_CASE("Double Loop") {
     for(size_t i = 0; i < nocc; ++i)
       for(size_t a = nocc; a < norb; ++a) {
         // Generate excited determinant
-        std::bitset<64> state = hf_det;
+        wfn_type state = hf_det;
         state.flip(i + 32).flip(a + 32);
         auto el_1 = ham_gen.matrix_element(hf_det, state);
         auto el_2 = ham_gen.matrix_element(state, hf_det);
@@ -161,8 +165,8 @@ TEST_CASE("Double Loop") {
 
   SECTION("RDM") {
     std::vector<double> ordm(norb * norb, 0.0), trdm(norb3 * norb, 0.0);
-    std::vector<std::bitset<64>> dets = {
-        macis::canonical_hf_determinant<64>(nocc, nocc)};
+    std::vector<wfn_type> dets = {
+        wfn_traits::canonical_hf_determinant(nocc, nocc)};
 
     std::vector<double> C = {1.};
 
@@ -194,14 +198,16 @@ TEST_CASE("RDMS") {
   macis::rank4_span<double> V_span(V.data(), norb, norb, norb, norb);
   macis::rank4_span<double> trdm_span(trdm.data(), norb, norb, norb, norb);
 
-  using generator_type = macis::DoubleLoopHamiltonianGenerator<128>;
+  using wfn_type = macis::wfn_t<128>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
+  using generator_type = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
   generator_type ham_gen(T_span, V_span);
 
   auto abs_sum = [](auto a, auto b) { return a + std::abs(b); };
 
   SECTION("HF") {
-    std::vector<std::bitset<128>> dets = {
-        macis::canonical_hf_determinant<128>(nocc, nocc)};
+    std::vector<wfn_type> dets = {
+        wfn_traits::canonical_hf_determinant(nocc, nocc)};
 
     std::vector<double> C = {1.};
 
@@ -224,7 +230,7 @@ TEST_CASE("RDMS") {
   }
 
   SECTION("CI") {
-    std::vector<std::bitset<128>> states;
+    std::vector<wfn_type> states;
     std::vector<double> coeffs;
     macis::read_wavefunction<128>(ch4_wfn_fname, states, coeffs);
 

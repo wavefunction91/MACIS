@@ -7,7 +7,7 @@
  */
 
 #include <blas.hh>
-#include <macis/util/fock_matrices.hpp>
+#include <macis/mcscf/fock_matrices.hpp>
 #include <vector>
 
 namespace macis {

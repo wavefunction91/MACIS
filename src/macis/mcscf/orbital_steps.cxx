@@ -6,8 +6,8 @@
  * See LICENSE.txt for details
  */
 
-#include <macis/util/orbital_hessian.hpp>
-#include <macis/util/orbital_steps.hpp>
+#include <macis/mcscf/orbital_hessian.hpp>
+#include <macis/mcscf/orbital_steps.hpp>
 
 namespace macis {
 

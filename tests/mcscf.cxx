@@ -12,7 +12,7 @@
 #include <iomanip>
 #include <macis/util/detail/rdm_files.hpp>
 #include <macis/util/fcidump.hpp>
-#include <macis/util/mcscf.hpp>
+#include <macis/mcscf/mcscf.hpp>
 
 #include "ut_common.hpp"
 

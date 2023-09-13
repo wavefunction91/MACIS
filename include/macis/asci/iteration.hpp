@@ -9,14 +9,14 @@
 #pragma once
 #include <macis/asci/determinant_search.hpp>
 #include <macis/solvers/selected_ci_diag.hpp>
-#include <macis/util/mcscf.hpp>
+#include <macis/mcscf/mcscf.hpp>
 
 namespace macis {
 
 template <size_t N, typename index_t = int32_t>
 auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                size_t ndets_max, double E0, std::vector<wfn_t<N>> wfn,
-               std::vector<double> X, HamiltonianGenerator<N>& ham_gen,
+               std::vector<double> X, HamiltonianGenerator<wfn_t<N>>& ham_gen,
                size_t norb MACIS_MPI_CODE(, MPI_Comm comm)) {
   // Sort wfn on coefficient weights
   if(wfn.size() > 1) reorder_ci_on_coeff(wfn, X);
@@ -31,7 +31,7 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
   // Rediagonalize
   std::vector<double> X_local;  // Precludes guess reuse
-  auto E = selected_ci_diag<N, index_t>(
+  auto E = selected_ci_diag<index_t>(
       wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
       mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol,
       X_local MACIS_MPI_CODE(, comm));

@@ -13,6 +13,7 @@
 #include <macis/asci/determinant_contributions.hpp>
 #include <macis/asci/grow.hpp>
 #include <macis/asci/refine.hpp>
+#include <macis/asci/pt2.hpp>
 #include <macis/bitset_operations.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/sd_operations.hpp>
@@ -44,11 +45,29 @@ size_t top_set_ordinal(std::bitset<NBits> word, size_t NSet) {
   return ord;
 }
 
+template <size_t N>
+auto make_quad(unsigned i, unsigned j, unsigned k, unsigned l) {
+  using wfn_type = macis::wfn_t<N>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
+  using constraint_type = macis::alpha_constraint<wfn_traits>;
+  using string_type     = typename constraint_type::constraint_type;
+
+  string_type C = 0;
+  C.flip(i).flip(j).flip(k).flip(l);
+  string_type B = 1;
+  B <<= l;
+  B = B.to_ullong() - 1;
+
+  return constraint_type(C,B,l);
+}
+
 TEST_CASE("Triplets") {
   constexpr size_t num_bits = 64;
   size_t norb = 32;
 
   using wfn_less_comparator = macis::bitset_less_comparator<num_bits>;
+  using wfn_type = macis::wfn_t<num_bits>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
 
   // Generate ficticious wfns
   std::vector<macis::wfn_t<num_bits>> wfn_a = {
@@ -158,12 +177,11 @@ TEST_CASE("Triplets") {
         triplets.emplace_back(i, j, k);
       }
 
-  const auto overfill = macis::full_mask<num_bits>(norb);
 
   std::vector<size_t> new_triplet_hist(triplet_hist.size(), 0);
   for(auto [i, j, k] : triplets) {
     const auto label = i * 32 * 32 + j * 32 + k;
-    auto [T, B, T_min] = macis::make_triplet<num_bits>(i, j, k);
+    auto constraint = macis::make_triplet<num_bits>(i, j, k);
 
     for(auto det : wfn_a_uniq) {
       const size_t nocc = det.count();
@@ -172,7 +190,7 @@ TEST_CASE("Triplets") {
       const size_t n_doubles = (n_singles * (n_singles - nocc - nvir + 1)) / 4;
 
       new_triplet_hist[label] += macis::constraint_histogram(
-          det, n_singles, n_doubles, T, overfill, B);
+          wfn_traits::alpha_string(det), n_singles, n_doubles, constraint);
     }
   }
 
@@ -190,7 +208,7 @@ TEST_CASE("Triplets") {
   for(auto [i, j, k, l] : quads) {
     const size_t label =
         i * 32ul * 32ul * 32ul + j * 32ul * 32ul + k * 32ul + l;
-    auto [Q, B, Q_min] = macis::make_quad<num_bits>(i, j, k, l);
+    auto constraint = make_quad<num_bits>(i, j, k, l);
 
     for(auto det : wfn_a_uniq) {
       const size_t nocc = det.count();
@@ -199,7 +217,7 @@ TEST_CASE("Triplets") {
       const size_t n_doubles = (n_singles * (n_singles - nocc - nvir + 1)) / 4;
 
       new_quad_hist[label] += macis::constraint_histogram(
-          det, n_singles, n_doubles, Q, overfill, B);
+          wfn_traits::alpha_string(det), n_singles, n_doubles, constraint);
     }
   }
 
@@ -231,7 +249,9 @@ TEST_CASE("ASCI") {
   macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
   // Hamiltonian Genereator
-  using generator_t = macis::DoubleLoopHamiltonianGenerator<64>;
+  using wfn_type = macis::wfn_t<64>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
+  using generator_t = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
   generator_t ham_gen(
       macis::matrix_span<double>(T.data(), norb, norb),
       macis::rank4_span<double>(V.data(), norb, norb, norb, norb));
@@ -242,8 +262,8 @@ TEST_CASE("ASCI") {
   macis::MCSCFSettings mcscf_settings;
 
   // HF guess
-  std::vector<macis::wfn_t<64>> dets = {
-      macis::canonical_hf_determinant<64>(nalpha, nbeta)};
+  std::vector<wfn_type> dets = {
+      wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
   ;
   std::vector<double> C = {1.0};
   double E0 = ham_gen.matrix_element(dets[0], dets[0]);
@@ -254,7 +274,8 @@ TEST_CASE("ASCI") {
       asci_settings, mcscf_settings, E0, std::move(dets), std::move(C), ham_gen,
       norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
-  REQUIRE(E0 == Approx(-8.542926243842e+01));
+  //std::cout << E0 - -8.542926243842e+01 << std::endl;
+  REQUIRE(std::abs(E0 - -8.542926243842e+01) < 1e-11);
   REQUIRE(dets.size() == 10000);
   REQUIRE(C.size() == 10000);
   REQUIRE(std::inner_product(C.begin(), C.end(), C.begin(), 0.0) ==
@@ -265,11 +286,20 @@ TEST_CASE("ASCI") {
       asci_settings, mcscf_settings, E0, std::move(dets), std::move(C), ham_gen,
       norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
-  REQUIRE(E0 == Approx(-8.542925964708e+01));
+  REQUIRE(std::abs(E0 - -8.542925964708e+01) < 1e-11);
   REQUIRE(dets.size() == 10000);
   REQUIRE(C.size() == 10000);
   REQUIRE(std::inner_product(C.begin(), C.end(), C.begin(), 0.0) ==
           Approx(1.0));
+
+  // ASCI-PT2
+  auto EPT2 = macis::asci_pt2_constraint( dets.begin(), dets.end(), E0, C, norb,
+    ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),ham_gen.G(), ham_gen.V(), 
+    ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+  std::cout << std::scientific << std::setprecision(12);
+  std::cout << EPT2 << std::endl;
+  REQUIRE(std::abs(EPT2 - -5.701585096318e-03) < 1e-10);
 
   MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
   spdlog::drop_all();

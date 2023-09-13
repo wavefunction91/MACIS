@@ -27,7 +27,9 @@ TEST_CASE("CSR Hamiltonian") {
   macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
   macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
-  using generator_type = macis::DoubleLoopHamiltonianGenerator<64>;
+  using wfn_type = macis::wfn_t<64>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
+  using generator_type = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
 
 #if 0
   generator_type ham_gen(norb, V.data(), T.data());
@@ -38,7 +40,7 @@ TEST_CASE("CSR Hamiltonian") {
 #endif
 
   // Generate configuration space
-  const auto hf_det = macis::canonical_hf_determinant<64>(nocc, nocc);
+  const auto hf_det = wfn_traits::canonical_hf_determinant(nocc, nocc);
   auto dets = macis::generate_cisd_hilbert_space(norb, hf_det);
 
   // Generate CSR Hamiltonian
@@ -82,7 +84,9 @@ TEST_CASE("Distributed CSR Hamiltonian") {
   macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
   macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
-  using generator_type = macis::DoubleLoopHamiltonianGenerator<64>;
+  using wfn_type = macis::wfn_t<64>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
+  using generator_type = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
 
 #if 0
   generator_type ham_gen(norb, V.data(), T.data());
@@ -93,7 +97,7 @@ TEST_CASE("Distributed CSR Hamiltonian") {
 #endif
 
   // Generate configuration space
-  const auto hf_det = macis::canonical_hf_determinant<64>(nocc, nocc);
+  const auto hf_det = wfn_traits::canonical_hf_determinant(nocc, nocc);
   auto dets = macis::generate_cisd_hilbert_space(norb, hf_det);
 
   // Generate Distributed CSR Hamiltonian
