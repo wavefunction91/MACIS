@@ -225,11 +225,11 @@ void generate_constraint_singles_contributions_ss(
   const size_t LDV2 = LDV * LDV;
   for(int ii = 0; ii < no; ++ii) {
     const auto i = fls(o);
-    o.flip(i); // Disable "i"-bit so it's not used in FLS next iteration
+    o.flip(i);  // Disable "i"-bit so it's not used in FLS next iteration
     auto v_cpy = v;
     for(int aa = 0; aa < nv; ++aa) {
       const auto a = fls(v_cpy);
-      v_cpy.flip(a); // Disable "a"-bit so it's not used in FLS next iteration
+      v_cpy.flip(a);  // Disable "a"-bit so it's not used in FLS next iteration
 
       double h_el = T_pq[a + i * LDT];
       const double* G_ov = G_kpq + a * LDG + i * LDG2;
@@ -250,7 +250,7 @@ void generate_constraint_singles_contributions_ss(
 
       // Compute Fast Diagonal Matrix Element
       auto h_diag = ham_gen.fast_diag_single(eps[i], eps[a], i, a, root_diag);
-      //h_el /= (E0 - h_diag);
+      // h_el /= (E0 - h_diag);
 
       asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
     }
@@ -305,7 +305,7 @@ void generate_constraint_doubles_contributions_ss(
       // Evaluate fast diagonal matrix element
       auto h_diag = ham_gen.fast_diag_ss_double(eps[i], eps[j], eps[a], eps[b],
                                                 i, j, a, b, root_diag);
-      //h_el /= (E0 - h_diag);
+      // h_el /= (E0 - h_diag);
 
       asci_contributions.push_back({full_ex, coeff * h_el, E0 - h_diag});
     }
@@ -366,7 +366,7 @@ void generate_constraint_doubles_contributions_os(
           auto h_diag =
               ham_gen.fast_diag_os_double(eps_same[i], eps_othr[j], eps_same[a],
                                           eps_othr[b], i, j, a, b, root_diag);
-          //h_el /= (E0 - h_diag);
+          // h_el /= (E0 - h_diag);
 
           asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
         }  // BJ

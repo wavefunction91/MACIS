@@ -15,8 +15,8 @@
 #include <iomanip>
 #include <iostream>
 #include <macis/asci/grow.hpp>
-#include <macis/asci/refine.hpp>
 #include <macis/asci/pt2.hpp>
+#include <macis/asci/refine.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/util/detail/rdm_files.hpp>
 #include <macis/util/fcidump.hpp>
@@ -384,9 +384,10 @@ int main(int argc, char** argv) {
         }
 #endif
         if(pt2) {
-          EPT2 = macis::asci_pt2_constraint( dets.begin(), dets.end(), E0 -(E_inactive + E_core), C, n_active,
-            ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),ham_gen.G(), ham_gen.V(), 
-            ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));
+          EPT2 = macis::asci_pt2_constraint(
+              dets.begin(), dets.end(), E0 - (E_inactive + E_core), C, n_active,
+              ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(), ham_gen.G(),
+              ham_gen.V(), ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));
         }
       }
 
@@ -397,8 +398,7 @@ int main(int argc, char** argv) {
         console->info("E(CI+PT2) = {:.12f} Eh", E0 + EPT2);
       }
 
-
-    // MCSCF
+      // MCSCF
     } else if(job == Job::MCSCF) {
       // Possibly read active RDMs
       if(rdm_fname.size()) {

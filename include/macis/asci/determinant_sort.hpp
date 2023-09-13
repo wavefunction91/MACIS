@@ -108,7 +108,8 @@ void keep_only_largest_copy_asci_pairs(
 
     // Keep only max value
     else {
-      cur_it->c_times_matel = std::max(cur_it->c_times_matel, it->c_times_matel);
+      cur_it->c_times_matel =
+          std::max(cur_it->c_times_matel, it->c_times_matel);
     }
   }
 
