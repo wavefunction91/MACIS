@@ -182,8 +182,7 @@ void read_fcidump_2body(std::string fname, double* V, size_t LDV) {
 }
 
 bool is_2body_diagonal(std::string fname) {
-
-  auto norb     = read_fcidump_norb(fname);
+  auto norb = read_fcidump_norb(fname);
   bool all_diag = true;
 
   std::ifstream file(fname);
@@ -199,10 +198,9 @@ bool is_2body_diagonal(std::string fname) {
       q--;
       r--;
       s--;
-      if(p != q || r != s)
-      {
-	all_diag = false;
-	break;
+      if(p != q || r != s) {
+        all_diag = false;
+        break;
       }
     }
   }

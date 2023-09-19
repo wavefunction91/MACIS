@@ -71,8 +71,8 @@ void read_fcidump_1body(std::string fname, col_major_span<double, 2> T);
 void read_fcidump_2body(std::string fname, col_major_span<double, 4> V);
 
 /**
- * @brief Check whether the 2-body contribution of the Hamiltonian is exclusively
- *        diagonal.
+ * @brief Check whether the 2-body contribution of the Hamiltonian is
+ * exclusively diagonal.
  *
  * @param[in] fname: Filename of FCIDUMP file
  *
