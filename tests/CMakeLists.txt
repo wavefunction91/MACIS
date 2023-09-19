@@ -13,6 +13,7 @@ add_executable( macis_test
   fcidump.cxx 
   read_wavefunction.cxx
   double_loop.cxx
+  sd_build.cxx
   csr_hamiltonian.cxx
   davidson.cxx
   transform.cxx

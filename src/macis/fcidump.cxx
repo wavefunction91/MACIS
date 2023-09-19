@@ -181,6 +181,34 @@ void read_fcidump_2body(std::string fname, double* V, size_t LDV) {
       fname, KokkosEx::submdspan(V_map, sl, sl, sl, Kokkos::full_extent));
 }
 
+bool is_2body_diagonal(std::string fname) {
+
+  auto norb     = read_fcidump_norb(fname);
+  bool all_diag = true;
+
+  std::ifstream file(fname);
+  std::string line;
+  while(std::getline(file, line)) {
+    auto tokens = split(line, " ");
+    if(tokens.size() != 5) continue;  // not a valid FCIDUMP line
+
+    auto [p, q, r, s, integral] = fcidump_line(tokens);
+    auto lc = line_classification(p, q, r, s);
+    if(lc == LineClassification::TwoBody) {
+      p--;
+      q--;
+      r--;
+      s--;
+      if(p != q || r != s)
+      {
+	all_diag = false;
+	break;
+      }
+    }
+  }
+  return all_diag;
+}
+
 void write_fcidump(std::string fname, size_t norb, const double* T, size_t LDT,
                    const double* V, size_t LDV, double E_core) {
   auto logger = spdlog::basic_logger_mt("fcidump", fname);
