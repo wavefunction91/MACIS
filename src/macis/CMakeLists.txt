@@ -18,6 +18,7 @@ add_library( macis
   gf/eigsolver.cxx
   gf/bandlan.cxx
   gf/gf.cxx
+  model/hubbard.cxx
 )
 
 target_include_directories( macis PUBLIC 
