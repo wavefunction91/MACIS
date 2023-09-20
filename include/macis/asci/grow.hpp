@@ -62,7 +62,7 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     logger->trace("  * ASCI_ITER_DUR = {:.2e} ms", ai_dur.count());
     if(ndets_new > wfn.size())
       logger->info("Wavefunction didn't grow enough...");
-      //throw std::runtime_error("Wavefunction didn't grow enough...");
+    // throw std::runtime_error("Wavefunction didn't grow enough...");
 
     logger->info(fmt_string, iter++, E, E - E0, wfn.size());
     if(asci_settings.grow_with_rot and
