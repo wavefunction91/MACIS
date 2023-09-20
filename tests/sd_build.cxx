@@ -9,16 +9,16 @@
 #include <iomanip>
 #include <iostream>
 #include <macis/hamiltonian_generator/sd_build.hpp>
-#include <macis/util/fcidump.hpp>
-#include <macis/wavefunction_io.hpp>
 #include <macis/util/cas.hpp>
+#include <macis/util/fcidump.hpp>
 #include <macis/util/fock_matrices.hpp>
+#include <macis/wavefunction_io.hpp>
 
 #include "ut_common.hpp"
 
-using macis::NumOrbital;
 using macis::NumActive;
 using macis::NumInactive;
+using macis::NumOrbital;
 
 TEST_CASE("Single Double Build") {
   ROOT_ONLY(MPI_COMM_WORLD);
@@ -33,7 +33,7 @@ TEST_CASE("Single Double Build") {
   auto E_core = macis::read_fcidump_core(hubbard10_fcidump);
   macis::read_fcidump_1body(hubbard10_fcidump, T.data(), norb);
   macis::read_fcidump_2body(hubbard10_fcidump, V.data(), norb);
-  bool just_singles = macis::is_2body_diagonal( hubbard10_fcidump );
+  bool just_singles = macis::is_2body_diagonal(hubbard10_fcidump);
 
   using generator_type = macis::SDBuildHamiltonianGenerator<64>;
 
@@ -78,11 +78,11 @@ TEST_CASE("Single Double Build") {
   }
 
   SECTION("CI") {
-    size_t nalpha = 5; 
-    size_t nbeta  = 5;
+    size_t nalpha = 5;
+    size_t nbeta = 5;
     size_t n_inactive = 0;
-    size_t n_active   = 10;
-    size_t n_virtual  = 0;
+    size_t n_active = 10;
+    size_t n_virtual = 0;
     std::vector<double> C_local;
     std::vector<double> active_ordm(n_active * n_active);
     std::vector<double> active_trdm;
@@ -101,15 +101,16 @@ TEST_CASE("Single Double Build") {
     auto E_inactive = macis::inactive_energy(NumInactive(n_inactive), T.data(),
                                              norb, F_inactive.data(), norb);
     auto dets = macis::generate_hilbert_space<64>(norb, nalpha, nbeta);
-    double E0 =
-        macis::selected_ci_diag(dets.begin(), dets.end(), ham_gen, mcscf_settings.ci_matel_tol,
-                         mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol, C_local,
-                         MACIS_MPI_CODE(MPI_COMM_WORLD,) true);
+    double E0 = macis::selected_ci_diag(
+        dets.begin(), dets.end(), ham_gen, mcscf_settings.ci_matel_tol,
+        mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol, C_local,
+        MACIS_MPI_CODE(MPI_COMM_WORLD, ) true);
     E0 += E_inactive + E_core;
     // Compute RDMs
-    ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
-                      C_local.data(), macis::matrix_span<double>(active_ordm.data(), norb, norb),
-                      macis::rank4_span<double>(active_trdm.data(), norb, norb, norb, norb));
+    ham_gen.form_rdms(
+        dets.begin(), dets.end(), dets.begin(), dets.end(), C_local.data(),
+        macis::matrix_span<double>(active_ordm.data(), norb, norb),
+        macis::rank4_span<double>(active_trdm.data(), norb, norb, norb, norb));
     REQUIRE(E0 == Approx(-2.538061882041e+01));
   }
 }
