@@ -7,6 +7,7 @@
  */
 
 #include "ini_input.hpp"
+
 #include <sstream>
 
 // Misc string functions
@@ -340,11 +341,10 @@ int INIFile::getData(std::string query) {
 template <>
 std::vector<int> INIFile::getData(std::string query) {
   std::string line = getData<std::string>(query);
-  std::istringstream iss( line );
+  std::istringstream iss(line);
   std::vector<int> res;
   int tmp;
-  while( iss >> tmp )
-    res.push_back(tmp);
+  while(iss >> tmp) res.push_back(tmp);
   return res;
 
 }  // INIFile::getData<std::vector<int>>
@@ -374,11 +374,10 @@ bool INIFile::getData(std::string query) {
 template <>
 std::vector<bool> INIFile::getData(std::string query) {
   std::string line = getData<std::string>(query);
-  std::istringstream iss( line );
+  std::istringstream iss(line);
   std::vector<bool> res;
   std::string tmp;
-  while( iss >> tmp )
-  {
+  while(iss >> tmp) {
     bool b = (not tmp.compare("TRUE") or not tmp.compare("ON"));
     res.push_back(b);
   }

@@ -345,10 +345,14 @@ int main(int argc, char** argv) {
           OPT_KEYWORD("GF.WRITE", gf_settings.writeGF, bool);
           OPT_KEYWORD("GF.PRINT", gf_settings.print, bool);
           OPT_KEYWORD("GF.SAVEGFMATS", gf_settings.saveGFmats, bool);
-	  OPT_KEYWORD("GF.ORBS_BASIS", gf_settings.GF_orbs_basis, std::vector<int>);
-	  OPT_KEYWORD("GF.IS_UP_BASIS", gf_settings.is_up_basis, std::vector<bool>);
-	  OPT_KEYWORD("GF.ORBS_COMP", gf_settings.GF_orbs_comp, std::vector<int>);
-	  OPT_KEYWORD("GF.IS_UP_COMP", gf_settings.is_up_comp, std::vector<bool>);
+          OPT_KEYWORD("GF.ORBS_BASIS", gf_settings.GF_orbs_basis,
+                      std::vector<int>);
+          OPT_KEYWORD("GF.IS_UP_BASIS", gf_settings.is_up_basis,
+                      std::vector<bool>);
+          OPT_KEYWORD("GF.ORBS_COMP", gf_settings.GF_orbs_comp,
+                      std::vector<int>);
+          OPT_KEYWORD("GF.IS_UP_COMP", gf_settings.is_up_comp,
+                      std::vector<bool>);
 
           // GF vector
           std::vector<std::vector<std::complex<double>>> GF(
