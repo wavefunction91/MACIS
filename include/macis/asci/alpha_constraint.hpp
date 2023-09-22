@@ -10,8 +10,9 @@ public:
   using wfn_traits      = WfnTraits;
   using wfn_type        = typename WfnTraits::wfn_type;
   using spin_wfn_type   = spin_wfn_t<wfn_type>;
-  using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
-  using constraint_type = spin_wfn_type;
+
+  using constraint_type   = spin_wfn_type;
+  using constraint_traits = wavefunction_traits<spin_wfn_type>;
 
 private:
   constraint_type C_;
@@ -22,7 +23,7 @@ private:
 public:
 
   alpha_constraint(constraint_type C, constraint_type B, uint32_t C_min) :
-    C_(C), B_(B), C_min_(C_min), count_(spin_wfn_traits::count(C)) {}
+    C_(C), B_(B), C_min_(C_min), count_(constraint_traits::count(C)) {}
 
   alpha_constraint(const alpha_constraint&) = default;
   alpha_constraint& operator=(const alpha_constraint&) = default;
@@ -53,13 +54,13 @@ public:
 
   template <typename WfnType>
   inline auto overlap(WfnType state) const {
-    return spin_wfn_traits::count(c_mask_union(state));
+    return constraint_traits::count(c_mask_union(state));
   }
 
   template <typename WfnType>
   inline bool satisfies_constraint(WfnType state) const {
     return overlap(state) == count_ and 
-           spin_wfn_traits::count(symmetric_difference(state) >> C_min_) == 0;
+           constraint_traits::count(symmetric_difference(state) >> C_min_) == 0;
   }
 
 

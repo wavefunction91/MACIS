@@ -224,6 +224,143 @@ TEST_CASE("Triplets") {
   REQUIRE(quad_hist == new_quad_hist);
 }
 
+
+TEST_CASE("Constraints") {
+
+  using wfn_type   = macis::wfn_t<64>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
+  using spin_wfn_type = typename wfn_traits::spin_wfn_type;
+  using spin_wfn_traits = macis::wavefunction_traits<spin_wfn_type>;
+  using wfn_comparator = typename wfn_traits::spin_comparator;
+  using spin_wfn_comparator = typename spin_wfn_traits::wfn_comparator;
+
+  using constraint_type = macis::alpha_constraint<wfn_traits>;
+
+  const size_t norb = 10;
+  size_t nalpha, nbeta;
+
+  SECTION("Closed Shell") {
+    nalpha = 6;
+    nbeta  = 6;
+  }
+
+  SECTION("Open Shell") {
+    nalpha = 6;
+    nbeta  = 3;
+  }
+
+  // Generate Hilbert Space
+  auto dets = macis::generate_hilbert_space<wfn_type>(norb, nalpha, nbeta);
+  std::sort(dets.begin(), dets.end(), wfn_comparator{}); // lex sort
+
+  // Get Alpha Compression Data 
+  std::vector<std::pair<spin_wfn_type, size_t>> unique_alpha;
+  unique_alpha.push_back( {wfn_traits::alpha_string(dets[0]), 1} );
+  for(size_t i = 1; i < dets.size(); ++i) {
+    auto& [cur_alpha, cur_count] = unique_alpha.back();
+    auto alpha_i = wfn_traits::alpha_string(dets[i]);
+    if(alpha_i == cur_alpha) { cur_count++; }
+    else {
+      unique_alpha.push_back({alpha_i, 1});
+    }
+  }
+
+  // Get offsets
+  std::vector<size_t> unique_alpha_offsets(unique_alpha.size());
+  std::transform_exclusive_scan(unique_alpha.begin(), unique_alpha.end(), 
+    unique_alpha_offsets.begin(), 0ul, std::plus<size_t>(), 
+    [](auto p){ return p.second; } );
+
+  //size_t ntot = std::accumulate( unique_alpha.begin(), unique_alpha.end(),
+  //  0ul, [](auto s, auto a){ return s + a.second; } );
+  //REQUIRE(ntot == dets.size());
+
+  // Generate constraints
+  std::vector<constraint_type> triplets, quads;
+  for(int i = 0; i < norb; ++i)
+  for(int j = 0; j < i;    ++j)
+  for(int k = 0; k < j;    ++k) {
+    triplets.emplace_back(macis::make_triplet<64>(i,j,k));
+    for(int l = 0; l < k; ++l) {
+      quads.emplace_back(make_quad<64>(i,j,k,l));
+    }
+  }
+
+  // Check doubles
+  auto check_doubles = []( auto det, auto C, auto& doubles ) {
+    // Sanity check
+    auto [_O, _V] = macis::generate_constraint_double_excitations(det, C);
+    REQUIRE(std::all_of(_O.begin(), _O.end(), [](auto e){ return spin_wfn_traits::count(e) == 2; })); 
+    REQUIRE(std::all_of(_V.begin(), _V.end(), [](auto e){ return spin_wfn_traits::count(e) == 2; })); 
+
+    // Extract all double excitations that satisfy the constraint
+    std::vector<spin_wfn_type> doubles_c;
+    std::copy_if(doubles.begin(), doubles.end(), std::back_inserter(doubles_c),
+      [=](auto d){ return C.satisfies_constraint(d); });
+
+    // Generate all double excitations that satisfy the constraint
+    std::vector<spin_wfn_type> doubles_g;
+    macis::generate_constraint_doubles(det, C, doubles_g);
+
+    // Compare and check counting
+    std::sort(doubles_c.begin(), doubles_c.end(), spin_wfn_comparator{});
+    std::sort(doubles_g.begin(), doubles_g.end(), spin_wfn_comparator{});
+    REQUIRE( doubles_c == doubles_g );
+    REQUIRE( doubles_g.size() == macis::count_constraint_doubles(det, C) );
+  };
+
+  // Check singles 
+  auto check_singles = []( auto det, auto C, auto& singles ) {
+    // Extract all double excitations that satisfy the constraint
+    std::vector<spin_wfn_type> singles_c;
+    std::copy_if(singles.begin(), singles.end(), std::back_inserter(singles_c),
+      [=](auto d){ return C.satisfies_constraint(d); });
+
+    // Generate all double excitations that satisfy the constraint
+    std::vector<spin_wfn_type> singles_g;
+    macis::generate_constraint_singles(det, C, singles_g);
+
+    // Compare and check counting
+    std::sort(singles_c.begin(), singles_c.end(), spin_wfn_comparator{});
+    std::sort(singles_g.begin(), singles_g.end(), spin_wfn_comparator{});
+    REQUIRE( singles_c == singles_g );
+    REQUIRE( singles_g.size() == macis::count_constraint_singles(det, C) );
+  };
+
+  for(auto i = 0; i < unique_alpha.size(); ++i) {
+    auto det = unique_alpha[i].first;
+
+    auto det_triplet = top_set_indices<3>(det);
+    auto det_quad    = top_set_indices<4>(det);
+
+    std::vector<spin_wfn_type> singles, doubles;
+    macis::generate_singles(norb, det, singles);
+    macis::generate_doubles(norb, det, doubles);
+
+    for( auto C : triplets ) {
+      // Check validity of constraint check
+      auto inds = top_set_indices<3>(C.C());
+      REQUIRE(C.C_min() == inds.back());
+      REQUIRE(C.satisfies_constraint(det) == (inds == det_triplet));
+
+      check_singles(det, C, singles);
+      check_doubles(det, C, doubles);
+    }
+
+    for( auto C : quads ) {
+      // Check validity of constraint check
+      auto inds = top_set_indices<4>(C.C());
+      REQUIRE(C.C_min() == inds.back());
+      REQUIRE(C.satisfies_constraint(det) == (inds == det_quad));
+
+      check_singles(det, C, singles);
+      check_doubles(det, C, doubles);
+    }
+  }
+  
+
+}
+
 TEST_CASE("ASCI") {
   MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
   using macis::NumActive;
@@ -297,8 +434,8 @@ TEST_CASE("ASCI") {
     ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),ham_gen.G(), ham_gen.V(), 
     ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
-  std::cout << std::scientific << std::setprecision(12);
-  std::cout << EPT2 << std::endl;
+  //std::cout << std::scientific << std::setprecision(12);
+  //std::cout << EPT2 << std::endl;
   REQUIRE(std::abs(EPT2 - -5.701585096318e-03) < 1e-10);
 
   MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)

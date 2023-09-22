@@ -38,6 +38,25 @@ struct wavefunction_traits<std::bitset<N>> {
     return bitset_hi_word(state);
   }
 
+  using wfn_comparator = bitset_less_comparator<N>;
+
+
+  struct spin_comparator {
+    using spin_wfn_comparator = bitset_less_comparator<N/2>;
+    bool operator()(wfn_type x, wfn_type y) const {
+      auto s_comp = spin_wfn_comparator{};
+      const auto x_a = alpha_string(x);
+      const auto y_a = alpha_string(y);
+      if( x_a == y_a ) {
+        const auto x_b = beta_string(x);
+        const auto y_b = beta_string(y);
+        return s_comp(x_b, y_b);
+      } else return s_comp(x_a, y_a);
+    }
+  };
+
+
+
   template <Spin Sigma = Spin::Alpha>
   static inline wfn_type from_spin(spin_wfn_type alpha, spin_wfn_type beta) {
     if constexpr (Sigma == Spin::Alpha) {

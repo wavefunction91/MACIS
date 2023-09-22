@@ -17,62 +17,71 @@
 namespace macis {
 
 
-template <size_t N, typename ConType>
-bool satisfies_constraint(wfn_t<N> det, ConType C) {
+template <typename WfnType, typename ConType>
+bool satisfies_constraint(WfnType det, ConType C) {
   return C.satisfies_constraint(det);
 }
 
-template <size_t N, typename ConType>
-auto generate_constraint_single_excitations(wfn_t<N> det, ConType constraint) {
-  using spin_wfn_traits = typename ConType::spin_wfn_traits;
+template <typename WfnType, typename ConType>
+auto generate_constraint_single_excitations(WfnType det, ConType constraint) {
+  using constraint_traits = typename ConType::constraint_traits;
   const auto C = constraint.C(); const auto B = constraint.B();
 
   // need to have at most one different from the constraint
   if(constraint.overlap(det) < (constraint.count()-1))
-    return std::make_pair(wfn_t<N>(0), wfn_t<N>(0));
+    return std::make_pair(WfnType(0), WfnType(0));
 
-  auto o = det ^ C;
-  auto v = (~det) & B;
+  auto o = constraint.symmetric_difference(det);
+  auto v = constraint.b_mask_union(~det);
 
-  if((o & C).count() == 1) {  
+  if(constraint_traits::count(o & C) == 1) {  
     v = o & C;
     o ^= v;
   }
 
-  if((o & ~B).count() > 1) return std::make_pair(wfn_t<N>(0), wfn_t<N>(0));
+  const auto o_and_not_b = o & ~B;
+  const auto o_and_not_b_count = constraint_traits::count(o_and_not_b);
+  if(o_and_not_b_count > 1) return std::make_pair(WfnType(0), WfnType(0));
 
-  if((o & ~B).count() == 1) o &= ~B;
+  if(o_and_not_b_count == 1) o = o_and_not_b;
 
   return std::make_pair(o, v);
 }
 
 template <size_t N, typename ConType>
 auto generate_constraint_double_excitations(wfn_t<N> det, ConType constraint) {
+  using constraint_traits = typename ConType::constraint_traits;
   const auto C = constraint.C(); const auto B = constraint.B();
   // Occ/Vir pairs to generate excitations
   std::vector<wfn_t<N>> O, V;
 
-  if((det & C) == 0) return std::make_tuple(O, V);
+  if(constraint.overlap(det) == 0) return std::make_tuple(O, V);
 
-  auto o = det ^ C;
-  auto v = (~det) & B;
+  auto o = constraint.symmetric_difference(det);
+  auto v = constraint.b_mask_union(~det);
 
-  if((o & C).count() >= 3) return std::make_tuple(O, V);
+  auto o_and_c = o & C;
+  auto o_and_c_count = constraint_traits::count(o_and_c);
+  if(o_and_c_count >= 3) return std::make_tuple(O, V);
 
   // Generate Virtual Pairs
-  if((o & C).count() == 2) {
-    v = o & C;
+  if(o_and_c_count == 2) {
+    v = o_and_c;
     o ^= v;
+    // Regenerate since o changed 
+    // XXX: This apparently is not needed, but leaving because <shrug>
+    o_and_c = o & C;
+    o_and_c_count = constraint_traits::count(o_and_c);
   }
 
+
   const auto virt_ind = bits_to_indices(v);
-  const auto o_and_t = o & C;
-  switch((o & C).count()) {
+  switch(o_and_c_count) {
     case 1:
       for(auto a : virt_ind) {
-        V.emplace_back(o_and_t).flip(a);
+        V.emplace_back(o_and_c).flip(a);
       }
-      o ^= o_and_t;
+      o ^= o_and_c;
       break;
     default:
       generate_pairs(virt_ind, V);
@@ -81,16 +90,17 @@ auto generate_constraint_double_excitations(wfn_t<N> det, ConType constraint) {
 
   // Generate Occupied Pairs
   const auto o_and_not_b = o & ~B;
-  if(o_and_not_b.count() > 2) return std::make_tuple(O, V);
+  const auto o_and_not_b_count = constraint_traits::count(o_and_not_b);
+  if(o_and_not_b_count > 2) return std::make_tuple(O, V);
 
-  switch(o_and_not_b.count()) {
+  switch(o_and_not_b_count) {
     case 1:
       for(auto i : bits_to_indices(o & B)) {
         O.emplace_back(o_and_not_b).flip(i);
       }
       break;
     default:
-      if(o_and_not_b.count() == 2) o = o_and_not_b;
+      if(o_and_not_b_count == 2) o = o_and_not_b;
       generate_pairs(bits_to_indices(o), O);
       break;
   }
