@@ -48,9 +48,9 @@ public:
   inline spin_wfn_type symmetric_difference(spin_wfn_type state) const {
     return state ^ C_;
   }
-  inline spin_wfn_type symmetric_difference(wfn_type state) const {
-    return symmetric_difference(wfn_traits::alpha_string(state));
-  }
+  //inline spin_wfn_type symmetric_difference(wfn_type state) const {
+  //  return symmetric_difference(wfn_traits::alpha_string(state));
+  //}
 
   template <typename WfnType>
   inline auto overlap(WfnType state) const {

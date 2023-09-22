@@ -48,12 +48,13 @@ auto generate_constraint_single_excitations(WfnType det, ConType constraint) {
   return std::make_pair(o, v);
 }
 
-template <size_t N, typename ConType>
-auto generate_constraint_double_excitations(wfn_t<N> det, ConType constraint) {
+template <typename WfnType, typename ConType>
+auto generate_constraint_double_excitations(WfnType det, ConType constraint) {
   using constraint_traits = typename ConType::constraint_traits;
+  using constraint_type = typename ConType::constraint_type;
   const auto C = constraint.C(); const auto B = constraint.B();
   // Occ/Vir pairs to generate excitations
-  std::vector<wfn_t<N>> O, V;
+  std::vector<constraint_type> O, V;
 
   if(constraint.overlap(det) == 0) return std::make_tuple(O, V);
 
@@ -108,9 +109,9 @@ auto generate_constraint_double_excitations(wfn_t<N> det, ConType constraint) {
   return std::make_tuple(O, V);
 }
 
-template <size_t N, typename ConType>
-void generate_constraint_singles(wfn_t<N> det, ConType constraint, 
-                                 std::vector<wfn_t<N>>& t_singles) {
+template <typename WfnType, typename ConType>
+void generate_constraint_singles(WfnType det, ConType constraint, 
+                                 std::vector<WfnType>& t_singles) {
   auto [o, v] = generate_constraint_single_excitations(det, constraint);
   const auto oc = o.count();
   const auto vc = v.count();
@@ -134,9 +135,9 @@ unsigned count_constraint_singles(Args&&... args) {
   return o.count() * v.count();
 }
 
-template <size_t N, typename ConType >
-void generate_constraint_doubles(wfn_t<N> det, ConType constraint, 
-                                 std::vector<wfn_t<N>>& t_doubles) {
+template <typename WfnType, typename ConType >
+void generate_constraint_doubles(WfnType det, ConType constraint, 
+                                 std::vector<WfnType>& t_doubles) {
   auto [O, V] = generate_constraint_double_excitations(det, constraint);
 
   t_doubles.clear();
@@ -155,25 +156,31 @@ void generate_constraint_doubles(wfn_t<N> det, ConType constraint,
  */
 template <size_t N, typename ConType>
 unsigned count_constraint_doubles(wfn_t<N> det, ConType constraint) {
+  using constraint_traits = typename ConType::constraint_traits;
   const auto C = constraint.C(); const auto B = constraint.B();
   if((det & C) == 0) return 0;
 
   auto o = det ^ C;
   auto v = (~det) & B;
 
-  if((o & C).count() >= 3) return 0;
+  auto o_and_c = o & C;
+  auto o_and_c_count = constraint_traits::count(o_and_c);
+  if(o_and_c_count >= 3) return 0;
 
   // Generate Virtual Pairs
-  if((o & C).count() == 2) {
-    v = o & C;
+  if(o_and_c_count == 2) {
+    v = o_and_c;
     o ^= v;
+    // Regenerate since o changed 
+    // XXX: This apparently is not needed, but leaving because <shrug>
+    o_and_c = o & C;
+    o_and_c_count = constraint_traits::count(o_and_c);
   }
 
-  unsigned nv_pairs = v.count();
-  const auto o_and_t = o & C;
-  switch((o & C).count()) {
+  unsigned nv_pairs = constraint_traits::count(v);
+  switch(o_and_c_count) {
     case 1:
-      o ^= o_and_t;
+      o ^= o_and_c;
       break;
     default:
       nv_pairs = (nv_pairs * (nv_pairs - 1)) / 2;
@@ -182,16 +189,17 @@ unsigned count_constraint_doubles(wfn_t<N> det, ConType constraint) {
 
   // Generate Occupied Pairs
   const auto o_and_not_b = o & ~B;
-  if(o_and_not_b.count() > 2) return 0;
+  const auto o_and_not_b_count = constraint_traits::count(o_and_not_b);
+  if(o_and_not_b_count > 2) return 0;
 
   unsigned no_pairs = 0;
-  switch(o_and_not_b.count()) {
+  switch(o_and_not_b_count) {
     case 1:
-      no_pairs = (o & B).count();
+      no_pairs = constraint_traits::count(o & B);
       break;
     default:
-      if(o_and_not_b.count() == 2) o = o_and_not_b;
-      no_pairs = o.count();
+      if(o_and_not_b_count == 2) o = o_and_not_b;
+      no_pairs = constraint_traits::count(o);
       no_pairs = (no_pairs * (no_pairs - 1)) / 2;
       break;
   }
@@ -199,8 +207,8 @@ unsigned count_constraint_doubles(wfn_t<N> det, ConType constraint) {
   return no_pairs * nv_pairs;
 }
 
-template <size_t N, typename ConType>
-size_t constraint_histogram(wfn_t<N> det, size_t n_os_singles,
+template <typename WfnType, typename ConType>
+size_t constraint_histogram(WfnType det, size_t n_os_singles,
                             size_t n_os_doubles, ConType constraint){ 
   auto ns = count_constraint_singles(det, constraint);
   auto nd = count_constraint_doubles(det, constraint);
