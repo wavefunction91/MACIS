@@ -122,6 +122,10 @@ struct wavefunction_traits<std::bitset<N>> {
     occ = bits_to_indices(state);
   }
 
+  static inline orbidx_container state_to_occ(wfn_type state) {
+    return bits_to_indices(state);
+  }
+
   static inline void state_to_occ_vir(size_t norb, wfn_type state, orbidx_container& occ,
     orbidx_container& vir) {
   
