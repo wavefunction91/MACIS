@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
   spdlog::cfg::load_env_levels();
   spdlog::set_pattern("[%n] %v");
 
-  constexpr size_t nwfn_bits = 64;
+  constexpr size_t nwfn_bits = 128;
   using wfn_type = macis::wfn_t<nwfn_bits>;
   using wfn_traits = macis::wavefunction_traits<wfn_type>;
 
@@ -315,8 +315,8 @@ int main(int argc, char** argv) {
         }
 
       } else {
-        if(nalpha != nbeta)
-          throw std::runtime_error("ASCI Only Implemented for Closed-Shell");
+        //if(nalpha != nbeta)
+        //  throw std::runtime_error("ASCI Only Implemented for Closed-Shell");
 
         // Generate the Hamiltonian Generator
         generator_t ham_gen(
@@ -348,7 +348,7 @@ int main(int argc, char** argv) {
         } else {
           // HF Guess
           console->info("Generating HF Guess for ASCI");
-          dets = {wfn_traits::canonical_hf_determinant(nalpha, nalpha)};
+          dets = {wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
           // std::cout << dets[0].to_ullong() << std::endl;
           E0 = ham_gen.matrix_element(dets[0], dets[0]);
           C = {1.0};
