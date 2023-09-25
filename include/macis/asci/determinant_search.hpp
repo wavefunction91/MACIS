@@ -234,7 +234,12 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   const auto n_sing_alpha = n_occ_alpha * n_vir_alpha;
   const auto n_doub_alpha = (n_sing_alpha * (n_sing_alpha - norb + 1)) / 4;
 
-  logger->info("  * NS = {} ND = {}", n_sing_alpha, n_doub_alpha);
+  const auto n_occ_beta = cdets_begin->count() - n_occ_alpha;
+  const auto n_vir_beta = norb - n_occ_beta;
+  const auto n_sing_beta = n_occ_beta * n_vir_beta;
+  const auto n_doub_beta = (n_sing_beta * (n_sing_beta - norb + 1)) / 4;
+
+  // logger->info("  * NS = {} ND = {}", n_sing_alpha, n_doub_alpha);
 
   // Generate mask constraints
   if(!world_rank) {
@@ -268,11 +273,12 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
 
-  size_t max_size = std::min(asci_settings.pair_size_max,
-                             ncdets * (2 * n_sing_alpha +  // AA + BB
-                                       2 * n_doub_alpha +  // AAAA + BBBB
-                                       n_sing_alpha * n_sing_alpha  // AABB
-                                       ));
+  size_t max_size =
+      std::min(asci_settings.pair_size_max,
+               ncdets * (n_sing_alpha + n_sing_beta +  // AA + BB
+                         n_doub_alpha + n_sing_beta +  // AAAA + BBBB
+                         n_sing_alpha * n_sing_beta    // AABB
+                         ));
   asci_pairs.reserve(max_size);
 
   // Process ASCI pair contributions for each constraint
