@@ -7,9 +7,9 @@
  */
 
 #pragma once
-#include <macis/types.hpp>
 #include <macis/mcscf/fock_matrices.hpp>
 #include <macis/mcscf/orbital_rotation_utilities.hpp>
+#include <macis/types.hpp>
 
 namespace macis {
 

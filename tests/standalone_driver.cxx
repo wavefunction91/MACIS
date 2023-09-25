@@ -18,10 +18,10 @@
 #include <macis/asci/pt2.hpp>
 #include <macis/asci/refine.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
-#include <macis/util/detail/rdm_files.hpp>
-#include <macis/util/fcidump.hpp>
 #include <macis/mcscf/cas.hpp>
 #include <macis/mcscf/fock_matrices.hpp>
+#include <macis/util/detail/rdm_files.hpp>
+#include <macis/util/fcidump.hpp>
 #include <macis/util/memory.hpp>
 #include <macis/util/moller_plesset.hpp>
 #include <macis/util/mpi.hpp>
@@ -304,8 +304,8 @@ int main(int argc, char** argv) {
                                 : spdlog::stdout_color_mt("determinants");
           det_logger->info("Print leading determinants > {:.2e}",
                            determinants_threshold);
-          auto dets = macis::generate_hilbert_space<wfn_type>(
-              n_active, nalpha, nbeta);
+          auto dets =
+              macis::generate_hilbert_space<wfn_type>(n_active, nalpha, nbeta);
           for(size_t i = 0; i < dets.size(); ++i) {
             if(std::abs(C_local[i]) > determinants_threshold) {
               det_logger->info("{:>16.12f}   {}", C_local[i],

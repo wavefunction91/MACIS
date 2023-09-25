@@ -6,13 +6,12 @@
  * See LICENSE.txt for details
  */
 
+#include <blas.hh>
 #include <iomanip>
 #include <iostream>
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/util/fcidump.hpp>
 #include <macis/wavefunction_io.hpp>
-
-#include <blas.hh>
 
 #include "ut_common.hpp"
 

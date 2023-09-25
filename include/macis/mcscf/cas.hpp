@@ -7,9 +7,9 @@
  */
 
 #pragma once
+#include <macis/mcscf/mcscf.hpp>
 #include <macis/solvers/selected_ci_diag.hpp>
 #include <macis/types.hpp>
-#include <macis/mcscf/mcscf.hpp>
 
 namespace macis {
 
@@ -34,7 +34,6 @@ double compute_casci_rdms(
     MCSCFSettings settings, NumOrbital norb, size_t nalpha, size_t nbeta,
     double* T, double* V, double* ORDM, double* TRDM,
     std::vector<double>& C MACIS_MPI_CODE(, MPI_Comm comm)) {
-
   using wfn_type = typename HamGen::full_det_t;
 #ifdef MACIS_ENABLE_MPI
   int rank;
@@ -50,10 +49,10 @@ double compute_casci_rdms(
 
   // Compute Lowest Energy Eigenvalue (ED)
   auto dets = generate_hilbert_space<wfn_type>(norb.get(), nalpha, nbeta);
-  double E0 =
-      selected_ci_diag<int32_t>(dets.begin(), dets.end(), ham_gen, settings.ci_matel_tol,
-                       settings.ci_max_subspace, settings.ci_res_tol, C,
-                       MACIS_MPI_CODE(comm, ) true);
+  double E0 = selected_ci_diag<int32_t>(
+      dets.begin(), dets.end(), ham_gen, settings.ci_matel_tol,
+      settings.ci_max_subspace, settings.ci_res_tol, C,
+      MACIS_MPI_CODE(comm, ) true);
 
   // Compute RDMs
   ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),

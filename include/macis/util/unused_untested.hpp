@@ -6,7 +6,6 @@
  * See LICENSE.txt for details
  */
 
-
 #if 0
 /**
  *  @brief Generate canonical HF determinant.

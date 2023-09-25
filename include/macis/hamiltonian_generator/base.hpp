@@ -14,15 +14,13 @@ namespace macis {
 
 template <typename Scalar>
 class HamiltonianGeneratorBase {
-
  protected:
-
   template <typename index_t>
   using sparse_matrix_type = sparsexx::csr_matrix<Scalar, index_t>;
 
   using matrix_span_t = matrix_span<Scalar>;
-  using rank3_span_t  = rank3_span<Scalar>;
-  using rank4_span_t  = rank4_span<Scalar>;
+  using rank3_span_t = rank3_span<Scalar>;
+  using rank4_span_t = rank4_span<Scalar>;
 
   size_t norb_;
   size_t norb2_;
@@ -53,7 +51,6 @@ class HamiltonianGeneratorBase {
   void generate_integral_intermediates_(rank4_span_t V);
 
  public:
-
   HamiltonianGeneratorBase(matrix_span_t T, rank4_span_t V);
   virtual ~HamiltonianGeneratorBase() noexcept = default;
 
@@ -66,7 +63,6 @@ class HamiltonianGeneratorBase {
   inline void generate_integral_intermediates() {
     generate_integral_intermediates_(V_pqrs_);
   }
-
 
   double single_orbital_en(uint32_t orb, const std::vector<uint32_t>& ss_occ,
                            const std::vector<uint32_t>& os_occ) const;
@@ -104,10 +100,7 @@ class HamiltonianGeneratorBase {
                              uint32_t orb_paru, uint32_t orb_pard,
                              double orig_det_Hii) const;
 
-
-
   void rotate_hamiltonian_ordm(const Scalar* ordm);
-
 };
 
-}
+}  // namespace macis

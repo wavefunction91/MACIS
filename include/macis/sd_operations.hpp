@@ -28,14 +28,13 @@ namespace macis {
  *  @returns The bitstring HF state consisting of the specified number of
  *    occupied orbitals.
  */
-//template <size_t N>
-//std::bitset<N> canonical_hf_determinant(uint32_t nalpha, uint32_t nbeta) {
-//  static_assert((N % 2) == 0, "N Must Be Even");
-//  std::bitset<N> alpha = full_mask<N>(nalpha);
-//  std::bitset<N> beta = full_mask<N>(nbeta) << (N / 2);
-//  return alpha | beta;
-//}
-
+// template <size_t N>
+// std::bitset<N> canonical_hf_determinant(uint32_t nalpha, uint32_t nbeta) {
+//   static_assert((N % 2) == 0, "N Must Be Even");
+//   std::bitset<N> alpha = full_mask<N>(nalpha);
+//   std::bitset<N> beta = full_mask<N>(nbeta) << (N / 2);
+//   return alpha | beta;
+// }
 
 /**
  *  @brief Generate the list of (un)occupied orbitals for a paricular state.
@@ -46,52 +45,53 @@ namespace macis {
  *  @param[out] occ    List of occupied orbitals in `state`
  *  @param[out] vir    List of unoccupied orbitals in `state`
  */
-//template <size_t N>
-//void bitset_to_occ_vir(size_t norb, std::bitset<N> state,
-//                       std::vector<uint32_t>& occ, std::vector<uint32_t>& vir) {
-//  occ = bits_to_indices(state);
-//  const auto nocc = occ.size();
-//  assert(nocc < norb);
+// template <size_t N>
+// void bitset_to_occ_vir(size_t norb, std::bitset<N> state,
+//                        std::vector<uint32_t>& occ, std::vector<uint32_t>&
+//                        vir) {
+//   occ = bits_to_indices(state);
+//   const auto nocc = occ.size();
+//   assert(nocc < norb);
 //
-//  const auto nvir = norb - nocc;
-//  vir.resize(nvir);
-//  state = ~state;
-//  for(int i = 0; i < nvir; ++i) {
-//    auto a = ffs(state) - 1;
-//    vir[i] = a;
-//    state.flip(a);
-//  }
-//}
+//   const auto nvir = norb - nocc;
+//   vir.resize(nvir);
+//   state = ~state;
+//   for(int i = 0; i < nvir; ++i) {
+//     auto a = ffs(state) - 1;
+//     vir[i] = a;
+//     state.flip(a);
+//   }
+// }
 
+// template <size_t N>
+// auto single_excitation(std::bitset<N> state, unsigned p, unsigned q) {
+//   return state.flip(p).flip(q);
+// }
 
-//template <size_t N>
-//auto single_excitation(std::bitset<N> state, unsigned p, unsigned q) {
-//  return state.flip(p).flip(q);
-//}
+// template <Spin Sigma, size_t N>
+// auto single_excitation_spin(std::bitset<N> state, unsigned p, unsigned q) {
+//   static_assert(N%2 == 0, "Num Bits Must Be Even");
+//   if constexpr (Sigma == Spin::Alpha)
+//     return single_excitation(state,p,q);
+//   else
+//     return single_excitation(state,p+N/2,q+N/2);
+// }
 
-//template <Spin Sigma, size_t N>
-//auto single_excitation_spin(std::bitset<N> state, unsigned p, unsigned q) {
-//  static_assert(N%2 == 0, "Num Bits Must Be Even");
-//  if constexpr (Sigma == Spin::Alpha) 
-//    return single_excitation(state,p,q);
-//  else
-//    return single_excitation(state,p+N/2,q+N/2);
-//}
+// template <size_t N>
+// auto double_excitation(std::bitset<N> state, unsigned p, unsigned q, unsigned
+// r, unsigned s) {
+//   return state.flip(p).flip(q).flip(r).flip(s);
+// }
 
-//template <size_t N>
-//auto double_excitation(std::bitset<N> state, unsigned p, unsigned q, unsigned r, unsigned s) {
-//  return state.flip(p).flip(q).flip(r).flip(s);
-//}
-
-//template <Spin Sigma, size_t N>
-//auto double_excitation_spin(std::bitset<N> state, unsigned p, unsigned q, unsigned r, unsigned s) {
-//  static_assert(N%2 == 0, "Num Bits Must Be Even");
-//  if constexpr (Sigma == Spin::Alpha) 
-//    return double_excitation(state,p,q,r,s);
-//  else
-//    return double_excitation(state,p+N/2,q+N/2,r+N/2,s+N/2);
-//}
-
+// template <Spin Sigma, size_t N>
+// auto double_excitation_spin(std::bitset<N> state, unsigned p, unsigned q,
+// unsigned r, unsigned s) {
+//   static_assert(N%2 == 0, "Num Bits Must Be Even");
+//   if constexpr (Sigma == Spin::Alpha)
+//     return double_excitation(state,p,q,r,s);
+//   else
+//     return double_excitation(state,p+N/2,q+N/2,r+N/2,s+N/2);
+// }
 
 // TODO: Test this function
 template <size_t N>
@@ -114,8 +114,7 @@ double single_excitation_sign(std::bitset<N> state, unsigned p, unsigned q) {
 
 template <typename WfnType, typename WfnContainer>
 void append_singles(WfnType state, const std::vector<uint32_t>& occ,
-                    const std::vector<uint32_t>& vir,
-                    WfnContainer& singles) {
+                    const std::vector<uint32_t>& vir, WfnContainer& singles) {
   using wfn_traits = wavefunction_traits<WfnType>;
   const size_t nocc = occ.size();
   const size_t nvir = vir.size();
@@ -125,14 +124,14 @@ void append_singles(WfnType state, const std::vector<uint32_t>& occ,
 
   for(size_t a = 0; a < nvir; ++a)
     for(size_t i = 0; i < nocc; ++i) {
-      singles.emplace_back(wfn_traits::single_excitation_no_check(state, occ[i], vir[a]));
+      singles.emplace_back(
+          wfn_traits::single_excitation_no_check(state, occ[i], vir[a]));
     }
 }
 
 template <typename WfnType, typename WfnContainer>
 void append_doubles(WfnType state, const std::vector<uint32_t>& occ,
-                    const std::vector<uint32_t>& vir,
-                    WfnContainer& doubles) {
+                    const std::vector<uint32_t>& vir, WfnContainer& doubles) {
   using wfn_traits = wavefunction_traits<WfnType>;
   const size_t nocc = occ.size();
   const size_t nvir = vir.size();
@@ -146,7 +145,8 @@ void append_doubles(WfnType state, const std::vector<uint32_t>& occ,
     for(size_t i = 0; i < nocc; ++i)
       for(size_t b = a + 1; b < nvir; ++b)
         for(size_t j = i + 1; j < nocc; ++j) {
-          doubles.emplace_back(wfn_traits::double_excitation_no_check(state, occ[i], occ[j], vir[a], vir[b]));
+          doubles.emplace_back(wfn_traits::double_excitation_no_check(
+              state, occ[i], occ[j], vir[a], vir[b]));
         }
 }
 
@@ -171,8 +171,8 @@ void generate_doubles(size_t norb, WfnType state, WfnContainer& doubles) {
 }
 
 template <typename WfnType, typename WfnContainer>
-void generate_singles_doubles(size_t norb, WfnType state,
-                              WfnContainer& singles, WfnContainer& doubles) {
+void generate_singles_doubles(size_t norb, WfnType state, WfnContainer& singles,
+                              WfnContainer& doubles) {
   using wfn_traits = wavefunction_traits<WfnType>;
   std::vector<uint32_t> occ_orbs, vir_orbs;
   wfn_traits::state_to_occ_vir(norb, state, occ_orbs, vir_orbs);
@@ -183,14 +183,12 @@ void generate_singles_doubles(size_t norb, WfnType state,
   append_doubles(state, occ_orbs, vir_orbs, doubles);
 }
 
-
 template <typename WfnType, typename WfnContainer>
 void generate_singles_spin(size_t norb, WfnType state, WfnContainer& singles) {
-
   using wfn_traits = wavefunction_traits<WfnType>;
 
   auto state_alpha = wfn_traits::alpha_string(state);
-  auto state_beta  = wfn_traits::beta_string (state);
+  auto state_beta = wfn_traits::beta_string(state);
 
   using spin_wfn_type = spin_wfn_t<WfnType>;
   std::vector<spin_wfn_type> singles_alpha, singles_beta;
@@ -215,12 +213,12 @@ void generate_singles_spin(size_t norb, WfnType state, WfnContainer& singles) {
 
 template <typename WfnType, typename WfnContainer>
 void generate_singles_doubles_spin(size_t norb, WfnType state,
-                                   WfnContainer& singles, WfnContainer& doubles) {
-
+                                   WfnContainer& singles,
+                                   WfnContainer& doubles) {
   using wfn_traits = wavefunction_traits<WfnType>;
 
   auto state_alpha = wfn_traits::alpha_string(state);
-  auto state_beta  = wfn_traits::beta_string (state);
+  auto state_beta = wfn_traits::beta_string(state);
 
   using spin_wfn_type = spin_wfn_t<WfnType>;
   std::vector<spin_wfn_type> singles_alpha, singles_beta;
@@ -229,7 +227,6 @@ void generate_singles_doubles_spin(size_t norb, WfnType state,
   // Generate Spin-Specific singles / doubles
   generate_singles_doubles(norb, state_alpha, singles_alpha, doubles_alpha);
   generate_singles_doubles(norb, state_beta, singles_beta, doubles_beta);
-
 
   // Generate Singles in full space
   singles.clear();
@@ -265,7 +262,8 @@ void generate_singles_doubles_spin(size_t norb, WfnType state,
 }
 
 template <typename WfnType, typename WfnContainer>
-void generate_cisd_hilbert_space(size_t norb, WfnType state, WfnContainer& dets) {
+void generate_cisd_hilbert_space(size_t norb, WfnType state,
+                                 WfnContainer& dets) {
   dets.clear();
   dets.emplace_back(state);
   std::vector<WfnType> singles, doubles;
@@ -340,7 +338,8 @@ std::vector<WfnType> generate_cis_hilbert_space(size_t norb, WfnType state) {
 
 // TODO: Test this function
 template <typename WfnType>
-inline auto single_excitation_sign_indices(WfnType bra, WfnType ket, WfnType ex) {
+inline auto single_excitation_sign_indices(WfnType bra, WfnType ket,
+                                           WfnType ex) {
   auto o1 = first_occupied_flipped(ket, ex);
   auto v1 = first_occupied_flipped(bra, ex);
   auto sign = single_excitation_sign(ket, v1, o1);
@@ -355,7 +354,7 @@ inline auto doubles_sign_indices(WfnType bra, WfnType ket, WfnType ex) {
   auto [o1, v1, sign1] = single_excitation_sign_indices(bra, ket, ex);
 
   ket = wfn_traits::single_excitation_no_check(ket, o1, v1);
-  ex  = wfn_traits::single_excitation_no_check(ex,  o1, v1);
+  ex = wfn_traits::single_excitation_no_check(ex, o1, v1);
 
   auto [o2, v2, sign2] = single_excitation_sign_indices(bra, ket, ex);
   auto sign = sign1 * sign2;
@@ -370,7 +369,6 @@ inline auto doubles_sign(WfnType bra, WfnType ket, WfnType ex) {
   return sign;
 }
 
-
 template <typename WfnType>
 std::string to_canonical_string(WfnType state) {
   using wfn_traits = wavefunction_traits<WfnType>;
@@ -378,7 +376,7 @@ std::string to_canonical_string(WfnType state) {
   using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
 
   auto state_alpha = wfn_traits::alpha_string(state);
-  auto state_beta  = wfn_traits::beta_string (state);
+  auto state_beta = wfn_traits::beta_string(state);
   std::string str;
 
   for(size_t i = 0; i < spin_wfn_traits::size(); ++i) {
@@ -397,13 +395,13 @@ std::string to_canonical_string(WfnType state) {
 template <typename WfnType>
 WfnType from_canonical_string(std::string str) {
   using spin_wfn_type = spin_wfn_t<WfnType>;
-  using wfn_traits    = wavefunction_traits<WfnType>;
-  using spin_wfn_traits    = wavefunction_traits<spin_wfn_type>;
+  using wfn_traits = wavefunction_traits<WfnType>;
+  using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
   spin_wfn_type state_alpha(0), state_beta(0);
-  for(auto i = 0ul; i < std::min(str.length(),spin_wfn_traits::size()); ++i) {
+  for(auto i = 0ul; i < std::min(str.length(), spin_wfn_traits::size()); ++i) {
     if(str[i] == '2') {
       state_alpha = spin_wfn_traits::create_no_check(state_alpha, i);
-      state_beta  = spin_wfn_traits::create_no_check(state_beta , i);
+      state_beta = spin_wfn_traits::create_no_check(state_beta, i);
     } else if(str[i] == 'u') {
       state_alpha = spin_wfn_traits::create_no_check(state_alpha, i);
     } else if(str[i] == 'd') {

@@ -13,10 +13,7 @@
 
 namespace macis {
 
-enum class Spin {
-  Alpha,
-  Beta
-};
+enum class Spin { Alpha, Beta };
 
 template <typename WfnType>
 struct wavefunction_traits;
@@ -26,10 +23,9 @@ using spin_wfn_t = typename wavefunction_traits<WfnType>::spin_wfn_type;
 
 template <size_t N>
 struct wavefunction_traits<std::bitset<N>> {
-
-  using wfn_type         = std::bitset<N>;
-  using spin_wfn_type    = std::bitset<N/2>;
-  using orbidx_type      = uint32_t;
+  using wfn_type = std::bitset<N>;
+  using spin_wfn_type = std::bitset<N / 2>;
+  using orbidx_type = uint32_t;
   using orbidx_container = std::vector<orbidx_type>;
 
   inline static constexpr size_t bit_size = N;
@@ -48,46 +44,43 @@ struct wavefunction_traits<std::bitset<N>> {
 
   using wfn_comparator = bitset_less_comparator<N>;
 
-
   struct spin_comparator {
-    using spin_wfn_comparator = bitset_less_comparator<N/2>;
+    using spin_wfn_comparator = bitset_less_comparator<N / 2>;
     bool operator()(wfn_type x, wfn_type y) const {
       auto s_comp = spin_wfn_comparator{};
       const auto x_a = alpha_string(x);
       const auto y_a = alpha_string(y);
-      if( x_a == y_a ) {
+      if(x_a == y_a) {
         const auto x_b = beta_string(x);
         const auto y_b = beta_string(y);
         return s_comp(x_b, y_b);
-      } else return s_comp(x_a, y_a);
+      } else
+        return s_comp(x_a, y_a);
     }
   };
 
-
-
   template <Spin Sigma = Spin::Alpha>
   static inline wfn_type from_spin(spin_wfn_type alpha, spin_wfn_type beta) {
-    if constexpr (Sigma == Spin::Alpha) {
+    if constexpr(Sigma == Spin::Alpha) {
       auto alpha_expand = expand_bitset<N>(alpha);
-      auto beta_expand  = expand_bitset<N>(beta) << N/2;
+      auto beta_expand = expand_bitset<N>(beta) << N / 2;
       return alpha_expand | beta_expand;
     } else {
-      auto alpha_expand = expand_bitset<N>(alpha) << N/2;
-      auto beta_expand  = expand_bitset<N>(beta);
+      auto alpha_expand = expand_bitset<N>(alpha) << N / 2;
+      auto beta_expand = expand_bitset<N>(beta);
       return alpha_expand | beta_expand;
     }
   }
 
-  static inline wfn_type canonical_hf_determinant(uint32_t nalpha, uint32_t nbeta) {
-
-    spin_wfn_type alpha = full_mask<N/2>(nalpha);
-    spin_wfn_type beta  = full_mask<N/2>(nbeta);
+  static inline wfn_type canonical_hf_determinant(uint32_t nalpha,
+                                                  uint32_t nbeta) {
+    spin_wfn_type alpha = full_mask<N / 2>(nalpha);
+    spin_wfn_type beta = full_mask<N / 2>(nbeta);
     return from_spin(alpha, beta);
-
   }
 
   template <Spin Sigma, typename... Inds>
-  static inline wfn_type& flip_bits(wfn_type& state, Inds&&... );
+  static inline wfn_type& flip_bits(wfn_type& state, Inds&&...);
 
   template <Spin Sigma>
   static inline wfn_type& flip_bits(wfn_type& state) {
@@ -95,34 +88,30 @@ struct wavefunction_traits<std::bitset<N>> {
   }
 
   template <Spin Sigma, typename... Inds>
-  static inline wfn_type& flip_bits(wfn_type& state, unsigned p, Inds&&... inds) {
-    return flip_bits<Sigma>(
-      state.flip(p + (Sigma == Spin::Alpha ? 0 : N/2)), 
-      std::forward<Inds>(inds)...
-    );
+  static inline wfn_type& flip_bits(wfn_type& state, unsigned p,
+                                    Inds&&... inds) {
+    return flip_bits<Sigma>(state.flip(p + (Sigma == Spin::Alpha ? 0 : N / 2)),
+                            std::forward<Inds>(inds)...);
   }
 
   template <Spin Sigma = Spin::Alpha>
   static inline wfn_type create_no_check(wfn_type state, unsigned p) {
-    flip_bits<Sigma>(state, p); 
+    flip_bits<Sigma>(state, p);
     return state;
   }
 
   template <Spin Sigma = Spin::Alpha>
-  static inline wfn_type single_excitation_no_check(wfn_type state, 
-                                                    unsigned p, 
+  static inline wfn_type single_excitation_no_check(wfn_type state, unsigned p,
                                                     unsigned q) {
-    flip_bits<Sigma>(state, p, q); 
+    flip_bits<Sigma>(state, p, q);
     return state;
   }
 
   template <Spin Sigma = Spin::Alpha>
-  static inline wfn_type double_excitation_no_check(wfn_type state, 
-                                                    unsigned p, 
-                                                    unsigned q, 
-                                                    unsigned r, 
+  static inline wfn_type double_excitation_no_check(wfn_type state, unsigned p,
+                                                    unsigned q, unsigned r,
                                                     unsigned s) {
-    flip_bits<Sigma>(state, p, q, r, s); 
+    flip_bits<Sigma>(state, p, q, r, s);
     return state;
   }
 
@@ -134,13 +123,13 @@ struct wavefunction_traits<std::bitset<N>> {
     return bits_to_indices(state);
   }
 
-  static inline void state_to_occ_vir(size_t norb, wfn_type state, orbidx_container& occ,
-    orbidx_container& vir) {
-  
+  static inline void state_to_occ_vir(size_t norb, wfn_type state,
+                                      orbidx_container& occ,
+                                      orbidx_container& vir) {
     state_to_occ(state, occ);
     const auto nocc = occ.size();
     assert(nocc < norb);
-  
+
     const auto nvir = norb - nocc;
     vir.resize(nvir);
     state = ~state;
@@ -150,9 +139,6 @@ struct wavefunction_traits<std::bitset<N>> {
       state.flip(a);
     }
   }
-
 };
 
-
-
-}
+}  // namespace macis

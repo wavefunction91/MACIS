@@ -7,15 +7,13 @@
  */
 
 #pragma once
+#include <macis/asci/alpha_constraint.hpp>
 #include <macis/sd_operations.hpp>
 #include <macis/types.hpp>
 #include <macis/util/mpi.hpp>
 #include <variant>
 
-#include <macis/asci/alpha_constraint.hpp>
-
 namespace macis {
-
 
 template <typename WfnType, typename ConType>
 bool satisfies_constraint(WfnType det, ConType C) {
@@ -25,16 +23,17 @@ bool satisfies_constraint(WfnType det, ConType C) {
 template <typename WfnType, typename ConType>
 auto generate_constraint_single_excitations(WfnType det, ConType constraint) {
   using constraint_traits = typename ConType::constraint_traits;
-  const auto C = constraint.C(); const auto B = constraint.B();
+  const auto C = constraint.C();
+  const auto B = constraint.B();
 
   // need to have at most one different from the constraint
-  if(constraint.overlap(det) < (constraint.count()-1))
+  if(constraint.overlap(det) < (constraint.count() - 1))
     return std::make_pair(WfnType(0), WfnType(0));
 
   auto o = constraint.symmetric_difference(det);
   auto v = constraint.b_mask_union(~det);
 
-  if(constraint_traits::count(o & C) == 1) {  
+  if(constraint_traits::count(o & C) == 1) {
     v = o & C;
     o ^= v;
   }
@@ -52,7 +51,8 @@ template <typename WfnType, typename ConType>
 auto generate_constraint_double_excitations(WfnType det, ConType constraint) {
   using constraint_traits = typename ConType::constraint_traits;
   using constraint_type = typename ConType::constraint_type;
-  const auto C = constraint.C(); const auto B = constraint.B();
+  const auto C = constraint.C();
+  const auto B = constraint.B();
   // Occ/Vir pairs to generate excitations
   std::vector<constraint_type> O, V;
 
@@ -69,18 +69,17 @@ auto generate_constraint_double_excitations(WfnType det, ConType constraint) {
   if(o_and_c_count == 2) {
     v = o_and_c;
     o ^= v;
-    // Regenerate since o changed 
+    // Regenerate since o changed
     // XXX: This apparently is not needed, but leaving because <shrug>
     o_and_c = o & C;
     o_and_c_count = constraint_traits::count(o_and_c);
   }
 
-
   const auto virt_ind = bits_to_indices(v);
   switch(o_and_c_count) {
     case 1:
       for(auto a : virt_ind) {
-        V.emplace_back(constraint_traits::create_no_check(o_and_c,a));
+        V.emplace_back(constraint_traits::create_no_check(o_and_c, a));
       }
       o ^= o_and_c;
       break;
@@ -97,7 +96,7 @@ auto generate_constraint_double_excitations(WfnType det, ConType constraint) {
   switch(o_and_not_b_count) {
     case 1:
       for(auto i : bits_to_indices(o & B)) {
-        O.emplace_back(constraint_traits::create_no_check(o_and_not_b,i));
+        O.emplace_back(constraint_traits::create_no_check(o_and_not_b, i));
       }
       break;
     default:
@@ -110,7 +109,7 @@ auto generate_constraint_double_excitations(WfnType det, ConType constraint) {
 }
 
 template <typename WfnType, typename ConType>
-void generate_constraint_singles(WfnType det, ConType constraint, 
+void generate_constraint_singles(WfnType det, ConType constraint,
                                  std::vector<WfnType>& t_singles) {
   using constraint_traits = typename ConType::constraint_traits;
   auto [o, v] = generate_constraint_single_excitations(det, constraint);
@@ -124,7 +123,7 @@ void generate_constraint_singles(WfnType det, ConType constraint,
   const auto vir = constraint_traits::state_to_occ(v);
   for(auto i : occ) {
     auto temp = constraint_traits::create_no_check(det, i);
-    for(auto a : vir) 
+    for(auto a : vir)
       t_singles.emplace_back(constraint_traits::create_no_check(temp, a));
   }
 }
@@ -132,15 +131,14 @@ void generate_constraint_singles(WfnType det, ConType constraint,
 template <typename WfnType, typename ConType>
 unsigned count_constraint_singles(WfnType det, ConType constraint) {
   using constraint_traits = typename ConType::constraint_traits;
-  auto [o, v] =
-      generate_constraint_single_excitations(det, constraint);
+  auto [o, v] = generate_constraint_single_excitations(det, constraint);
   const auto oc = constraint_traits::count(o);
   const auto vc = constraint_traits::count(v);
   return oc * vc;
 }
 
-template <typename WfnType, typename ConType >
-void generate_constraint_doubles(WfnType det, ConType constraint, 
+template <typename WfnType, typename ConType>
+void generate_constraint_doubles(WfnType det, ConType constraint,
                                  std::vector<WfnType>& t_doubles) {
   auto [O, V] = generate_constraint_double_excitations(det, constraint);
 
@@ -161,7 +159,8 @@ void generate_constraint_doubles(WfnType det, ConType constraint,
 template <typename WfnType, typename ConType>
 unsigned count_constraint_doubles(WfnType det, ConType constraint) {
   using constraint_traits = typename ConType::constraint_traits;
-  const auto C = constraint.C(); const auto B = constraint.B();
+  const auto C = constraint.C();
+  const auto B = constraint.B();
   if(constraint.overlap(det) == 0) return 0;
 
   auto o = constraint.symmetric_difference(det);
@@ -175,7 +174,7 @@ unsigned count_constraint_doubles(WfnType det, ConType constraint) {
   if(o_and_c_count == 2) {
     v = o_and_c;
     o ^= v;
-    // Regenerate since o changed 
+    // Regenerate since o changed
     // XXX: This apparently is not needed, but leaving because <shrug>
     o_and_c = o & C;
     o_and_c_count = constraint_traits::count(o_and_c);
@@ -213,7 +212,7 @@ unsigned count_constraint_doubles(WfnType det, ConType constraint) {
 
 template <typename WfnType, typename ConType>
 size_t constraint_histogram(WfnType det, size_t n_os_singles,
-                            size_t n_os_doubles, ConType constraint){ 
+                            size_t n_os_doubles, ConType constraint) {
   auto ns = count_constraint_singles(det, constraint);
   auto nd = count_constraint_doubles(det, constraint);
 
@@ -239,7 +238,8 @@ void generate_constraint_singles_contributions_ss(
     asci_contrib_container<WfnType>& asci_contributions) {
   using wfn_traits = wavefunction_traits<WfnType>;
   using constraint_traits = typename ConType::constraint_traits;
-  auto [o, v] = generate_constraint_single_excitations(wfn_traits::alpha_string(det), constraint);
+  auto [o, v] = generate_constraint_single_excitations(
+      wfn_traits::alpha_string(det), constraint);
   const auto no = constraint_traits::count(o);
   const auto nv = constraint_traits::count(v);
   if(!no or !nv) return;
@@ -248,11 +248,11 @@ void generate_constraint_singles_contributions_ss(
   const size_t LDV2 = LDV * LDV;
   for(int ii = 0; ii < no; ++ii) {
     const auto i = fls(o);
-    o = constraint_traits::create_no_check(o, i); // o.flip(i)
+    o = constraint_traits::create_no_check(o, i);  // o.flip(i)
     auto v_cpy = v;
     for(int aa = 0; aa < nv; ++aa) {
       const auto a = fls(v_cpy);
-      v_cpy = constraint_traits::create_no_check(v_cpy, a); // v_cpy.flip(a)
+      v_cpy = constraint_traits::create_no_check(v_cpy, a);  // v_cpy.flip(a)
 
       double h_el = T_pq[a + i * LDT];
       const double* G_ov = G_kpq + a * LDG + i * LDG2;
@@ -264,8 +264,9 @@ void generate_constraint_singles_contributions_ss(
       if(std::abs(coeff * h_el) < h_el_tol) continue;
 
       // Calculate Excited Determinant
-      auto ex_det = wfn_traits::template single_excitation_no_check<Spin::Alpha>(det, i, a );
-      
+      auto ex_det =
+          wfn_traits::template single_excitation_no_check<Spin::Alpha>(det, i,
+                                                                       a);
 
       // Compute Sign in a Canonical Way
       auto sign = single_excitation_sign(det, a, i);
@@ -290,7 +291,8 @@ void generate_constraint_doubles_contributions_ss(
     asci_contrib_container<WfnType>& asci_contributions) {
   using wfn_traits = wavefunction_traits<WfnType>;
   using spin_wfn_traits = wavefunction_traits<spin_wfn_t<WfnType>>;
-  auto [O, V] = generate_constraint_double_excitations(wfn_traits::alpha_string(det), constraint);
+  auto [O, V] = generate_constraint_double_excitations(
+      wfn_traits::alpha_string(det), constraint);
   const auto no_pairs = O.size();
   const auto nv_pairs = V.size();
   if(!no_pairs or !nv_pairs) return;
@@ -301,7 +303,9 @@ void generate_constraint_doubles_contributions_ss(
     const auto i = ffs(ij) - 1;
     const auto j = fls(ij);
     const auto G_ij = G + (j + i * LDG2) * LDG;
-    const auto ex_ij = wfn_traits::template single_excitation_no_check<Spin::Alpha>(det,i,j); // det ^ ij;
+    const auto ex_ij =
+        wfn_traits::template single_excitation_no_check<Spin::Alpha>(
+            det, i, j);  // det ^ ij;
     for(int _ab = 0; _ab < nv_pairs; ++_ab) {
       const auto ab = V[_ab];
       const auto a = ffs(ab) - 1;
@@ -313,14 +317,20 @@ void generate_constraint_doubles_contributions_ss(
       if(std::abs(coeff * G_aibj) < h_el_tol) continue;
 
       // Calculate Excited Determinant (spin)
-      const auto full_ex_spin = spin_wfn_traits::template single_excitation_no_check<Spin::Alpha>(ij,a,b);   // ij | ab;
-      const auto ex_det_spin = wfn_traits::template single_excitation_no_check<Spin::Alpha>(ex_ij,a,b); // ex_ij | ab;
+      const auto full_ex_spin =
+          spin_wfn_traits::template single_excitation_no_check<Spin::Alpha>(
+              ij, a, b);  // ij | ab;
+      const auto ex_det_spin =
+          wfn_traits::template single_excitation_no_check<Spin::Alpha>(
+              ex_ij, a, b);  // ex_ij | ab;
 
       // Compute Sign in a Canonical Way
-      auto sign = doubles_sign(wfn_traits::alpha_string(det), wfn_traits::alpha_string(ex_det_spin), full_ex_spin);
+      auto sign =
+          doubles_sign(wfn_traits::alpha_string(det),
+                       wfn_traits::alpha_string(ex_det_spin), full_ex_spin);
 
       // Calculate Full Excited Determinant
-      const auto full_ex = ex_det_spin;// | os_det;
+      const auto full_ex = ex_det_spin;  // | os_det;
 
       // Update Sign of Matrix Element
       auto h_el = sign * G_aibj;
@@ -347,7 +357,8 @@ void generate_constraint_doubles_contributions_os(
   using wfn_traits = wavefunction_traits<WfnType>;
   using constraint_traits = typename ConType::constraint_traits;
   // Generate Single Excitations that Satisfy the Constraint
-  auto [o, v] = generate_constraint_single_excitations(wfn_traits::alpha_string(det), constraint);
+  auto [o, v] = generate_constraint_single_excitations(
+      wfn_traits::alpha_string(det), constraint);
   const auto no = constraint_traits::count(o);
   const auto nv = constraint_traits::count(v);
   if(!no or !nv) return;
@@ -355,11 +366,11 @@ void generate_constraint_doubles_contributions_os(
   const size_t LDV2 = LDV * LDV;
   for(int ii = 0; ii < no; ++ii) {
     const auto i = fls(o);
-    o = constraint_traits::create_no_check(o, i); // o.flip(i)
+    o = constraint_traits::create_no_check(o, i);  // o.flip(i)
     auto v_cpy = v;
     for(int aa = 0; aa < nv; ++aa) {
       const auto a = fls(v_cpy);
-      v_cpy = constraint_traits::create_no_check(v_cpy, a); // v_cpy.flip(a)
+      v_cpy = constraint_traits::create_no_check(v_cpy, a);  // v_cpy.flip(a)
 
       const auto* V_ai = V + a + i * LDV;
       double sign_same = single_excitation_sign(det, a, i);
@@ -379,10 +390,13 @@ void generate_constraint_doubles_contributions_os(
           double sign = sign_same * sign_othr;
 
           // Compute Excited Determinant
-          //auto ex_det = det | os_det;
-          //ex_det.flip(i).flip(a).flip(j + N / 2).flip(b + N / 2);
-          auto ex_det = wfn_traits::template single_excitation_no_check<Spin::Alpha>(det,i,a);
-          ex_det = wfn_traits::template single_excitation_no_check<Spin::Beta>(ex_det,j,b);
+          // auto ex_det = det | os_det;
+          // ex_det.flip(i).flip(a).flip(j + N / 2).flip(b + N / 2);
+          auto ex_det =
+              wfn_traits::template single_excitation_no_check<Spin::Alpha>(
+                  det, i, a);
+          ex_det = wfn_traits::template single_excitation_no_check<Spin::Beta>(
+              ex_det, j, b);
 
           // Finalize Matrix Element
           auto h_el = sign * V_aibj;
@@ -478,13 +492,12 @@ auto dist_triplets_histogram(size_t norb, size_t ns_othr, size_t nd_othr,
 }
 #endif
 
-
 template <size_t N>
 auto make_triplet(unsigned i, unsigned j, unsigned k) {
   using wfn_type = wfn_t<N>;
   using wfn_traits = wavefunction_traits<wfn_type>;
   using constraint_type = alpha_constraint<wfn_traits>;
-  using string_type     = typename constraint_type::constraint_type;
+  using string_type = typename constraint_type::constraint_type;
 
   string_type C = 0;
   C.flip(i).flip(j).flip(k);
@@ -492,7 +505,7 @@ auto make_triplet(unsigned i, unsigned j, unsigned k) {
   B <<= k;
   B = B.to_ullong() - 1;
 
-  return constraint_type(C,B,k);
+  return constraint_type(C, B, k);
 }
 
 #ifdef MACIS_ENABLE_MPI
@@ -504,11 +517,11 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
   using wfn_type = wfn_t<N>;
   using wfn_traits = wavefunction_traits<wfn_type>;
   using constraint_type = alpha_constraint<wfn_traits>;
-  using string_type     = typename constraint_type::constraint_type;
+  using string_type = typename constraint_type::constraint_type;
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
 
-  //wfn_t<N> O = full_mask<N>(norb);
+  // wfn_t<N> O = full_mask<N>(norb);
 
   // Global workloads
   std::vector<size_t> workloads(world_size, 0);
@@ -524,7 +537,8 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
 
         size_t nw = 0;
         for(const auto& alpha : unique_alpha) {
-          nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr, nd_othr, constraint);
+          nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
+                                     nd_othr, constraint);
         }
         if(nw) constraint_sizes.emplace_back(constraint, nw);
         total_work += nw;
@@ -563,7 +577,8 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
         size_t nw = 0;
 
         for(const auto& alpha : unique_alpha) {
-          nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr, nd_othr, c_next); 
+          nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
+                                     nd_othr, c_next);
         }
         if(nw) constraint_sizes.emplace_back(c_next, nw);
         total_work += nw;

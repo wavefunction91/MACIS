@@ -13,7 +13,7 @@ namespace macis {
 
 template <typename WfnType>
 double HamiltonianGenerator<WfnType>::matrix_element(full_det_t bra,
-                                               full_det_t ket) const {
+                                                     full_det_t ket) const {
   using wfn_traits = wavefunction_traits<WfnType>;
   auto bra_alpha = wfn_traits::alpha_string(bra);
   auto ket_alpha = wfn_traits::alpha_string(ket);
@@ -38,7 +38,7 @@ double HamiltonianGenerator<WfnType>::matrix_element(
     const std::vector<uint32_t>& bra_occ_beta) const {
   using spin_wfn_traits = wavefunction_traits<spin_det_t>;
   const uint32_t ex_alpha_count = spin_wfn_traits::count(ex_alpha);
-  const uint32_t ex_beta_count  = spin_wfn_traits::count(ex_beta);
+  const uint32_t ex_beta_count = spin_wfn_traits::count(ex_beta);
 
   if((ex_alpha_count + ex_beta_count) > 4) return 0.;
 
@@ -65,8 +65,9 @@ double HamiltonianGenerator<WfnType>::matrix_element(
 }
 
 template <typename WfnType>
-double HamiltonianGenerator<WfnType>::matrix_element_4(spin_det_t bra, spin_det_t ket,
-                                                 spin_det_t ex) const {
+double HamiltonianGenerator<WfnType>::matrix_element_4(spin_det_t bra,
+                                                       spin_det_t ket,
+                                                       spin_det_t ex) const {
   auto [o1, v1, o2, v2, sign] = doubles_sign_indices(bra, ket, ex);
 
   return sign * G_pqrs_(v1, o1, v2, o2);

@@ -8,8 +8,8 @@
 
 #include <iomanip>
 #include <iostream>
-#include <macis/util/fcidump.hpp>
 #include <macis/mcscf/orbital_energies.hpp>
+#include <macis/util/fcidump.hpp>
 
 #include "ut_common.hpp"
 

@@ -7,16 +7,14 @@
  */
 
 #pragma once
-#include <macis/sd_operations.hpp>
 #include <macis/hamiltonian_generator/base.hpp>
+#include <macis/sd_operations.hpp>
 
 namespace macis {
 
 template <typename WfnType>
 class HamiltonianGenerator : public HamiltonianGeneratorBase<double> {
-
  public:
-
   using full_det_t = WfnType;
   using spin_det_t = spin_wfn_t<WfnType>;
 
@@ -32,9 +30,8 @@ class HamiltonianGenerator : public HamiltonianGeneratorBase<double> {
       full_det_iterator, double) = 0;
 
  public:
-
-  HamiltonianGenerator(matrix_span_t T, rank4_span_t V) :
-    HamiltonianGeneratorBase<double>(T,V) {};
+  HamiltonianGenerator(matrix_span_t T, rank4_span_t V)
+      : HamiltonianGeneratorBase<double>(T, V){};
 
   virtual ~HamiltonianGenerator() noexcept = default;
 
@@ -101,7 +98,7 @@ class HamiltonianGenerator : public HamiltonianGeneratorBase<double> {
 
   virtual void SetJustSingles(bool /*_js*/) {}
   virtual bool GetJustSingles() { return false; }
-  //virtual size_t GetNimp() const { return N / 2; }
+  // virtual size_t GetNimp() const { return N / 2; }
 };
 
 }  // namespace macis

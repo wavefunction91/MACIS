@@ -21,9 +21,9 @@ namespace macis {
 // Base implementation of CSR hamiltonian generation
 template <typename index_t, typename WfnType, typename WfnIterator>
 sparsexx::csr_matrix<double, index_t> make_csr_hamiltonian_block(
-    WfnIterator bra_begin, WfnIterator bra_end,
-    WfnIterator ket_begin, WfnIterator ket_end,
-    HamiltonianGenerator<WfnType>& ham_gen, double H_thresh) {
+    WfnIterator bra_begin, WfnIterator bra_end, WfnIterator ket_begin,
+    WfnIterator ket_end, HamiltonianGenerator<WfnType>& ham_gen,
+    double H_thresh) {
   size_t nbra = std::distance(bra_begin, bra_end);
   size_t nket = std::distance(ket_begin, ket_end);
 
@@ -47,7 +47,8 @@ sparsexx::csr_matrix<double, index_t> make_csr_hamiltonian(
 // Base implementation of dist-CSR H construction for bitsets
 template <typename index_t, typename WfnType, typename WfnIterator>
 sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double, index_t>>
-make_dist_csr_hamiltonian(MPI_Comm comm, WfnIterator sd_begin, WfnIterator sd_end,
+make_dist_csr_hamiltonian(MPI_Comm comm, WfnIterator sd_begin,
+                          WfnIterator sd_end,
                           HamiltonianGenerator<WfnType>& ham_gen,
                           const double H_thresh) {
   using namespace sparsexx;

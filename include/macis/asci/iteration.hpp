@@ -8,8 +8,8 @@
 
 #pragma once
 #include <macis/asci/determinant_search.hpp>
-#include <macis/solvers/selected_ci_diag.hpp>
 #include <macis/mcscf/mcscf.hpp>
+#include <macis/solvers/selected_ci_diag.hpp>
 
 namespace macis {
 

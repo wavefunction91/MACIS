@@ -72,7 +72,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     // Alias state data
     auto state = *(cdets_begin + i);
     auto state_alpha = wfn_traits::alpha_string(state);
-    auto state_beta  = wfn_traits::beta_string(state);
+    auto state_beta = wfn_traits::beta_string(state);
     auto coeff = C[i];
 
     // Get occupied and virtual indices
@@ -150,10 +150,11 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs, HamiltonianGenerator<wfn_t<N>>& ham_gen, MPI_Comm comm) {
+    const double* V_pqrs, HamiltonianGenerator<wfn_t<N>>& ham_gen,
+    MPI_Comm comm) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
-  using wfn_traits    = wavefunction_traits<wfn_t<N>>;
+  using wfn_traits = wavefunction_traits<wfn_t<N>>;
   using spin_wfn_type = spin_wfn_t<wfn_t<N>>;
   using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
 
@@ -300,9 +301,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         generate_constraint_singles_contributions_ss(
-            coeff, det|beta, con, occ_alpha, occ_beta,
-            orb_ens_alpha.data(), T_pq, norb, G_red, norb, V_red, norb,
-            h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+            coeff, det | beta, con, occ_alpha, occ_beta, orb_ens_alpha.data(),
+            T_pq, norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
+            ham_gen, asci_pairs);
       }
 
       // AAAA excitations
@@ -313,9 +314,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         const auto& occ_beta = bcd.occ_beta;
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         generate_constraint_doubles_contributions_ss(
-            coeff, det|beta, con, occ_alpha, occ_beta,
-            orb_ens_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-            ham_gen, asci_pairs);
+            coeff, det | beta, con, occ_alpha, occ_beta, orb_ens_alpha.data(),
+            G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
       }
 
       // AABB excitations
@@ -328,7 +328,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         const auto& orb_ens_beta = bcd.orb_ens_beta;
         generate_constraint_doubles_contributions_os(
-            coeff, det|beta, con, occ_alpha, occ_beta, vir_beta,
+            coeff, det | beta, con, occ_alpha, occ_beta, vir_beta,
             orb_ens_alpha.data(), orb_ens_beta.data(), V_pqrs, norb, h_el_tol,
             h_diag, E_ASCI, ham_gen, asci_pairs);
       }
@@ -346,7 +346,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
           const auto state = det | beta;
           const auto state_alpha = wfn_traits::alpha_string(state);
-          const auto state_beta  = wfn_traits::beta_string(beta);
+          const auto state_beta = wfn_traits::beta_string(beta);
           // BB Excitations
           append_singles_asci_contributions<Spin::Beta>(
               coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
@@ -355,9 +355,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
           // BBBB Excitations
           append_ss_doubles_asci_contributions<Spin::Beta>(
-              coeff, state, state_beta, state_alpha, occ_beta, vir_beta, occ_alpha,
-              eps_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
-              asci_pairs);
+              coeff, state, state_beta, state_alpha, occ_beta, vir_beta,
+              occ_alpha, eps_beta.data(), G_pqrs, norb, h_el_tol, h_diag,
+              E_ASCI, ham_gen, asci_pairs);
 
         }  // Beta Loop
       }    // Triplet Check

@@ -7,6 +7,7 @@
  */
 
 #include "base.ipp"
+
 #include "fast_diagonals.ipp"
 
 namespace macis {

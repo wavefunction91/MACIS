@@ -33,7 +33,7 @@ TEST_CASE("Slater Det Operations") {
 
   SECTION("Occupied / Unoccupied Conversion") {
     SECTION("Default") {
-      using wfn_type   = macis::wfn_t<64>;
+      using wfn_type = macis::wfn_t<64>;
       using wfn_traits = macis::wavefunction_traits<wfn_type>;
       wfn_type state = 0x00000000000000AF;
       std::vector<uint32_t> ref_occ = {0, 1, 2, 3, 5, 7};
@@ -258,7 +258,8 @@ TEST_CASE("Slater Det Operations") {
   SECTION("String Conversions") {
     using wfn_type = macis::wfn_t<64>;
     using wfn_traits = macis::wavefunction_traits<wfn_type>;
-    auto state = wfn_traits::canonical_hf_determinant(2, 2).flip(3).flip(4 + 32);
+    auto state =
+        wfn_traits::canonical_hf_determinant(2, 2).flip(3).flip(4 + 32);
 
     SECTION("To String") {
       auto str = macis::to_canonical_string(state);

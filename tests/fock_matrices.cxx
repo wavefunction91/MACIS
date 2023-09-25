@@ -7,9 +7,9 @@
  */
 
 #include <iomanip>
+#include <macis/mcscf/fock_matrices.hpp>
 #include <macis/util/detail/rdm_files.hpp>
 #include <macis/util/fcidump.hpp>
-#include <macis/mcscf/fock_matrices.hpp>
 
 #include "ut_common.hpp"
 

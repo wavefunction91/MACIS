@@ -7,9 +7,6 @@
  */
 
 #pragma once
-#include <macis/util/fcidump.hpp>
-#include <macis/util/transform.hpp>
-
 #include <macis/mcscf/diis.hpp>
 #include <macis/mcscf/fock_matrices.hpp>
 #include <macis/mcscf/mcscf.hpp>
@@ -17,6 +14,8 @@
 #include <macis/mcscf/orbital_hessian.hpp>
 #include <macis/mcscf/orbital_rotation_utilities.hpp>
 #include <macis/mcscf/orbital_steps.hpp>
+#include <macis/util/fcidump.hpp>
+#include <macis/util/transform.hpp>
 
 // #include <ceres/ceres.h>
 
