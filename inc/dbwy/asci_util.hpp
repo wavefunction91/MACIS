@@ -801,9 +801,36 @@ double selected_ci_diag(
 
 
   std::vector<double> W(ndets);
-  lapack::syevd( lapack::Job::NoVec, lapack::Uplo::Lower, ndets, 
+  lapack::syevd( lapack::Job::Vec, lapack::Uplo::Lower, ndets, 
     H_dense.data(), ndets, W.data() );
-  auto E = W[0];
+  E = W[0];
+  if(!quiet)
+  {
+    std::cout << "  * Hamiltonian eigenvalues: ";
+    for( int ii = 0; ii < nstates; ii++ )
+      std::cout << W[ii] << ", ";
+    std::cout << std::endl;
+  }
+  // Check for ground state degeneracies
+  double deg_tol = 1.E-7;
+  int ngs = 1;
+  for( int i = 1; i < nstates; i++ )
+  {
+    if( std::abs(W[i] - W[0]) > deg_tol )
+      break;
+    ngs++;
+  }
+  // In case of degeneracy, symmetrize
+  if( ngs == 1 )
+  {
+    for( int ii = 0; ii < ndets; ii++ )
+      C_local[ii] = H_dense[ii + 0 * ndets]; 
+  }
+  else
+  {
+    ham_gen.SymmDegStates( C_local.data(), H_dense.data(), ngs, 
+                           dets_begin, dets_end, ndets );
+  }
   #endif
   MPI_Barrier(comm);
   auto dav_en = clock_type::now();
