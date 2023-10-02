@@ -502,6 +502,7 @@ auto make_triplet(unsigned i, unsigned j, unsigned k) {
   string_type C = 0;
   C.flip(i).flip(j).flip(k);
   string_type B = 1;
+  static_assert(B.size() <= 64, "ULLONG NOT POSSIBLE HERE");
   B <<= k;
   B = B.to_ullong() - 1;
 

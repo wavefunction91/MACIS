@@ -161,6 +161,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   auto logger = spdlog::get("asci_search");
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
 
+  auto world_rank = comm_rank(comm);
+  auto world_size = comm_size(comm);
+
   asci_contrib_container<wfn_t<N>> asci_pairs;
   std::vector<uint32_t> occ_alpha, vir_alpha;
   std::vector<uint32_t> occ_beta, vir_beta;
@@ -227,8 +230,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     }
   }
 
-  auto world_rank = comm_rank(comm);
-  auto world_size = comm_size(comm);
 
   const auto n_occ_alpha = wfn_traits::count(uniq_alpha_wfn[0]);
   const auto n_vir_alpha = norb - n_occ_alpha;
@@ -283,7 +284,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   asci_pairs.reserve(max_size);
 
   // Process ASCI pair contributions for each constraint
-  for(auto con : constraints) {
+  for(const auto& con : constraints) {
+    //std::cout << std::distance(constraints.data(), &con) << "/" << constraints.size() << std::endl;
     auto size_before = asci_pairs.size();
 
     const double h_el_tol = asci_settings.h_el_tol;
@@ -366,7 +368,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       if(asci_pairs.size() > asci_settings.pair_size_max) {
         // Remove small contributions
         auto it = std::partition(
-            asci_pairs.begin(), asci_pairs.end(), [=](const auto& x) {
+            asci_pairs.begin() + size_before, asci_pairs.end(), [=](const auto& x) {
               return std::abs(x.rv()) > asci_settings.rv_prune_tol;
             });
         asci_pairs.erase(it, asci_pairs.end());
@@ -390,11 +392,22 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       }  // Pruning
     }    // Unique Alpha Loop
 
+
     // Local S&A for each quad
     {
+     if(size_before > asci_pairs.size()) throw std::runtime_error("DIE DIE DIE");
       auto uit = sort_and_accumulate_asci_pairs(
           asci_pairs.begin() + size_before, asci_pairs.end());
       asci_pairs.erase(uit, asci_pairs.end());
+
+      // Remove small contributions
+      const auto sz_tmp = asci_pairs.size();
+      uit = std::partition(asci_pairs.begin() + size_before, 
+        asci_pairs.end(), [=](const auto &x) {
+          return std::abs(x.rv()) > asci_settings.rv_prune_tol;
+      });
+      asci_pairs.erase(uit, asci_pairs.end());
+      //std::cout << "REMOVED " << sz_tmp - asci_pairs.size() << " PAIRS" << std::endl;
     }
   }  // Constraint Loop
 
@@ -455,16 +468,16 @@ std::vector<wfn_t<N>> asci_search(
   // Expand Search Space with Connected ASCI Contributions
   auto pairs_st = clock_type::now();
   asci_contrib_container<wfn_t<N>> asci_pairs;
-  if(world_size == 1)
-    asci_pairs = asci_contributions_standard(
-        asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
-        V_red, G_pqrs, V_pqrs, ham_gen);
-#ifdef MACIS_ENABLE_MPI
-  else
+  //if(world_size == 1)
+  //  asci_pairs = asci_contributions_standard(
+  //      asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
+  //      V_red, G_pqrs, V_pqrs, ham_gen);
+//#ifdef MACIS_ENABLE_MPI
+  //else
     asci_pairs = asci_contributions_constraint(
         asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
         V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
-#endif
+//#endif
   auto pairs_en = clock_type::now();
 
   {
