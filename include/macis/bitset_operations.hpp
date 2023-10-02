@@ -86,7 +86,8 @@ template <size_t N>
 uint128_t to_uint128(std::bitset<N> bits) {
   static_assert(N <= 128, "N > 128");
   if constexpr(N == 128) {
-    auto _x = reinterpret_cast<uint128_t*>(&bits);
+    alignas(alignof(uint128_t)) std::bitset<N> cpy = bits;
+    auto _x = reinterpret_cast<uint128_t*>(&cpy);
     return *_x;
   } else {
     return fast_to_ullong(bits);
@@ -293,9 +294,9 @@ bool bitset_less(std::bitset<N> x, std::bitset<N> y) {
   else if constexpr(N <= 64)
     return fast_to_ullong(x) < fast_to_ullong(y);
   else if constexpr(N == 128) {
-    auto _x = reinterpret_cast<uint128_t*>(&x);
-    auto _y = reinterpret_cast<uint128_t*>(&y);
-    return *_x < *_y;
+    auto _x = to_uint128(x);
+    auto _y = to_uint128(y);
+    return _x < _y;
   } else {
     for(int i = N - 1; i >= 0; i--) {
       if(x[i] ^ y[i]) return y[i];
