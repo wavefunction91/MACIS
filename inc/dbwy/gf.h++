@@ -476,7 +476,7 @@ namespace cmz
       int nLanIts;
       try{ nLanIts = getParam<int>( input, "nLanIts" ); } catch(...){ nLanIts = 1000; } 
       bool print, writeGF;
-      try{ print = getParam<bool>( input, "nLanIts" ); } catch(...){ print = false;}
+      try{ print = getParam<bool>( input, "printGF" ); } catch(...){ print = false;}
       try{ writeGF = getParam<bool>( input, "writeGF" ); } catch(...){ writeGF = false;}
       bool saveGFmats;
       try{ saveGFmats = getParam<bool>( input, "saveGFmats" ); } catch(...){ saveGFmats = false;}
