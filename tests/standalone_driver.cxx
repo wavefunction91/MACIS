@@ -326,7 +326,7 @@ int main(int argc, char** argv) {
           double wmin = -8.;
           double wmax = 8.;
           size_t nws = 1001;
-	  double beta = 157.;
+          double beta = 157.;
           double eta = 0.1;
           std::complex<double> w0(wmin, eta);
           std::complex<double> wf(wmax, eta);
@@ -334,7 +334,7 @@ int main(int argc, char** argv) {
                                                std::complex<double>(0., 0.));
           for(int i = 0; i < nws; i++)
             ws[i] = w0 + (wf - w0) / double(nws - 1) * double(i);
-            //ws[i] = std::complex<double>(0., 1.) * (2. * i + 1.) * M_PI / beta; 
+          // ws[i] = std::complex<double>(0., 1.) * (2. * i + 1.) * M_PI / beta;
 
           // MCSCF Settings
           macis::GFSettings gf_settings;
@@ -364,12 +364,11 @@ int main(int argc, char** argv) {
 
           // Occupation numbers
           std::vector<double> occs(n_active, 1.);
-	  for( int i = 0; i < n_active; i++ )
-	    occs[i] = active_ordm[i + n_active * i] / 2.;
-	  std::cout << "Occupation Nrs.: ";
-	  for( int i = 0; i < n_active; i++ )
-	    std::cout << "  " << occs[i];
-	  std::cout << std::endl; 
+          for(int i = 0; i < n_active; i++)
+            occs[i] = active_ordm[i + n_active * i] / 2.;
+          std::cout << "Occupation Nrs.: ";
+          for(int i = 0; i < n_active; i++) std::cout << "  " << occs[i];
+          std::cout << std::endl;
 
           // GS vector
           Eigen::VectorXd psi0 = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(

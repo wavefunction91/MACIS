@@ -225,7 +225,7 @@ void BandResolvent(
   int nbands = nvecs;
   BandLan<double>(Hop, vecs, bandH, nLanIts, nbands, len_vec, 1.E-6, print);
   std::cout << "DONE! ";
-  
+
   if(print) {
     std::ofstream ofile("BLH.dat", std::ios::out);
     ofile.precision(dbl::max_digits10);
