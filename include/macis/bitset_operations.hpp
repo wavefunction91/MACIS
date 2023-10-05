@@ -157,12 +157,15 @@ uint32_t ffs(std::bitset<N> bits) {
     return ffsl(fast_to_ulong(bits));
   else if constexpr(N <= 64)
     return ffsll(fast_to_ullong(bits));
-  else if constexpr(N <= 128) {
+  else if constexpr(N % 64 == 0) {
     auto as_words = reinterpret_cast<uint64_t*>(&bits);
-    if(as_words[0])
-      return ffsll(as_words[0]);
-    else
-      return ffsll(as_words[1]) + 64;
+    constexpr int n_words = N / 64;
+    int off = 0;
+    for(int i = 0; i < n_words; ++i) {
+      if(as_words[i]) return ffsll(as_words[i]) + off;
+      off += 64;
+    }
+    return 0;
   } else {
     uint32_t ind = 0;
     for(ind = 0; ind < N; ++ind)
@@ -188,17 +191,20 @@ uint32_t fls(std::bitset<N> bits) {
     return fls(fast_to_ulong(bits));
   else if constexpr(N <= 64)
     return fls(fast_to_ullong(bits));
-  else if constexpr(N <= 128) {
+  else if constexpr(N % 64 == 0) {
     auto as_words = reinterpret_cast<uint64_t*>(&bits);
-    if(as_words[1])
-      return fls(as_words[1]) + 64;
-    else
-      return fls(as_words[0]);
+    constexpr int n_words = N / 64;
+    int off = N - 64;
+    for(int i = n_words-1; i >= 0; --i) {
+      if(as_words[i]) return fls(as_words[i]) + off;
+      off -= 64;
+    }
+    return UINT32_MAX;
   } else {
     uint32_t ind = 0;
     for(ind = N - 1; ind >= 0; ind--)
       if(bits[ind]) return ind;
-    return ind;
+    return UINT32_MAX;
   }
   abort();
 }
@@ -225,6 +231,7 @@ std::vector<uint32_t> bits_to_indices(std::bitset<N> bits) {
   return indices;
 }
 
+#if 0
 /// Truncate a bitset to one of smaller width
 template <size_t N, size_t M>
 inline std::bitset<N> truncate_bitset(std::bitset<M> bits) {
@@ -243,6 +250,7 @@ inline std::bitset<N> truncate_bitset(std::bitset<M> bits) {
     return trunc_bits;
   }
 }
+#endif
 
 /// Expand a bitset to one of larger width
 template <size_t N, size_t M>
@@ -265,26 +273,69 @@ inline std::bitset<N> expand_bitset(std::bitset<M> bits) {
 /// Extract to lo word of a bitset of even width
 template <size_t N>
 inline std::bitset<N / 2> bitset_lo_word(std::bitset<N> bits) {
-  static_assert(N == 128 or N == 64, "Not Supported");
-  if constexpr(N == 128) {
-    return std::bitset<64>(reinterpret_cast<uint64_t*>(&bits)[0]);
-  }
+  static_assert((N % 64 == 0) and (N == 64 or N/2 % 64 == 0), "Not Supported");
   if constexpr(N == 64) {
     return std::bitset<32>(reinterpret_cast<uint32_t*>(&bits)[0]);
+  } else  {
+    std::bitset<N/2> lo;
+    constexpr int nword = (N/2) / 64; 
+    auto lo_as_words = reinterpret_cast<uint64_t*>(&lo);
+    auto bi_as_words = reinterpret_cast<uint64_t*>(&bits);
+    for(int i = 0; i < nword; ++i) lo_as_words[i] = bi_as_words[i];
+    return lo;
+  }
+}
+
+template <size_t N>
+inline void set_bitset_lo_word(std::bitset<N>& bits, std::bitset<N/2> word) {
+  static_assert((N % 64 == 0) and (N == 64 or N/2 % 64 == 0), "Not Supported");
+
+  if constexpr(N == 64) {
+    auto bi_as_words = reinterpret_cast<uint32_t*>(&bits);
+    auto wo_as_words = reinterpret_cast<uint32_t*>(&word);
+    bi_as_words[0] = wo_as_words[0];
+  } else  {
+    constexpr int nword = (N/2) / 64; 
+    auto bi_as_words = reinterpret_cast<uint64_t*>(&bits);
+    auto wo_as_words = reinterpret_cast<uint64_t*>(&word);
+    for(int i = 0; i < nword; ++i) bi_as_words[i] = wo_as_words[i];
   }
 }
 
 /// Extract to hi word of a bitset of even width
 template <size_t N>
 inline std::bitset<N / 2> bitset_hi_word(std::bitset<N> bits) {
-  static_assert(N == 128 or N == 64, "Not Supported");
-  if constexpr(N == 128) {
-    return std::bitset<64>(reinterpret_cast<uint64_t*>(&bits)[1]);
-  }
+  static_assert((N % 64 == 0) and (N == 64 or N/2 % 64 == 0), "Not Supported");
   if constexpr(N == 64) {
     return std::bitset<32>(reinterpret_cast<uint32_t*>(&bits)[1]);
+  } else {
+    std::bitset<N/2> hi;
+    constexpr int nword = (N/2) / 64; 
+    auto hi_as_words = reinterpret_cast<uint64_t*>(&hi);
+    auto bi_as_words = reinterpret_cast<uint64_t*>(&bits);
+    for(int i = 0; i < nword; ++i) hi_as_words[i] = bi_as_words[i + nword];
+    return hi;
   }
 }
+
+template <size_t N>
+inline void set_bitset_hi_word(std::bitset<N>& bits, std::bitset<N/2> word) {
+  static_assert((N % 64 == 0) and (N == 64 or N/2 % 64 == 0), "Not Supported");
+
+  if constexpr(N == 64) {
+    auto bi_as_words = reinterpret_cast<uint32_t*>(&bits);
+    auto wo_as_words = reinterpret_cast<uint32_t*>(&word);
+    bi_as_words[1] = wo_as_words[0];
+  } else  {
+    constexpr int nword = (N/2) / 64; 
+    auto bi_as_words = reinterpret_cast<uint64_t*>(&bits);
+    auto wo_as_words = reinterpret_cast<uint64_t*>(&word);
+    for(int i = 0; i < nword; ++i) bi_as_words[i+nword] = wo_as_words[i];
+  }
+}
+
+
+
 
 /// Bitwise less-than operator for bitset
 template <size_t N>
@@ -297,6 +348,16 @@ bool bitset_less(std::bitset<N> x, std::bitset<N> y) {
     auto _x = to_uint128(x);
     auto _y = to_uint128(y);
     return _x < _y;
+  } else if constexpr(N % 64 == 0) {
+    auto x_as_words = reinterpret_cast<uint64_t*>(&x);
+    auto y_as_words = reinterpret_cast<uint64_t*>(&y);
+    constexpr auto nwords = N / 64;
+    for(int i = nwords - 1; i >= 0; --i) {
+      const auto x_i = x_as_words[i];
+      const auto y_i = y_as_words[i];
+      if(x_i != y_i) return x_i < y_i;
+    }
+    return false;
   } else {
     for(int i = N - 1; i >= 0; i--) {
       if(x[i] ^ y[i]) return y[i];
