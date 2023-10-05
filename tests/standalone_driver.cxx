@@ -315,8 +315,8 @@ int main(int argc, char** argv) {
         }
 
       } else {
-        //if(nalpha != nbeta)
-        //  throw std::runtime_error("ASCI Only Implemented for Closed-Shell");
+        // if(nalpha != nbeta)
+        //   throw std::runtime_error("ASCI Only Implemented for Closed-Shell");
 
         // Generate the Hamiltonian Generator
         generator_t ham_gen(
