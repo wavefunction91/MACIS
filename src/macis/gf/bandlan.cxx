@@ -138,7 +138,7 @@ bool GetEigsysBand(std::vector<double> &mat, int nSupDiag,
   // PREPARE VARIABLES FOR LAPACK
   lapack::Uplo UPLO = lapack::Uplo::Upper;
   lapack::Job VECT = lapack::Job::Vec;
-  lapack::Job COMPZ = lapack::Job::Vec;
+  lapack::Job COMPZ = lapack::Job::UpdateVec;
   int N = matsize, LDQ = matsize, LDAB = nSupDiag + 1;
   std::vector<double> AB((nSupDiag + 1) * N, 0.);
   std::vector<double> D(N, 0.), E(N - 1, 0.), Q(N * N, 0.);
@@ -225,6 +225,7 @@ void BandResolvent(
   int nbands = nvecs;
   BandLan<double>(Hop, vecs, bandH, nLanIts, nbands, len_vec, 1.E-6, print);
   std::cout << "DONE! ";
+  
   if(print) {
     std::ofstream ofile("BLH.dat", std::ios::out);
     ofile.precision(dbl::max_digits10);
