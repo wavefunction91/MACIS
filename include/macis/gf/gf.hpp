@@ -52,7 +52,31 @@ struct GFSettings {
   bool writeGF = false;
   bool print = false;
   bool saveGFmats = false;
+  double wmin = -8.;
+  double wmax =  8.;
+  size_t nws  = 2001;
+  double eta  = 0.1;
+  std::string w_scale = "lin";
+  bool real_g = true;
+  bool beta = 1.;
 };
+
+/**
+ * @brief Generates the frequency grid over which to evaluate the GF,
+ *        details of which are specified in the settings instance. We
+ *        have implemented linear, Matsubara and logarithmic frequency
+ *        grids.
+ *
+ * @param[in] const GFSettings& settings: Settings defining the frequency
+ *            grid.
+ *
+ * @returns std::vector<std::complex<double> >: Vector of complex frequencies
+ *          building the grid.
+ *
+ * @author Carlos Mejuto Zaera
+ * @date 09/10/2023
+ */
+std::vector<std::complex<double> > GetGFFreqGrid( const GFSettings& settings );
 
 /**
  * @brief Gets fermionic sign incurred by inserting an electron of spin
