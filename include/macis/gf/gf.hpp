@@ -53,9 +53,9 @@ struct GFSettings {
   bool print = false;
   bool saveGFmats = false;
   double wmin = -8.;
-  double wmax =  8.;
-  size_t nws  = 2001;
-  double eta  = 0.1;
+  double wmax = 8.;
+  size_t nws = 2001;
+  double eta = 0.1;
   std::string w_scale = "lin";
   bool real_g = true;
   bool beta = 1.;
@@ -76,7 +76,7 @@ struct GFSettings {
  * @author Carlos Mejuto Zaera
  * @date 09/10/2023
  */
-std::vector<std::complex<double> > GetGFFreqGrid( const GFSettings& settings );
+std::vector<std::complex<double>> GetGFFreqGrid(const GFSettings &settings);
 
 /**
  * @brief Gets fermionic sign incurred by inserting an electron of spin
