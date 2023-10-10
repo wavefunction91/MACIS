@@ -29,6 +29,11 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                     E0, X, norb, ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),
                     ham_gen.G(), ham_gen.V(), ham_gen MACIS_MPI_CODE(, comm));
 
+  //std::sort(wfn.begin(), wfn.end(), bitset_less_comparator<N>{});
+  using wfn_traits = wavefunction_traits<wfn_t<N>>;
+  using wfn_comp   = typename wfn_traits::spin_comparator;
+  std::sort(wfn.begin(), wfn.end(), wfn_comp{});
+
   // Rediagonalize
   std::vector<double> X_local;  // Precludes guess reuse
   auto E = selected_ci_diag<index_t>(

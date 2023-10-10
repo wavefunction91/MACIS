@@ -11,11 +11,13 @@
 #include <iostream>
 #include <macis/csr_hamiltonian.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
+#include <macis/hamiltonian_generator/sorted_double_loop.hpp>
 #include <macis/util/fcidump.hpp>
 
 #include "ut_common.hpp"
 
-TEST_CASE("CSR Hamiltonian") {
+using wfn_type = macis::wfn_t<64>;
+TEMPLATE_TEST_CASE("CSR Hamiltonian","[ham_gen]", macis::DoubleLoopHamiltonianGenerator<wfn_type>, macis::SortedDoubleLoopHamiltonianGenerator<wfn_type> ) {
   ROOT_ONLY(MPI_COMM_WORLD);
 
   size_t norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
@@ -27,9 +29,8 @@ TEST_CASE("CSR Hamiltonian") {
   macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
   macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
-  using wfn_type = macis::wfn_t<64>;
   using wfn_traits = macis::wavefunction_traits<wfn_type>;
-  using generator_type = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
+  using generator_type = TestType;
 
 #if 0
   generator_type ham_gen(norb, V.data(), T.data());
@@ -42,10 +43,30 @@ TEST_CASE("CSR Hamiltonian") {
   // Generate configuration space
   const auto hf_det = wfn_traits::canonical_hf_determinant(nocc, nocc);
   auto dets = macis::generate_cisd_hilbert_space(norb, hf_det);
+  std::sort(dets.begin(), dets.end(), wfn_traits::spin_comparator{});
 
   // Generate CSR Hamiltonian
+  auto st = std::chrono::high_resolution_clock::now();
   auto H = macis::make_csr_hamiltonian_block<int32_t>(
       dets.begin(), dets.end(), dets.begin(), dets.end(), ham_gen, 1e-16);
+  auto en = std::chrono::high_resolution_clock::now();
+  std::cout << std::chrono::duration<double,std::milli>(en - st).count() << std::endl;
+
+//#define GENERATE_TESTS
+#ifdef GENERATE_TESTS
+  std::string tmp_rowptr_fname = "tmp_rowptr.bin";
+  std::string tmp_colind_fname = "tmp_colind.bin";
+  std::string tmp_nzval_fname  = "tmp_nzval.bin";
+
+  std::ofstream rowptr_file(tmp_rowptr_fname, std::ios::binary);
+  rowptr_file.write((char*)H.rowptr().data(), H.rowptr().size() * sizeof(int32_t));
+  std::ofstream colind_file(tmp_colind_fname, std::ios::binary);
+  colind_file.write((char*)H.colind().data(), H.colind().size() * sizeof(int32_t));
+  std::ofstream nzval_file(tmp_nzval_fname, std::ios::binary);
+  nzval_file.write((char*)H.nzval().data(), H.nzval().size() * sizeof(double));
+#else
+
+  //std::cout << "NEW H " << H.m() << " " << H.nnz() << " " << H.indexing() << std::endl;
 
   // Read reference data
   std::vector<int32_t> ref_rowptr(H.rowptr().size()),
@@ -70,6 +91,7 @@ TEST_CASE("CSR Hamiltonian") {
   for(auto i = 0ul; i < nnz; ++i) {
     REQUIRE(H.nzval()[i] == Approx(ref_nzval[i]));
   }
+#endif
 }
 
 #ifdef MACIS_ENABLE_MPI

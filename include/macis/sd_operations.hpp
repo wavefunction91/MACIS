@@ -369,6 +369,28 @@ inline auto doubles_sign(WfnType bra, WfnType ket, WfnType ex) {
   return sign;
 }
 
+
+template <typename WfnIterator>
+auto get_unique_alpha(WfnIterator begin, WfnIterator end) {
+  using wfn_type = typename std::iterator_traits<WfnIterator>::value_type;
+  using wfn_traits = wavefunction_traits<wfn_type>;
+  using spin_wfn_type = typename wfn_traits::spin_wfn_type;
+
+  std::vector<std::pair<spin_wfn_type, size_t>> unique_alpha;
+  unique_alpha.push_back({wfn_traits::alpha_string(*begin), 1});
+  for(auto it = begin+1; it != end; ++it) {
+    auto& [cur_alpha, cur_count] = unique_alpha.back();
+    auto alpha_i = wfn_traits::alpha_string(*it);
+    if(alpha_i == cur_alpha) {
+      cur_count++;
+    } else {
+      unique_alpha.push_back({alpha_i, 1});
+    }
+  }
+
+  return unique_alpha;
+}
+
 template <typename WfnType>
 std::string to_canonical_string(WfnType state) {
   using wfn_traits = wavefunction_traits<WfnType>;
