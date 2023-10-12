@@ -78,7 +78,7 @@ csr_matrix<T, index_t, Alloc>::csr_matrix(
   rowptr_.at(0) = other.indexing();
   auto cur_row = 0;
   for(size_type i = 0; i < nnz_; ++i)
-    if(rowind_coo[i] != (cur_row + indexing_)) {
+    while(rowind_coo[i] != (cur_row + indexing_)) {
       cur_row++;
       rowptr_.at(cur_row) = i + indexing_;
     }
@@ -105,7 +105,7 @@ csc_matrix<T, index_t, Alloc>::csc_matrix(
   colptr_.at(0) = other.indexing();
   auto cur_col = 0;
   for(size_t i = 0; i < nnz_; ++i)
-    if(colind_coo[i] != (cur_col + indexing_)) {
+    while(colind_coo[i] != (cur_col + indexing_)) {
       cur_col++;
       colptr_.at(cur_col) = i + indexing_;
     }

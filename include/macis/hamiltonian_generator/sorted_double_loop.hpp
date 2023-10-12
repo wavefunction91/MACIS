@@ -80,7 +80,7 @@ class SortedDoubleLoopHamiltonianGenerator : public HamiltonianGenerator<WfnType
     // Loop over uniq alphas in bra/ket
     auto pop_st = std::chrono::high_resolution_clock::now();
     for(size_t ia_bra = 0; ia_bra < nuniq_bra; ++ia_bra) 
-    if(unique_alpha_bra[ia_bra].first.any()) {
+    if(unique_alpha_bra[ia_bra].first.count()) {
       // Extract alpha bra
       const auto bra_alpha = unique_alpha_bra[ia_bra].first;
       const size_t beta_st_bra = unique_alpha_bra_idx[ia_bra];
@@ -88,7 +88,7 @@ class SortedDoubleLoopHamiltonianGenerator : public HamiltonianGenerator<WfnType
       spin_wfn_traits::state_to_occ(bra_alpha, bra_occ_alpha);
 
       for(size_t ia_ket = 0; ia_ket < nuniq_ket; ++ia_ket) 
-      if(unique_alpha_ket[ia_ket].first.any()) {
+      if(unique_alpha_ket[ia_ket].first.count()) {
         // Extract alpha ket
         const auto ket_alpha = unique_alpha_ket[ia_ket].first;
 

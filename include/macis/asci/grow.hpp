@@ -124,6 +124,7 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       logger->trace("  * Rediagonalizing");
       auto rdg_st = hrt_t::now();
       std::vector<double> X_local;
+      throw "DIE DIE DIE";
       selected_ci_diag<index_t>(
           wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
           mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol,

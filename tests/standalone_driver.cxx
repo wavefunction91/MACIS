@@ -18,6 +18,7 @@
 #include <macis/asci/pt2.hpp>
 #include <macis/asci/refine.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
+#include <macis/hamiltonian_generator/sorted_double_loop.hpp>
 #include <macis/mcscf/cas.hpp>
 #include <macis/mcscf/fock_matrices.hpp>
 #include <macis/util/detail/rdm_files.hpp>
@@ -289,7 +290,7 @@ int main(int argc, char** argv) {
 
     // CI
     if(job == Job::CI) {
-      using generator_t = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
+      using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
       if(ci_exp == CIExpansion::CAS) {
         std::vector<double> C_local;
         E0 = macis::CASRDMFunctor<generator_t>::rdms(

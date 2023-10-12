@@ -95,7 +95,7 @@ TEMPLATE_TEST_CASE("CSR Hamiltonian","[ham_gen]", macis::DoubleLoopHamiltonianGe
 }
 
 #ifdef MACIS_ENABLE_MPI
-TEST_CASE("Distributed CSR Hamiltonian") {
+TEMPLATE_TEST_CASE("Distributed CSR Hamiltonian","[ham_gen]", macis::DoubleLoopHamiltonianGenerator<wfn_type>, macis::SortedDoubleLoopHamiltonianGenerator<wfn_type> ) {
   MPI_Barrier(MPI_COMM_WORLD);
   size_t norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
   size_t nocc = 5;
@@ -106,9 +106,8 @@ TEST_CASE("Distributed CSR Hamiltonian") {
   macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
   macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
-  using wfn_type = macis::wfn_t<64>;
   using wfn_traits = macis::wavefunction_traits<wfn_type>;
-  using generator_type = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
+  using generator_type = TestType;
 
 #if 0
   generator_type ham_gen(norb, V.data(), T.data());
@@ -121,6 +120,7 @@ TEST_CASE("Distributed CSR Hamiltonian") {
   // Generate configuration space
   const auto hf_det = wfn_traits::canonical_hf_determinant(nocc, nocc);
   auto dets = macis::generate_cisd_hilbert_space(norb, hf_det);
+  std::sort(dets.begin(), dets.end(), wfn_traits::spin_comparator{});
 
   // Generate Distributed CSR Hamiltonian
   auto H_dist = macis::make_dist_csr_hamiltonian<int32_t>(
