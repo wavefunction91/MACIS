@@ -9,6 +9,7 @@
 #pragma once
 #include <macis/asci/determinant_contributions.hpp>
 #include <macis/asci/determinant_sort.hpp>
+#include <deque>
 
 namespace macis {
 
@@ -25,7 +26,13 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
   using duration_type = std::chrono::duration<double, std::milli>;
   using wfn_traits = wavefunction_traits<wfn_t<N>>;
 
-  auto logger = spdlog::get("asci_search");
+  auto world_rank = comm_rank(comm);
+  auto world_size = comm_size(comm);
+  auto logger = spdlog::get("asci_pt2");
+  if(!logger)
+    logger = world_rank ? spdlog::null_logger_mt("asci_pt2")
+                        : spdlog::stdout_color_mt("asci_pt2");
+
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
   // std::cout << "NDETS PT = " << ncdets <<  " " << C.size() << std::endl;
   // std::cout << "PT E0    = " << E_ASCI << std::endl;
@@ -95,29 +102,38 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
     }
   }
 
-  auto world_rank = comm_rank(comm);
-  auto world_size = comm_size(comm);
 
   const auto n_occ_alpha = wfn_traits::count(uniq_alpha_wfn[0]);
   const auto n_vir_alpha = norb - n_occ_alpha;
   const auto n_sing_alpha = n_occ_alpha * n_vir_alpha;
   const auto n_doub_alpha = (n_sing_alpha * (n_sing_alpha - norb + 1)) / 4;
 
+  const auto n_occ_beta = cdets_begin->count() - n_occ_alpha;
+  const auto n_vir_beta = norb - n_occ_beta;
+  const auto n_sing_beta = n_occ_beta * n_vir_beta;
+  const auto n_doub_beta = (n_sing_beta * (n_sing_beta - norb + 1)) / 4;
+
   logger->info("  * NS = {} ND = {}", n_sing_alpha, n_doub_alpha);
 
   auto gen_c_st = clock_type::now();
   auto constraints = dist_constraint_general(
-      0, norb, n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
+      3, norb, n_sing_beta, n_doub_beta, uniq_alpha_wfn, comm);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
 
   size_t max_size = std::min(100000000ul,
-                             ncdets * (2 * n_sing_alpha +  // AA + BB
-                                       2 * n_doub_alpha +  // AAAA + BBBB
-                                       n_sing_alpha * n_sing_alpha  // AABB
-                                       ));
+               ncdets * (n_sing_alpha + n_sing_beta +  // AA + BB
+                         n_doub_alpha + n_sing_beta +  // AAAA + BBBB
+                         n_sing_alpha * n_sing_beta    // AABB
+                         ));
   double EPT2 = 0.0;
+  auto pt2_st = clock_type::now();
+  std::deque<size_t> print_points(10);
+  for(auto i = 0; i < 10; ++i ) {
+    print_points[i] = constraints.size() * (i/10.);
+  }
+  //std::mutex print_barrier;
 
 // Process ASCI pair contributions for each constraint
 #pragma omp parallel
@@ -127,6 +143,11 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
 #pragma omp for reduction(+ : EPT2)
     for(size_t ic = 0; ic < constraints.size(); ++ic) {
       const auto& con = constraints[ic];
+      if(ic >= print_points.front()) {
+        //std::lock_guard<std::mutex> lock(print_barrier);
+        printf("[rank %d] %.1f  done\n", world_rank, double(ic)/constraints.size()*100);
+        print_points.pop_front();
+      }
       // std::cout << std::distance(&constraints[0], &con) << "/" <<
       // constraints.size() << std::endl;
       const double h_el_tol = 1e-16;
@@ -226,8 +247,20 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
       EPT2 += EPT2_local;
     }  // Constraint Loop
   }
+  auto pt2_en = clock_type::now();
 
   EPT2 = allreduce(EPT2, MPI_SUM, comm);
+
+  double local_pt2_dur = duration_type(pt2_en - pt2_st).count();
+  if(world_size > 1) {
+    double total_dur = allreduce(local_pt2_dur, MPI_SUM, comm);
+    double min_dur   = allreduce(local_pt2_dur, MPI_MIN, comm);
+    double max_dur   = allreduce(local_pt2_dur, MPI_MAX, comm);
+    logger->info("* PT2_DUR MIN = {:.2e}, MAX = {:.2e}, AVG = {:.2e} ms",
+      min_dur, max_dur, total_dur / world_size);
+  } else {
+    logger->info("* PT2_DUR = ${:.2e} ms", local_pt2_dur);
+  }
 
   return EPT2;
 }

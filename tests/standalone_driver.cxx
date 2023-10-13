@@ -390,10 +390,16 @@ int main(int argc, char** argv) {
         }
 #endif
         if(pt2) {
+          MPI_Barrier(MPI_COMM_WORLD);
+          auto pt2_st = hrt_t::now();
           EPT2 = macis::asci_pt2_constraint(
               dets.begin(), dets.end(), E0 - (E_inactive + E_core), C, n_active,
               ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(), ham_gen.G(),
               ham_gen.V(), ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));
+          MPI_Barrier(MPI_COMM_WORLD);
+          auto pt2_en = hrt_t::now();
+          dur_t pt2_dur = pt2_en - pt2_st;
+          console->info("* ASCI_PT2_DUR = {:.2e} ms", asci_dur.count());
         }
       }
 
