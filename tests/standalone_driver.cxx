@@ -399,7 +399,7 @@ int main(int argc, char** argv) {
           MPI_Barrier(MPI_COMM_WORLD);
           auto pt2_en = hrt_t::now();
           dur_t pt2_dur = pt2_en - pt2_st;
-          console->info("* ASCI_PT2_DUR = {:.2e} ms", asci_dur.count());
+          console->info("* ASCI_PT2_DUR = {:.2e} ms", pt2_dur.count());
         }
       }
 
