@@ -328,7 +328,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
   auto gen_c_st = clock_type::now();
   auto constraints =
-      dist_constraint_general(asci_settings.constraint_level, norb, n_sing_beta,
+      dist_constraint_general<wfn_t<N>>(asci_settings.constraint_level, norb, n_sing_beta,
                               n_doub_beta, uniq_alpha_wfn, comm);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;

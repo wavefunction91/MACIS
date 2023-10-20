@@ -510,22 +510,22 @@ auto make_triplet(unsigned i, unsigned j, unsigned k) {
 }
 
 #ifdef MACIS_ENABLE_MPI
-template <size_t N>
+template <typename WfnType, typename ContainerType>
 auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
                              size_t nd_othr,
-                             const std::vector<wfn_t<N>>& unique_alpha,
+                             const ContainerType& unique_alpha,
                              MPI_Comm comm) {
-  using wfn_type = wfn_t<N>;
-  using wfn_traits = wavefunction_traits<wfn_type>;
+
+  using wfn_traits = wavefunction_traits<WfnType>;
   using constraint_type = alpha_constraint<wfn_traits>;
   using string_type = typename constraint_type::constraint_type;
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
 
-  // wfn_t<N> O = full_mask<N>(norb);
-
-  // Global workloads
-  std::vector<size_t> workloads(world_size, 0);
+  constexpr bool flat_container = std::is_same_v<
+      std::decay_t<WfnType>, 
+      std::decay_t<typename ContainerType::value_type>
+  >;
 
   // Generate triplets + heuristic
   std::vector<std::pair<constraint_type, size_t>> constraint_sizes;
@@ -534,18 +534,22 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
   for(int t_i = 0; t_i < norb; ++t_i)
     for(int t_j = 0; t_j < t_i; ++t_j)
       for(int t_k = 0; t_k < t_j; ++t_k) {
-        auto constraint = make_triplet<N>(t_i, t_j, t_k);
+        auto constraint = constraint_type::make_triplet(t_i, t_j, t_k);
 
         size_t nw = 0;
         for(const auto& alpha : unique_alpha) {
-          nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
-                                     nd_othr, constraint);
+          if constexpr (flat_container)
+            nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
+                                       nd_othr, constraint);
+          else
+            nw += alpha.second * 
+              constraint_histogram(alpha.first, ns_othr, nd_othr, constraint);
         }
         if(nw) constraint_sizes.emplace_back(constraint, nw);
         total_work += nw;
       }
 
-  size_t local_average = (0.6 * total_work) / world_size;
+  size_t local_average = (0.8 * total_work) / world_size;
 
   for(size_t ilevel = 0; ilevel < nlevels; ++ilevel) {
     // Select constraints larger than average to be broken apart
@@ -578,8 +582,12 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
         size_t nw = 0;
 
         for(const auto& alpha : unique_alpha) {
-          nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
-                                     nd_othr, c_next);
+          if constexpr (flat_container)
+            nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
+                                       nd_othr, c_next);
+          else
+            nw += alpha.second * 
+              constraint_histogram(alpha.first, ns_othr, nd_othr, c_next);
         }
         if(nw) constraint_sizes.emplace_back(c_next, nw);
         total_work += nw;
@@ -587,27 +595,13 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
     }
   }  // Recurse into constraints
 
-  // if(!world_rank) {
-  //   const auto ntrip = std::count_if(constraint_sizes.begin(),
-  //     constraint_sizes.end(), [](auto &c){ return c.first.C.count() == 3; });
-  //   printf("[rank 0] NTRIP = %lu\n", ntrip);
-  //   if(nlevels > 0) {
-  //     const auto nquad = std::count_if(constraint_sizes.begin(),
-  //       constraint_sizes.end(), [](auto &c){ return c.first.C.count() == 4;
-  //       });
-  //     printf("[rank 0] NQUAD = %lu\n", nquad);
-  //   }
-  //   if(nlevels > 1) {
-  //     const auto nquint = std::count_if(constraint_sizes.begin(),
-  //       constraint_sizes.end(), [](auto &c){ return c.first.C.count() == 5;
-  //       });
-  //     printf("[rank 0] NQINT = %lu\n", nquint);
-  //   }
-  // }
-
   // Sort to get optimal bucket partitioning
   std::sort(constraint_sizes.begin(), constraint_sizes.end(),
             [](const auto& a, const auto& b) { return a.second > b.second; });
+
+
+  // Global workloads
+  std::vector<size_t> workloads(world_size, 0);
 
   // Assign work
   std::vector<constraint_type> constraints;

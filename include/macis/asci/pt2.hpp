@@ -113,8 +113,10 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
   logger->info("  * NS = {} ND = {}", n_sing_alpha, n_doub_alpha);
 
   auto gen_c_st = clock_type::now();
-  auto constraints = dist_constraint_general(
-      5, norb, n_sing_beta, n_doub_beta, uniq_alpha_wfn, comm);
+  //auto constraints = dist_constraint_general<wfn_t<N>>(
+  //    5, norb, n_sing_beta, n_doub_beta, uniq_alpha_wfn, comm);
+  auto constraints = dist_constraint_general<wfn_t<N>>(
+      5, norb, n_sing_beta, n_doub_beta, uniq_alpha, comm);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
