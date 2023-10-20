@@ -157,6 +157,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   using wfn_traits = wavefunction_traits<wfn_t<N>>;
   using spin_wfn_type = spin_wfn_t<wfn_t<N>>;
   using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
+  using wfn_comp   = typename wfn_traits::spin_comparator;
+  if(!std::is_sorted(cdets_begin, cdets_end, wfn_comp{}))
+    throw std::runtime_error("PT2 Only Works with Sorted Wfns");
 
   auto logger = spdlog::get("asci_search");
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
@@ -165,6 +168,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   auto world_size = comm_size(comm);
 
   asci_contrib_container<wfn_t<N>> asci_pairs;
+#if 0
   std::vector<uint32_t> occ_alpha, vir_alpha;
   std::vector<uint32_t> occ_beta, vir_beta;
 
@@ -229,8 +233,64 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       }
     }
   }
+#else
 
-  const auto n_occ_alpha = wfn_traits::count(uniq_alpha_wfn[0]);
+  // For each unique alpha, create a list of beta string and store metadata
+  struct beta_coeff_data {
+    spin_wfn_type beta_string;
+    std::vector<uint32_t> occ_beta;
+    std::vector<uint32_t> vir_beta;
+    std::vector<double> orb_ens_alpha;
+    std::vector<double> orb_ens_beta;
+    double coeff;
+    double h_diag;
+
+    beta_coeff_data(double c, size_t norb,
+                    const std::vector<uint32_t>& occ_alpha, wfn_t<N> w,
+                    const HamiltonianGenerator<wfn_t<N>>& ham_gen) {
+      coeff = c;
+
+      beta_string = wfn_traits::beta_string(w);
+
+      // Compute diagonal matrix element
+      h_diag = ham_gen.matrix_element(w, w);
+
+      // Compute occ/vir for beta string
+      spin_wfn_traits::state_to_occ_vir(norb, beta_string, occ_beta, vir_beta);
+
+      // Precompute orbital energies
+      orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
+      orb_ens_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
+    }
+  };
+
+
+  auto uniq_alpha = get_unique_alpha(cdets_begin, cdets_end);
+  const size_t nuniq_alpha = uniq_alpha.size();
+  std::vector<wfn_t<N>> uniq_alpha_wfn(nuniq_alpha);
+  std::transform(uniq_alpha.begin(), uniq_alpha.end(), uniq_alpha_wfn.begin(),
+    [](const auto& p) { return wfn_traits::from_spin(p.first,0); });
+
+
+  using unique_alpha_data = std::vector<beta_coeff_data>;
+  std::vector<unique_alpha_data> uad(nuniq_alpha);
+  for(auto i = 0, iw = 0; i < nuniq_alpha; ++i) {
+    std::vector<uint32_t> occ_alpha, vir_alpha;
+    spin_wfn_traits::state_to_occ_vir(norb, uniq_alpha[i].first, 
+      occ_alpha, vir_alpha);
+
+    const auto nbeta = uniq_alpha[i].second;
+    uad[i].reserve(nbeta);
+    for(auto j = 0; j < nbeta; ++j, ++iw) {
+      const auto& w = *(cdets_begin + iw);
+      uad[i].emplace_back(C[iw], norb, occ_alpha, w, ham_gen);
+    }
+  }
+
+#endif
+
+  //const auto n_occ_alpha = wfn_traits::count(uniq_alpha_wfn[0]);
+  const auto n_occ_alpha = spin_wfn_traits::count(uniq_alpha[0].first);
   const auto n_vir_alpha = norb - n_occ_alpha;
   const auto n_sing_alpha = n_occ_alpha * n_vir_alpha;
   const auto n_doub_alpha = (n_sing_alpha * (n_sing_alpha - norb + 1)) / 4;
@@ -277,19 +337,18 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   size_t max_size =
       std::min(asci_settings.pair_size_max,
                ncdets * (n_sing_alpha + n_sing_beta +  // AA + BB
-                         n_doub_alpha + n_sing_beta +  // AAAA + BBBB
+                         n_doub_alpha + n_doub_beta +  // AAAA + BBBB
                          n_sing_alpha * n_sing_beta    // AABB
                          ));
   asci_pairs.reserve(max_size);
 
   // Process ASCI pair contributions for each constraint
   for(const auto& con : constraints) {
-    // std::cout << std::distance(constraints.data(), &con) << "/" <<
-    // constraints.size() << std::endl;
     auto size_before = asci_pairs.size();
 
     const double h_el_tol = asci_settings.h_el_tol;
 
+#if 0
     // Loop over unique alpha strings
     for(size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
       const auto& det = uniq_alpha_wfn[i_alpha];
@@ -392,6 +451,69 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
       }  // Pruning
     }    // Unique Alpha Loop
+#else
+
+      for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
+        const auto& alpha_det = uniq_alpha[i_alpha].first;
+        const auto occ_alpha = bits_to_indices(alpha_det);
+        const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
+
+        const auto& bcd = uad[i_alpha];
+        const size_t nbeta = bcd.size();
+        for(size_t j_beta = 0; j_beta < nbeta; ++j_beta, ++iw) {
+          const auto  w = *(cdets_begin + iw);
+          const auto  c = C[iw];
+          const auto& beta_det = bcd[j_beta].beta_string;
+          const auto  h_diag = bcd[j_beta].h_diag;
+          const auto& occ_beta = bcd[j_beta].occ_beta;
+          const auto& vir_beta = bcd[j_beta].vir_beta;
+          const auto& orb_ens_alpha = bcd[j_beta].orb_ens_alpha;
+          const auto& orb_ens_beta  = bcd[j_beta].orb_ens_beta;
+
+          // AA excitations
+          generate_constraint_singles_contributions_ss(
+              c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(),
+              T_pq, norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
+              ham_gen, asci_pairs);
+
+          // AAAA excitations
+          generate_constraint_doubles_contributions_ss(
+              c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(),
+              G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+
+          // AABB excitations
+          generate_constraint_doubles_contributions_os(
+              c, w, con, occ_alpha, occ_beta, vir_beta,
+              orb_ens_alpha.data(), orb_ens_beta.data(), V_pqrs, norb, h_el_tol,
+              h_diag, E_ASCI, ham_gen, asci_pairs);
+
+          if(alpha_satisfies_con) {
+            // BB excitations
+            append_singles_asci_contributions<Spin::Beta>(
+                c, w, beta_det, occ_beta, vir_beta, occ_alpha,
+                orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb, h_el_tol,
+                h_diag, E_ASCI, ham_gen, asci_pairs);
+
+            // BBBB excitations
+            append_ss_doubles_asci_contributions<Spin::Beta>(
+                c, w, beta_det, alpha_det, occ_beta, vir_beta,
+                occ_alpha, orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag,
+                E_ASCI, ham_gen, asci_pairs);
+
+            // No excitation (push inf to remove from list)
+            asci_pairs.push_back(
+                {w, std::numeric_limits<double>::infinity(), 1.0});
+          }
+        }
+
+      // Prune Down Contributions
+      if(asci_pairs.size() > asci_settings.pair_size_max) {
+        throw std::runtime_error("DIE DIE DIE");
+      }
+
+      }  // Unique Alpha Loop
+
+#endif
 
     // Local S&A for each quad
     {
@@ -553,6 +675,7 @@ std::vector<wfn_t<N>> asci_search(
   }
 
   auto keep_large_st = clock_type::now();
+#if 0
   // Finalize scores
   for(auto& x : asci_pairs) {
     x.c_times_matel = -std::abs(x.c_times_matel);
@@ -573,8 +696,15 @@ std::vector<wfn_t<N>> asci_search(
                                   [](const auto& p) { return p.rv() < 0.0; }),
                    asci_pairs.end());
 
-  // Only do top-K on (ndets_max - ncdets) b/c CDETS will be added later
-  const size_t top_k_elements = ndets_max - ncdets;
+#else
+  // Remove core dets
+  // XXX: This assumes the constraint search for now
+  {
+  auto inf_ptr = std::partition(asci_pairs.begin(), asci_pairs.end(),
+    [](auto& p){ return !std::isinf(p.rv()); });
+  asci_pairs.erase(inf_ptr, asci_pairs.end());
+  }
+#endif
 
   auto keep_large_en = clock_type::now();
   duration_type keep_large_dur = keep_large_en - keep_large_st;
@@ -589,6 +719,9 @@ std::vector<wfn_t<N>> asci_search(
   } else {
     logger->info("  * KEEP_LARG_DUR = {:.2e} s", keep_large_dur.count());
   }
+
+  // Only do top-K on (ndets_max - ncdets) b/c CDETS will be added later
+  const size_t top_k_elements = ndets_max - ncdets;
 
   // Do Top-K to get the largest determinant contributions
   auto asci_sort_st = clock_type::now();

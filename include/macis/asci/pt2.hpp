@@ -39,76 +39,6 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
                         : spdlog::stdout_color_mt("asci_pt2");
 
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
-  // std::cout << "NDETS PT = " << ncdets <<  " " << C.size() << std::endl;
-  // std::cout << "PT E0    = " << E_ASCI << std::endl;
-
-  std::vector<uint32_t> occ_alpha, vir_alpha;
-  std::vector<uint32_t> occ_beta, vir_beta;
-
-#if 0
-  // Get unique alpha strings
-  std::vector<wfn_t<N>> uniq_alpha_wfn(cdets_begin, cdets_end);
-  std::transform(uniq_alpha_wfn.begin(), uniq_alpha_wfn.end(),
-                 uniq_alpha_wfn.begin(),
-                 [=](const auto& w) { return w & full_mask<N / 2, N>(); });
-  std::sort(uniq_alpha_wfn.begin(), uniq_alpha_wfn.end(),
-            bitset_less_comparator<N>{});
-  {
-    auto it = std::unique(uniq_alpha_wfn.begin(), uniq_alpha_wfn.end());
-    uniq_alpha_wfn.erase(it, uniq_alpha_wfn.end());
-  }
-  const size_t nuniq_alpha = uniq_alpha_wfn.size();
-
-  // For each unique alpha, create a list of beta string and store metadata
-  struct beta_coeff_data {
-    wfn_t<N> beta_string;
-    std::vector<uint32_t> occ_beta;
-    std::vector<uint32_t> vir_beta;
-    std::vector<double> orb_ens_alpha;
-    std::vector<double> orb_ens_beta;
-    double coeff;
-    double h_diag;
-
-    beta_coeff_data(double c, size_t norb,
-                    const std::vector<uint32_t>& occ_alpha, wfn_t<N> w,
-                    const HamiltonianGenerator<wfn_t<N>>& ham_gen) {
-      coeff = c;
-
-      // Compute Beta string
-      const auto beta_shift = w >> N / 2;
-      // Reduce the number of times things shift in inner loop
-      beta_string = beta_shift << N / 2;
-
-      // Compute diagonal matrix element
-      h_diag = ham_gen.matrix_element(w, w);
-
-      // Compute occ/vir for beta string
-      wfn_traits::state_to_occ_vir(norb, beta_shift, occ_beta, vir_beta);
-
-      // Precompute orbital energies
-      orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
-      orb_ens_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
-    }
-  };
-
-  struct unique_alpha_data {
-    std::vector<beta_coeff_data> bcd;
-  };
-
-  std::vector<unique_alpha_data> uad(nuniq_alpha);
-  for(auto i = 0; i < nuniq_alpha; ++i) {
-    const auto wfn_a = uniq_alpha_wfn[i];
-    std::vector<uint32_t> occ_alpha, vir_alpha;
-    wfn_traits::state_to_occ_vir(norb, wfn_a, occ_alpha, vir_alpha);
-    for(auto j = 0; j < ncdets; ++j) {
-      const auto w = *(cdets_begin + j);
-      if((w & full_mask<N / 2, N>()) == wfn_a) {
-        uad[i].bcd.emplace_back(C[j], norb, occ_alpha, w, ham_gen);
-      }
-    }
-  }
-
-#else
 
   // For each unique alpha, create a list of beta string and store metadata
   struct beta_coeff_data {
@@ -139,9 +69,6 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
     }
   };
 
-  struct unique_alpha_data {
-    std::vector<beta_coeff_data> bcd;
-  };
 
   auto uniq_alpha = get_unique_alpha(cdets_begin, cdets_end);
   const size_t nuniq_alpha = uniq_alpha.size();
@@ -149,6 +76,8 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
   std::transform(uniq_alpha.begin(), uniq_alpha.end(), uniq_alpha_wfn.begin(),
     [](const auto& p) { return wfn_traits::from_spin(p.first,0); });
 
+
+  using unique_alpha_data = std::vector<beta_coeff_data>;
   std::vector<unique_alpha_data> uad(nuniq_alpha);
   for(auto i = 0, iw = 0; i < nuniq_alpha; ++i) {
     std::vector<uint32_t> occ_alpha, vir_alpha;
@@ -156,10 +85,10 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
       occ_alpha, vir_alpha);
 
     const auto nbeta = uniq_alpha[i].second;
-    uad[i].bcd.reserve(nbeta);
+    uad[i].reserve(nbeta);
     for(auto j = 0; j < nbeta; ++j, ++iw) {
       const auto& w = *(cdets_begin + iw);
-      uad[i].bcd.emplace_back(C[iw], norb, occ_alpha, w, ham_gen);
+      uad[i].emplace_back(C[iw], norb, occ_alpha, w, ham_gen);
     }
   }
 
@@ -169,7 +98,6 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
   //    ofile << to_canonical_string(wfn_traits::from_spin(d,0)) << " " << c << std::endl;
   //  }
   //}
-#endif
 
   //const auto n_occ_alpha = wfn_traits::count(uniq_alpha_wfn[0]);
   const auto n_occ_alpha = spin_wfn_traits::count(uniq_alpha[0].first);
@@ -305,7 +233,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
         const auto occ_alpha = bits_to_indices(alpha_det);
         const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
 
-        const auto& bcd = uad[i_alpha].bcd;
+        const auto& bcd = uad[i_alpha];
         const size_t nbeta = bcd.size();
         for(size_t j_beta = 0; j_beta < nbeta; ++j_beta, ++iw) {
           const auto  w = *(cdets_begin + iw);

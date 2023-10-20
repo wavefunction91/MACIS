@@ -24,6 +24,10 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   // Sanity check on search determinants
   size_t nkeep = std::min(asci_settings.ncdets_max, wfn.size());
 
+  // Sort kept dets on alpha string
+  if(wfn.size() > 1) 
+    reorder_ci_on_alpha(wfn.begin(), wfn.begin() + nkeep, X.data());
+
   // Perform the ASCI search
   wfn = asci_search(asci_settings, ndets_max, wfn.begin(), wfn.begin() + nkeep,
                     E0, X, norb, ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),

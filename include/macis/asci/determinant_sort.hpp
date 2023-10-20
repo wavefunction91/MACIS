@@ -36,6 +36,31 @@ void reorder_ci_on_coeff(std::vector<WfnT>& dets, std::vector<double>& C) {
   dets = std::move(reorder_dets);
 }
 
+template <typename WfnIterator>
+void reorder_ci_on_alpha(WfnIterator begin, WfnIterator end, double* C) {
+  using wfn_type = typename WfnIterator::value_type;
+  using wfn_traits = wavefunction_traits<wfn_type>;
+  using cmp_type   = typename wfn_traits::spin_comparator;
+  const size_t ndets = std::distance(begin,end);
+
+  cmp_type comparator{};
+  std::vector<size_t> idx(ndets);
+  std::iota(idx.begin(), idx.end(), 0);
+  std::sort(idx.begin(), idx.end(),
+            [&](auto i, auto j) { return comparator(*(begin+i),*(begin+j)); });
+
+  std::vector<double> reorder_C(ndets);
+  std::vector<wfn_type> reorder_dets(ndets);
+  for(auto i = 0ul; i < ndets; ++i) {
+    reorder_C[i] = C[idx[i]];
+    reorder_dets[i] = *(begin + idx[i]);
+  }
+
+  std::copy(reorder_dets.begin(), reorder_dets.end(), begin);
+  std::copy(reorder_C.begin(), reorder_C.end(), C);
+
+}
+
 template <typename PairIterator>
 PairIterator sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
                                             PairIterator pairs_end) {
