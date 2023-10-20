@@ -125,6 +125,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
                          n_sing_alpha * n_sing_beta    // AABB
                          ));
   double EPT2 = 0.0;
+  size_t NPT2 = 0;
   auto pt2_st = clock_type::now();
   std::deque<size_t> print_points(100);
   for(auto i = 0; i < 100; ++i ) {
@@ -137,7 +138,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
   {
     asci_contrib_container<wfn_t<N>> asci_pairs;
     asci_pairs.reserve(max_size);
-#pragma omp for reduction(+ : EPT2)
+#pragma omp for reduction(+ : EPT2) reduction(+ : NPT2)
     for(size_t ic = 0; ic < constraints.size(); ++ic) {
       const auto& con = constraints[ic];
       if(ic >= print_points.front()) {
@@ -292,8 +293,10 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
                                                   asci_pairs.end());
         for(auto it = asci_pairs.begin(); it != uit; ++it) {
           // if(std::find(cdets_begin, cdets_end, it->state) == cdets_end)
-          if(!std::isinf(it->c_times_matel))
+          if(!std::isinf(it->c_times_matel)) {
             EPT2_local += (it->c_times_matel * it->c_times_matel) / it->h_diag;
+            NPT2++;
+          }
         }
         asci_pairs.clear();
       }
@@ -315,6 +318,9 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
   } else {
     logger->info("* PT2_DUR = ${:.2e} ms", local_pt2_dur);
   }
+
+  NPT2 = allreduce(NPT2, MPI_SUM, comm);
+  logger->info("* NPT2 = {}", NPT2);
 
   return EPT2;
 }
