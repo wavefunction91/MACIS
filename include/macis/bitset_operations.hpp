@@ -7,6 +7,9 @@
  */
 
 #pragma once
+#include <string.h>
+#include <strings.h>
+
 #include <bit>
 #include <cassert>
 #include <climits>
