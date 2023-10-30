@@ -17,7 +17,9 @@
 #include "ut_common.hpp"
 
 using wfn_type = macis::wfn_t<64>;
-TEMPLATE_TEST_CASE("CSR Hamiltonian","[ham_gen]", macis::DoubleLoopHamiltonianGenerator<wfn_type>, macis::SortedDoubleLoopHamiltonianGenerator<wfn_type> ) {
+TEMPLATE_TEST_CASE("CSR Hamiltonian", "[ham_gen]",
+                   macis::DoubleLoopHamiltonianGenerator<wfn_type>,
+                   macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>) {
   ROOT_ONLY(MPI_COMM_WORLD);
 
   size_t norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
@@ -50,23 +52,27 @@ TEMPLATE_TEST_CASE("CSR Hamiltonian","[ham_gen]", macis::DoubleLoopHamiltonianGe
   auto H = macis::make_csr_hamiltonian_block<int32_t>(
       dets.begin(), dets.end(), dets.begin(), dets.end(), ham_gen, 1e-16);
   auto en = std::chrono::high_resolution_clock::now();
-  std::cout << std::chrono::duration<double,std::milli>(en - st).count() << std::endl;
+  std::cout << std::chrono::duration<double, std::milli>(en - st).count()
+            << std::endl;
 
-//#define GENERATE_TESTS
+// #define GENERATE_TESTS
 #ifdef GENERATE_TESTS
   std::string tmp_rowptr_fname = "tmp_rowptr.bin";
   std::string tmp_colind_fname = "tmp_colind.bin";
-  std::string tmp_nzval_fname  = "tmp_nzval.bin";
+  std::string tmp_nzval_fname = "tmp_nzval.bin";
 
   std::ofstream rowptr_file(tmp_rowptr_fname, std::ios::binary);
-  rowptr_file.write((char*)H.rowptr().data(), H.rowptr().size() * sizeof(int32_t));
+  rowptr_file.write((char*)H.rowptr().data(),
+                    H.rowptr().size() * sizeof(int32_t));
   std::ofstream colind_file(tmp_colind_fname, std::ios::binary);
-  colind_file.write((char*)H.colind().data(), H.colind().size() * sizeof(int32_t));
+  colind_file.write((char*)H.colind().data(),
+                    H.colind().size() * sizeof(int32_t));
   std::ofstream nzval_file(tmp_nzval_fname, std::ios::binary);
   nzval_file.write((char*)H.nzval().data(), H.nzval().size() * sizeof(double));
 #else
 
-  //std::cout << "NEW H " << H.m() << " " << H.nnz() << " " << H.indexing() << std::endl;
+  // std::cout << "NEW H " << H.m() << " " << H.nnz() << " " << H.indexing() <<
+  // std::endl;
 
   // Read reference data
   std::vector<int32_t> ref_rowptr(H.rowptr().size()),
@@ -95,7 +101,9 @@ TEMPLATE_TEST_CASE("CSR Hamiltonian","[ham_gen]", macis::DoubleLoopHamiltonianGe
 }
 
 #ifdef MACIS_ENABLE_MPI
-TEMPLATE_TEST_CASE("Distributed CSR Hamiltonian","[ham_gen]", macis::DoubleLoopHamiltonianGenerator<wfn_type>, macis::SortedDoubleLoopHamiltonianGenerator<wfn_type> ) {
+TEMPLATE_TEST_CASE("Distributed CSR Hamiltonian", "[ham_gen]",
+                   macis::DoubleLoopHamiltonianGenerator<wfn_type>,
+                   macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>) {
   MPI_Barrier(MPI_COMM_WORLD);
   size_t norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
   size_t nocc = 5;
