@@ -16,8 +16,8 @@
 
 namespace macis {
 
-namespace KokkosEx =
-    MDSPAN_IMPL_STANDARD_NAMESPACE::MDSPAN_IMPL_PROPOSED_NAMESPACE;
+namespace KokkosEx = Kokkos;
+//    MDSPAN_IMPL_STANDARD_NAMESPACE::MDSPAN_IMPL_PROPOSED_NAMESPACE;
 
 template <typename T, size_t rank>
 using col_major_span =
