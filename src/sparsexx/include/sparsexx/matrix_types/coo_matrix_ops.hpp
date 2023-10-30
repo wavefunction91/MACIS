@@ -72,7 +72,6 @@ void coo_matrix<T, index_t, Alloc>::sort_by_row_index() {
 
 template <typename T, typename index_t, typename Alloc>
 void coo_matrix<T, index_t, Alloc>::expand_from_triangle() {
-
 #if SPARSEXX_ENABLE_RANGES_V3
 
   auto idx_zip = ranges::views::zip(rowind_, colind_);
@@ -109,7 +108,7 @@ void coo_matrix<T, index_t, Alloc>::expand_from_triangle() {
   std::cout << "UT " << upper_triangle << std::endl;
   if(diagonal or full_matrix) return;
 
-  //std::cout << "Performing Expansion..." << std::endl;
+  // std::cout << "Performing Expansion..." << std::endl;
   size_t new_nnz = 2 * nnz_ - n_;
   rowind_.reserve(new_nnz);
   colind_.reserve(new_nnz);

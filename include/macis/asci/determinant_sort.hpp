@@ -40,14 +40,15 @@ template <typename WfnIterator>
 void reorder_ci_on_alpha(WfnIterator begin, WfnIterator end, double* C) {
   using wfn_type = typename WfnIterator::value_type;
   using wfn_traits = wavefunction_traits<wfn_type>;
-  using cmp_type   = typename wfn_traits::spin_comparator;
-  const size_t ndets = std::distance(begin,end);
+  using cmp_type = typename wfn_traits::spin_comparator;
+  const size_t ndets = std::distance(begin, end);
 
   cmp_type comparator{};
   std::vector<size_t> idx(ndets);
   std::iota(idx.begin(), idx.end(), 0);
-  std::sort(idx.begin(), idx.end(),
-            [&](auto i, auto j) { return comparator(*(begin+i),*(begin+j)); });
+  std::sort(idx.begin(), idx.end(), [&](auto i, auto j) {
+    return comparator(*(begin + i), *(begin + j));
+  });
 
   std::vector<double> reorder_C(ndets);
   std::vector<wfn_type> reorder_dets(ndets);
@@ -58,7 +59,6 @@ void reorder_ci_on_alpha(WfnIterator begin, WfnIterator end, double* C) {
 
   std::copy(reorder_dets.begin(), reorder_dets.end(), begin);
   std::copy(reorder_C.begin(), reorder_C.end(), C);
-
 }
 
 template <typename PairIterator>
