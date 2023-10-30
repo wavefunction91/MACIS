@@ -217,10 +217,9 @@ class coo_matrix {
     static_assert(not Check, "insert check NYI");
     rowind_.emplace_back(i);
     colind_.emplace_back(j);
-    nzval_ .emplace_back(v);
+    nzval_.emplace_back(v);
     nnz_++;
   }
-  
 
 #ifdef SPARSEXX_ENABLE_CEREAL
   template <class Archive>

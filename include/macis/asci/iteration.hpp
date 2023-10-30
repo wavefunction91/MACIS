@@ -25,7 +25,7 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   size_t nkeep = std::min(asci_settings.ncdets_max, wfn.size());
 
   // Sort kept dets on alpha string
-  if(wfn.size() > 1) 
+  if(wfn.size() > 1)
     reorder_ci_on_alpha(wfn.begin(), wfn.begin() + nkeep, X.data());
 
   // Perform the ASCI search
@@ -33,9 +33,9 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                     E0, X, norb, ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),
                     ham_gen.G(), ham_gen.V(), ham_gen MACIS_MPI_CODE(, comm));
 
-  //std::sort(wfn.begin(), wfn.end(), bitset_less_comparator<N>{});
+  // std::sort(wfn.begin(), wfn.end(), bitset_less_comparator<N>{});
   using wfn_traits = wavefunction_traits<wfn_t<N>>;
-  using wfn_comp   = typename wfn_traits::spin_comparator;
+  using wfn_comp = typename wfn_traits::spin_comparator;
   std::sort(wfn.begin(), wfn.end(), wfn_comp{});
 
   // Rediagonalize

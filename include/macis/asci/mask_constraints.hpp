@@ -629,18 +629,15 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
 #else
 template <typename WfnType, typename ContainerType>
 auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
-                             size_t nd_othr,
-                             const ContainerType& unique_alpha,
+                             size_t nd_othr, const ContainerType& unique_alpha,
                              int world_size) {
-
   using wfn_traits = wavefunction_traits<WfnType>;
   using constraint_type = alpha_constraint<wfn_traits>;
   using string_type = typename constraint_type::constraint_type;
 
-  constexpr bool flat_container = std::is_same_v<
-      std::decay_t<WfnType>, 
-      std::decay_t<typename ContainerType::value_type>
-  >;
+  constexpr bool flat_container =
+      std::is_same_v<std::decay_t<WfnType>,
+                     std::decay_t<typename ContainerType::value_type>>;
 
   // Generate triplets + heuristic
   std::vector<std::pair<constraint_type, size_t>> constraint_sizes;
@@ -653,12 +650,12 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
 
         size_t nw = 0;
         for(const auto& alpha : unique_alpha) {
-          if constexpr (flat_container)
+          if constexpr(flat_container)
             nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
                                        nd_othr, constraint);
           else
-            nw += alpha.second * 
-              constraint_histogram(alpha.first, ns_othr, nd_othr, constraint);
+            nw += alpha.second * constraint_histogram(alpha.first, ns_othr,
+                                                      nd_othr, constraint);
         }
         if(nw) constraint_sizes.emplace_back(constraint, nw);
         total_work += nw;
@@ -697,12 +694,12 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
         size_t nw = 0;
 
         for(const auto& alpha : unique_alpha) {
-          if constexpr (flat_container)
+          if constexpr(flat_container)
             nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
                                        nd_othr, c_next);
           else
-            nw += alpha.second * 
-              constraint_histogram(alpha.first, ns_othr, nd_othr, c_next);
+            nw += alpha.second *
+                  constraint_histogram(alpha.first, ns_othr, nd_othr, c_next);
         }
         if(nw) constraint_sizes.emplace_back(c_next, nw);
         total_work += nw;
@@ -719,10 +716,8 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
 
 template <typename WfnType, typename ContainerType>
 auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
-                             size_t nd_othr,
-                             const ContainerType& unique_alpha,
+                             size_t nd_othr, const ContainerType& unique_alpha,
                              MPI_Comm comm) {
-
   using wfn_traits = wavefunction_traits<WfnType>;
   using constraint_type = alpha_constraint<wfn_traits>;
 
@@ -730,8 +725,8 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
   auto world_size = comm_size(comm);
 
   // Generate constraints subject to expected workload
-  auto constraint_sizes = gen_constraints_general<WfnType>(nlevels, norb, ns_othr,
-    nd_othr, unique_alpha, world_size);
+  auto constraint_sizes = gen_constraints_general<WfnType>(
+      nlevels, norb, ns_othr, nd_othr, unique_alpha, world_size);
 
   // Global workloads
   std::vector<size_t> workloads(world_size, 0);
@@ -757,7 +752,6 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
   //   workloads[world_rank], total_work);
 
   return constraints;
-  
 }
 #endif
 #endif
