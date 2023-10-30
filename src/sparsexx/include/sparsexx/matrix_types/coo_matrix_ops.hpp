@@ -9,8 +9,8 @@
 #pragma once
 
 #include <iostream>
-
 #include <sparsexx/sparsexx_config.hpp>
+
 #include "coo_matrix.hpp"
 
 #ifdef SPARSEXX_ENABLE_RANGES_V3
@@ -73,7 +73,6 @@ void coo_matrix<T, index_t, Alloc>::sort_by_row_index() {
 
 template <typename T, typename index_t, typename Alloc>
 void coo_matrix<T, index_t, Alloc>::expand_from_triangle() {
-
 #ifdef SPARSEXX_ENABLE_RANGES_V3
 
   auto idx_zip = ranges::views::zip(rowind_, colind_);
