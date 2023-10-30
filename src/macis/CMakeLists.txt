@@ -20,6 +20,16 @@ add_library( macis
   hamiltonian_generator/base.cxx
 )
 
+if(MACIS_ENABLE_TREXIO)
+  FetchContent_Declare( trexio
+    #GIT_REPOSITORY https://github.com/TREX-CoE/trexio
+    GIT_REPOSITORY https://github.com/wavefunction91/trexio
+  )
+  FetchContent_MakeAvailable( trexio )
+  target_link_libraries(macis PUBLIC trexio)
+
+endif()
+
 target_include_directories( macis PUBLIC 
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
