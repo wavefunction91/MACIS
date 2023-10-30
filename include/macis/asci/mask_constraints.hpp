@@ -510,6 +510,7 @@ auto make_triplet(unsigned i, unsigned j, unsigned k) {
 }
 
 #ifdef MACIS_ENABLE_MPI
+#if 0
 template <typename WfnType, typename ContainerType>
 auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
                              size_t nd_othr,
@@ -625,6 +626,140 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
 
   return constraints;
 }
+#else
+template <typename WfnType, typename ContainerType>
+auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
+                             size_t nd_othr,
+                             const ContainerType& unique_alpha,
+                             int world_size) {
+
+  using wfn_traits = wavefunction_traits<WfnType>;
+  using constraint_type = alpha_constraint<wfn_traits>;
+  using string_type = typename constraint_type::constraint_type;
+
+  constexpr bool flat_container = std::is_same_v<
+      std::decay_t<WfnType>, 
+      std::decay_t<typename ContainerType::value_type>
+  >;
+
+  // Generate triplets + heuristic
+  std::vector<std::pair<constraint_type, size_t>> constraint_sizes;
+  constraint_sizes.reserve(norb * norb * norb);
+  size_t total_work = 0;
+  for(int t_i = 0; t_i < norb; ++t_i)
+    for(int t_j = 0; t_j < t_i; ++t_j)
+      for(int t_k = 0; t_k < t_j; ++t_k) {
+        auto constraint = constraint_type::make_triplet(t_i, t_j, t_k);
+
+        size_t nw = 0;
+        for(const auto& alpha : unique_alpha) {
+          if constexpr (flat_container)
+            nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
+                                       nd_othr, constraint);
+          else
+            nw += alpha.second * 
+              constraint_histogram(alpha.first, ns_othr, nd_othr, constraint);
+        }
+        if(nw) constraint_sizes.emplace_back(constraint, nw);
+        total_work += nw;
+      }
+
+  size_t local_average = (0.8 * total_work) / world_size;
+
+  for(size_t ilevel = 0; ilevel < nlevels; ++ilevel) {
+    // Select constraints larger than average to be broken apart
+    std::vector<std::pair<constraint_type, size_t>> tps_to_next;
+    {
+      auto it = std::partition(
+          constraint_sizes.begin(), constraint_sizes.end(),
+          [=](const auto& a) { return a.second <= local_average; });
+
+      // Remove constraints from full list
+      tps_to_next = decltype(tps_to_next)(it, constraint_sizes.end());
+      constraint_sizes.erase(it, constraint_sizes.end());
+      for(auto [t, s] : tps_to_next) total_work -= s;
+    }
+
+    if(!tps_to_next.size()) break;
+
+    // Break apart constraints
+    for(auto [c, nw_trip] : tps_to_next) {
+      const auto C_min = c.C_min();
+
+      // Loop over possible constraints with one more element
+      for(auto q_l = 0; q_l < C_min; ++q_l) {
+        // Generate masks / counts
+        string_type cn_C = c.C();
+        cn_C.flip(q_l);
+        string_type cn_B = c.B() >> (C_min - q_l);
+        constraint_type c_next(cn_C, cn_B, q_l);
+
+        size_t nw = 0;
+
+        for(const auto& alpha : unique_alpha) {
+          if constexpr (flat_container)
+            nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
+                                       nd_othr, c_next);
+          else
+            nw += alpha.second * 
+              constraint_histogram(alpha.first, ns_othr, nd_othr, c_next);
+        }
+        if(nw) constraint_sizes.emplace_back(c_next, nw);
+        total_work += nw;
+      }
+    }
+  }  // Recurse into constraints
+
+  // Sort to get optimal bucket partitioning
+  std::sort(constraint_sizes.begin(), constraint_sizes.end(),
+            [](const auto& a, const auto& b) { return a.second > b.second; });
+
+  return constraint_sizes;
+}
+
+template <typename WfnType, typename ContainerType>
+auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
+                             size_t nd_othr,
+                             const ContainerType& unique_alpha,
+                             MPI_Comm comm) {
+
+  using wfn_traits = wavefunction_traits<WfnType>;
+  using constraint_type = alpha_constraint<wfn_traits>;
+
+  auto world_rank = comm_rank(comm);
+  auto world_size = comm_size(comm);
+
+  // Generate constraints subject to expected workload
+  auto constraint_sizes = gen_constraints_general<WfnType>(nlevels, norb, ns_othr,
+    nd_othr, unique_alpha, world_size);
+
+  // Global workloads
+  std::vector<size_t> workloads(world_size, 0);
+
+  // Assign work
+  std::vector<constraint_type> constraints;
+  constraints.reserve(constraint_sizes.size() / world_size);
+
+  for(auto [c, nw] : constraint_sizes) {
+    // Get rank with least amount of work
+    auto min_rank_it = std::min_element(workloads.begin(), workloads.end());
+    int min_rank = std::distance(workloads.begin(), min_rank_it);
+
+    // Assign constraint
+    *min_rank_it += nw;
+    if(world_rank == min_rank) {
+      constraints.emplace_back(c);
+    }
+  }
+
+  // if(world_rank == 0)
+  // printf("[rank %2d] AFTER LOCAL WORK = %lu TOTAL WORK = %lu\n", world_rank,
+  //   workloads[world_rank], total_work);
+
+  return constraints;
+  
+}
+#endif
 #endif
 
 #if 0
