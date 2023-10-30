@@ -93,7 +93,7 @@ if( SPARSEXX_ENABLE_RANGES_V3 )
     add_subdirectory(${range_v3_download_SOURCE_DIR} ${range_v3_download_BINARY_DIR})
     add_library( ranges INTERFACE IMPORTED )
     target_link_libraries( ranges INTERFACE range-v3 )
-    target_compile_definitions( ranges INTERFACE "SPARSEXX_ENABLE_RANGES_V3=1" )
+    #target_compile_definitions( ranges INTERFACE "SPARSEXX_ENABLE_RANGES_V3=1" )
   endif()
   list(APPEND SPARSEXX_EXTERNAL_LIBRARIES ranges)
 endif()
@@ -128,7 +128,7 @@ endif()
 if( TARGET OpenMP::OpenMP_CXX )
   target_link_libraries( sparsexx PUBLIC OpenMP::OpenMP_CXX )
 endif()
-target_link_libraries     ( sparsexx PRIVATE ${SPARSEXX_EXTERNAL_LIBRARIES} )
+target_link_libraries     ( sparsexx PUBLIC ${SPARSEXX_EXTERNAL_LIBRARIES} )
 target_include_directories( sparsexx PUBLIC 
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>

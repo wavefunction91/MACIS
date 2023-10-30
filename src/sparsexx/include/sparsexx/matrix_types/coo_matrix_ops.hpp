@@ -10,9 +10,10 @@
 
 #include <iostream>
 
+#include <sparsexx/sparsexx_config.hpp>
 #include "coo_matrix.hpp"
 
-#if SPARSEXX_ENABLE_RANGES_V3
+#ifdef SPARSEXX_ENABLE_RANGES_V3
 #include <range/v3/all.hpp>
 #endif
 #include <algorithm>
@@ -22,7 +23,7 @@ namespace sparsexx {
 
 template <typename T, typename index_t, typename Alloc>
 void coo_matrix<T, index_t, Alloc>::sort_by_row_index() {
-#if SPARSEXX_ENABLE_RANGES_V3
+#ifdef SPARSEXX_ENABLE_RANGES_V3
   auto coo_zip = ranges::views::zip(rowind_, colind_, nzval_);
 
   // Sort lex by row index
@@ -72,7 +73,8 @@ void coo_matrix<T, index_t, Alloc>::sort_by_row_index() {
 
 template <typename T, typename index_t, typename Alloc>
 void coo_matrix<T, index_t, Alloc>::expand_from_triangle() {
-#if SPARSEXX_ENABLE_RANGES_V3
+
+#ifdef SPARSEXX_ENABLE_RANGES_V3
 
   auto idx_zip = ranges::views::zip(rowind_, colind_);
 
@@ -130,7 +132,7 @@ void coo_matrix<T, index_t, Alloc>::expand_from_triangle() {
 
 template <typename T, typename index_t, typename Alloc>
 void coo_matrix<T, index_t, Alloc>::sort_by_col_index() {
-#if SPARSEXX_ENABLE_RANGES_V3
+#ifdef SPARSEXX_ENABLE_RANGES_V3
   auto coo_zip = ranges::views::zip(rowind_, colind_, nzval_);
 
   // Sort lex by row index

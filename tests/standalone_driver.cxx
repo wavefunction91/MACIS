@@ -67,7 +67,11 @@ int main(int argc, char** argv) {
   using wfn_type = macis::wfn_t<nwfn_bits>;
   using wfn_traits = macis::wavefunction_traits<wfn_type>;
 
-  MACIS_MPI_CODE(MPI_Init(&argc, &argv);)
+  MACIS_MPI_CODE(
+    int dummy; 
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &dummy);
+    if(dummy != MPI_THREAD_MULTIPLE) throw std::runtime_error("MPI Thread Init Failed");
+  )
 
 #ifdef MACIS_ENABLE_MPI
   auto world_rank = macis::comm_rank(MPI_COMM_WORLD);
