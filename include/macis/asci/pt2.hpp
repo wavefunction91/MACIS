@@ -143,7 +143,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
   if(window == MPI_WIN_NULL) throw std::runtime_error("Window failed");
   MPI_Win_lock_all(MPI_MODE_NOCHECK, window);
   // Process ASCI pair contributions for each constraint
-  // #pragma omp parallel reduction(+ : EPT2) reduction(+ : NPT2)
+  #pragma omp parallel reduction(+ : EPT2) reduction(+ : NPT2)
   {
     asci_contrib_container<wfn_t<N>> asci_pairs;
     asci_pairs.reserve(max_size);
@@ -151,7 +151,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
     // for(size_t ic = 0; ic < constraints.size(); ++ic)
     size_t ic = 0;
     while(ic < ncon_total) {
-      size_t ntake = 10;
+      size_t ntake = ic < 1000 ? 1 : 10;
       MPI_Fetch_and_op(&ntake, &ic, MPI_UINT64_T, 0, 0, MPI_SUM, window);
       MPI_Win_flush(0, window);
 
@@ -164,7 +164,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
         //   printf("[rank %d] %.1f  done\n", world_rank,
         //   double(ic)/constraints.size()*100); print_points.pop_front();
         // }
-        printf("[rank %d] %lu / %lu\n", world_rank, ic, ncon_total);
+        printf("[rank %4d tid:%4d] %lu / %lu\n", world_rank, omp_get_thread_num(), ic, ncon_total);
         const double h_el_tol = 1e-16;
 
         for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
@@ -223,6 +223,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
         }  // Unique Alpha Loop
 
         double EPT2_local = 0.0;
+        size_t NPT2_local = 0;
         // Local S&A for each quad + update EPT2
         {
           auto uit = sort_and_accumulate_asci_pairs(asci_pairs.begin(),
@@ -232,13 +233,14 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
             if(!std::isinf(it->c_times_matel)) {
               EPT2_local +=
                   (it->c_times_matel * it->c_times_matel) / it->h_diag;
-              NPT2++;
+              NPT2_local++;
             }
           }
           asci_pairs.clear();
         }
 
         EPT2 += EPT2_local;
+        NPT2 += NPT2_local;
       }  // Loc constraint loop
     }    // Constraint Loop
   }
