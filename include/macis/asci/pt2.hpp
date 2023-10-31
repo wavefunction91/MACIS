@@ -142,8 +142,8 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
                    &window_buffer, &window);
   if(window == MPI_WIN_NULL) throw std::runtime_error("Window failed");
   MPI_Win_lock_all(MPI_MODE_NOCHECK, window);
-  // Process ASCI pair contributions for each constraint
-  #pragma omp parallel reduction(+ : EPT2) reduction(+ : NPT2)
+// Process ASCI pair contributions for each constraint
+#pragma omp parallel reduction(+ : EPT2) reduction(+ : NPT2)
   {
     asci_contrib_container<wfn_t<N>> asci_pairs;
     asci_pairs.reserve(max_size);
@@ -164,7 +164,8 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
         //   printf("[rank %d] %.1f  done\n", world_rank,
         //   double(ic)/constraints.size()*100); print_points.pop_front();
         // }
-        printf("[rank %4d tid:%4d] %lu / %lu\n", world_rank, omp_get_thread_num(), ic, ncon_total);
+        printf("[rank %4d tid:%4d] %lu / %lu\n", world_rank,
+               omp_get_thread_num(), ic, ncon_total);
         const double h_el_tol = 1e-16;
 
         for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
