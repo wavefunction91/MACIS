@@ -133,7 +133,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
   // std::mutex print_barrier;
 
   const size_t ncon_total = constraints.size();
-  duration_type lock_wait_dur(0.0);
+#if 0
   MPI_Win window;
   // MPI_Win_create( &window_count, sizeof(size_t), sizeof(size_t),
   // MPI_INFO_NULL, comm, &window );
@@ -142,6 +142,9 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
                    &window_buffer, &window);
   if(window == MPI_WIN_NULL) throw std::runtime_error("Window failed");
   MPI_Win_lock_all(MPI_MODE_NOCHECK, window);
+#else
+  global_atomic<size_t> nxtval(comm);
+#endif
 // Process ASCI pair contributions for each constraint
 #pragma omp parallel reduction(+ : EPT2) reduction(+ : NPT2)
   {
@@ -152,8 +155,9 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
     size_t ic = 0;
     while(ic < ncon_total) {
       size_t ntake = ic < 1000 ? 1 : 10;
-      MPI_Fetch_and_op(&ntake, &ic, MPI_UINT64_T, 0, 0, MPI_SUM, window);
-      MPI_Win_flush(0, window);
+      //MPI_Fetch_and_op(&ntake, &ic, MPI_UINT64_T, 0, 0, MPI_SUM, window);
+      //MPI_Win_flush(0, window);
+      ic = nxtval.fetch_and_add(ntake);
 
       // Loop over assigned tasks
       const size_t c_end = std::min(ncon_total, ic + ntake);
@@ -259,12 +263,11 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
   } else {
     logger->info("* PT2_DUR = ${:.2e} ms", local_pt2_dur);
   }
-  printf("[rank %d] WAIT_DUR = %.2e\n", world_rank, lock_wait_dur.count());
 
   NPT2 = allreduce(NPT2, MPI_SUM, comm);
   logger->info("* NPT2 = {}", NPT2);
-  MPI_Win_unlock_all(window);
-  MPI_Win_free(&window);
+  //MPI_Win_unlock_all(window);
+  //MPI_Win_free(&window);
 
   return EPT2;
 }

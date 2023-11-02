@@ -228,5 +228,45 @@ struct mpi_traits<std::bitset<N>> {
   }
 };
 
+
+
+
+template <typename T>
+class global_atomic {
+  MPI_Win window_;
+  T*      buffer_;
+
+public:
+
+  global_atomic() = delete;
+
+  global_atomic(MPI_Comm comm) {
+    MPI_Win_allocate(sizeof(T), sizeof(T), MPI_INFO_NULL, comm, &buffer_,
+      &window_);
+    if(window_ == MPI_WIN_NULL) {
+      throw std::runtime_error("Window creation failed");
+    }
+    *buffer_ = 0;
+    MPI_Win_lock_all(MPI_MODE_NOCHECK, window_);
+  }
+
+  ~global_atomic() noexcept {
+    MPI_Win_unlock_all(window_);
+    MPI_Win_free(&window_);
+  }
+
+  global_atomic(const global_atomic&) = default;
+  global_atomic(global_atomic&&) noexcept = default;
+  
+  T fetch_and_add(T val) {
+    T next_val;
+    MPI_Fetch_and_op(&val, &next_val, mpi_traits<T>::datatype(), 0, 0, MPI_SUM,
+      window_);
+    MPI_Win_flush(0,window_);
+    return next_val;
+  }
+};
+
+
 }  // namespace macis
 #endif
