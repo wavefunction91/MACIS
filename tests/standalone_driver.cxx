@@ -23,6 +23,7 @@
 #include <macis/mcscf/fock_matrices.hpp>
 #include <macis/util/detail/rdm_files.hpp>
 #include <macis/util/fcidump.hpp>
+#include <macis/util/trexio.hpp>
 #include <macis/util/memory.hpp>
 #include <macis/util/moller_plesset.hpp>
 #include <macis/util/mpi.hpp>
@@ -91,29 +92,47 @@ int main(int argc, char** argv) {
     auto input_file = opts.at(1);
     INIFile input(input_file);
 
-    // Required Keywords
-    auto fcidump_fname = input.getData<std::string>("CI.FCIDUMP");
-    auto nalpha = input.getData<size_t>("CI.NALPHA");
-    auto nbeta = input.getData<size_t>("CI.NBETA");
-
-    // if(nalpha != nbeta) throw std::runtime_error("NALPHA != NBETA");
-
-    // Read FCIDUMP File
-    size_t norb = macis::read_fcidump_norb(fcidump_fname);
-    size_t norb2 = norb * norb;
-    size_t norb3 = norb2 * norb;
-    size_t norb4 = norb2 * norb2;
-
-    // XXX: Consider reading this into shared memory to avoid replication
-    std::vector<double> T(norb2), V(norb4);
-    auto E_core = macis::read_fcidump_core(fcidump_fname);
-    macis::read_fcidump_1body(fcidump_fname, T.data(), norb);
-    macis::read_fcidump_2body(fcidump_fname, V.data(), norb);
-
 #define OPT_KEYWORD(STR, RES, DTYPE) \
   if(input.containsData(STR)) {      \
     RES = input.getData<DTYPE>(STR); \
   }
+
+    // Required Keywords
+    auto nalpha = input.getData<size_t>("CI.NALPHA");
+    auto nbeta = input.getData<size_t>("CI.NBETA");
+
+    std::string reference_data_format = input.getData<std::string>("CI.REF_DATA_FORMAT");
+    std::string reference_data_file   = input.getData<std::string>("CI.REF_DATA_FILE");
+
+
+    size_t norb, norb2, norb3, norb4;
+    std::vector<double> T, V;
+    double E_core;
+    if(reference_data_format == "FCIDUMP") {
+      // Read FCIDUMP File
+      norb = macis::read_fcidump_norb(reference_data_file);
+      norb2 = norb * norb;
+      norb3 = norb2 * norb;
+      norb4 = norb2 * norb2;
+
+      // XXX: Consider reading this into shared memory to avoid replication
+      T.resize(norb2); V.resize(norb4);
+      E_core = macis::read_fcidump_core(reference_data_file);
+      macis::read_fcidump_1body(reference_data_file, T.data(), norb);
+      macis::read_fcidump_2body(reference_data_file, V.data(), norb);
+    } else { // TREXIO
+      macis::TREXIOFile trexio_file(reference_data_file, 'r', TREXIO_AUTO);
+      norb = trexio_file.read_mo_num();
+      norb2 = norb * norb;
+      norb3 = norb2 * norb;
+      norb4 = norb2 * norb2;
+
+      // XXX: Consider reading this into shared memory to avoid replication
+      T.resize(norb2); V.resize(norb4);
+      E_core = trexio_file.read_nucleus_repulsion();
+      trexio_file.read_mo_1e_int_core_hamiltonian(T.data());
+      trexio_file.read_mo_2e_int_eri(V.data());
+    }
 
     // Set up job
     std::string job_str = "MCSCF";
@@ -203,9 +222,10 @@ int main(int argc, char** argv) {
 
     if(!world_rank) {
       console->info("[Wavefunction Data]:");
-      console->info("  * JOB     = {}", job_str);
-      console->info("  * CIEXP   = {}", ciexp_str);
-      console->info("  * FCIDUMP = {}", fcidump_fname);
+      console->info("  * JOB           = {}", job_str);
+      console->info("  * CIEXP         = {}", ciexp_str);
+      console->info("  * REF_FILE_NAME = {}", reference_data_file);
+      console->info("  * REF_FILE_FMT  = {}", reference_data_format);
       if(fci_out_fname.size())
         console->info("  * FCIDUMP_OUT = {}", fci_out_fname);
       console->info("  * MP2_GUESS = {}", mp2_guess);
