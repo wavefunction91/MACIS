@@ -39,7 +39,6 @@ class SortedDoubleLoopHamiltonianGenerator
     const size_t nbra_dets = std::distance(bra_begin, bra_end);
     const size_t nket_dets = std::distance(ket_begin, ket_end);
 
-    std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
     const bool is_symm = bra_begin == ket_begin and bra_end == ket_end;
 
     // Get unique alpha strings
@@ -77,14 +76,24 @@ class SortedDoubleLoopHamiltonianGenerator
     //     << std::endl;
 
     // Populate COO matrix locally
-    sparsexx::coo_matrix<double, index_t> coo_mat(nbra_dets, nket_dets, 0, 0);
+    //sparsexx::coo_matrix<double, index_t> coo_mat(nbra_dets, nket_dets, 0, 0);
+    std::vector<index_t> row_ind, col_ind;
+    std::vector<double>  nz_val;
 
-    size_t skip1 = 0;
-    size_t skip2 = 0;
+    //size_t skip1 = 0;
+    //size_t skip2 = 0;
+
+    std::mutex coo_mat_thread_mutex;
 
     // Loop over uniq alphas in bra/ket
     auto pop_st = std::chrono::high_resolution_clock::now();
-    for(size_t ia_bra = 0; ia_bra < nuniq_bra; ++ia_bra)
+    #pragma omp parallel
+    {
+    std::vector<index_t> row_ind_loc, col_ind_loc;
+    std::vector<double>  nz_val_loc;
+    std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
+    #pragma omp for schedule(dynamic)
+    for(size_t ia_bra = 0; ia_bra < nuniq_bra; ++ia_bra) {
       if(unique_alpha_bra[ia_bra].first.any()) {
         // Extract alpha bra
         const auto bra_alpha = unique_alpha_bra[ia_bra].first;
@@ -93,7 +102,7 @@ class SortedDoubleLoopHamiltonianGenerator
         spin_wfn_traits::state_to_occ(bra_alpha, bra_occ_alpha);
 
         const auto ket_lower = is_symm ? ia_bra : 0;
-        for(size_t ia_ket = ket_lower; ia_ket < nuniq_ket; ++ia_ket)
+        for(size_t ia_ket = ket_lower; ia_ket < nuniq_ket; ++ia_ket) {
           if(unique_alpha_ket[ia_ket].first.any()) {
             // Extract alpha ket
             const auto ket_alpha = unique_alpha_ket[ia_ket].first;
@@ -104,7 +113,7 @@ class SortedDoubleLoopHamiltonianGenerator
 
             // Early exit
             if(ex_alpha_count > 4) {
-              skip1++;
+              //skip1++;
               continue;
             }
 
@@ -115,7 +124,7 @@ class SortedDoubleLoopHamiltonianGenerator
                     : 0.0;
             if(ex_alpha_count == 4 and std::abs(mat_el_4_alpha) < H_thresh) {
               // The only possible matrix element is too-small, skip everyhing
-              skip2++;
+              //skip2++;
               continue;
             }
 
@@ -164,18 +173,43 @@ class SortedDoubleLoopHamiltonianGenerator
 
                 // Insert matrix element
                 if(std::abs(h_el) > H_thresh) {
-                  coo_mat.template insert<false>(ibra, iket, h_el);
+                  //coo_mat.template insert<false>(ibra, iket, h_el);
+                  row_ind_loc.emplace_back(ibra);
+                  col_ind_loc.emplace_back(iket);
+                  nz_val_loc. emplace_back(h_el);
                   if(is_symm and ibra != iket) {
-                    coo_mat.template insert<false>(iket, ibra, h_el);
+                    //coo_mat.template insert<false>(iket, ibra, h_el);
+                    row_ind_loc.emplace_back(iket);
+                    col_ind_loc.emplace_back(ibra);
+                    nz_val_loc. emplace_back(h_el);
                   }
                 }
 
               }  // ket beta
             }    // bra beta
 
-          }  // Loop over ket alphas
-      }      // Loop over bra alphas
+          }  
+        } // Loop over ket alphas
+      }      
+    } // Loop over bra alphas
+
+    // Atomically insert into larger matrix arrays
+    #pragma omp critical
+    {
+      row_ind.insert(row_ind.end(), row_ind_loc.begin(), row_ind_loc.end());
+      //row_ind_loc.clear(); row_ind_loc.shrink_to_fit();
+      col_ind.insert(col_ind.end(), col_ind_loc.begin(), col_ind_loc.end());
+      //col_ind_loc.clear(); col_ind_loc.shrink_to_fit();
+      nz_val.insert(nz_val.end(), nz_val_loc.begin(), nz_val_loc.end());
+      //nz_val_loc.clear(); nz_val_loc.shrink_to_fit();
+    }
+
+    } // OpenMP
     auto pop_en = std::chrono::high_resolution_clock::now();
+
+    // Generate Sparse Matrix
+    sparsexx::coo_matrix<double, index_t> coo_mat(nbra_dets, nket_dets,
+      std::move(col_ind), std::move(row_ind), std::move(nz_val), 0);
 
     // Sort for CSR Conversion
     auto sort_st = std::chrono::high_resolution_clock::now();
@@ -186,12 +220,11 @@ class SortedDoubleLoopHamiltonianGenerator
     sparse_matrix_type<index_t> csr_mat(coo_mat);  // Convert to CSR Matrix
     auto conv_en = std::chrono::high_resolution_clock::now();
 
-    printf("Setup %.2e Pop %.2e Sort %.2e Conv %.2e S1 %lu S2 %lu\n",
+    printf("Setup %.2e Pop %.2e Sort %.2e Conv %.2e\n",
            std::chrono::duration<double>(setup_en - setup_st).count(),
            std::chrono::duration<double>(pop_en - pop_st).count(),
            std::chrono::duration<double>(sort_en - sort_st).count(),
-           std::chrono::duration<double>(conv_en - conv_st).count(), skip1,
-           skip2);
+           std::chrono::duration<double>(conv_en - conv_st).count());
 
     return csr_mat;
   }
