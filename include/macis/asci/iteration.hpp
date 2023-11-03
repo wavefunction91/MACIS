@@ -8,15 +8,15 @@
 
 #pragma once
 #include <macis/asci/determinant_search.hpp>
+#include <macis/mcscf/mcscf.hpp>
 #include <macis/solvers/selected_ci_diag.hpp>
-#include <macis/util/mcscf.hpp>
 
 namespace macis {
 
 template <size_t N, typename index_t = int32_t>
 auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                size_t ndets_max, double E0, std::vector<wfn_t<N>> wfn,
-               std::vector<double> X, HamiltonianGenerator<N>& ham_gen,
+               std::vector<double> X, HamiltonianGenerator<wfn_t<N>>& ham_gen,
                size_t norb MACIS_MPI_CODE(, MPI_Comm comm)) {
   // Sort wfn on coefficient weights
   if(wfn.size() > 1) reorder_ci_on_coeff(wfn, X);
@@ -24,14 +24,23 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   // Sanity check on search determinants
   size_t nkeep = std::min(asci_settings.ncdets_max, wfn.size());
 
+  // Sort kept dets on alpha string
+  if(wfn.size() > 1)
+    reorder_ci_on_alpha(wfn.begin(), wfn.begin() + nkeep, X.data());
+
   // Perform the ASCI search
   wfn = asci_search(asci_settings, ndets_max, wfn.begin(), wfn.begin() + nkeep,
                     E0, X, norb, ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),
                     ham_gen.G(), ham_gen.V(), ham_gen MACIS_MPI_CODE(, comm));
 
+  // std::sort(wfn.begin(), wfn.end(), bitset_less_comparator<N>{});
+  using wfn_traits = wavefunction_traits<wfn_t<N>>;
+  using wfn_comp = typename wfn_traits::spin_comparator;
+  std::sort(wfn.begin(), wfn.end(), wfn_comp{});
+
   // Rediagonalize
   std::vector<double> X_local;  // Precludes guess reuse
-  auto E = selected_ci_diag<N, index_t>(
+  auto E = selected_ci_diag<index_t>(
       wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
       mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol,
       X_local MACIS_MPI_CODE(, comm));

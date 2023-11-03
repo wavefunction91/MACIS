@@ -8,8 +8,8 @@
 
 #include <iostream>
 #include <lapack.hh>
+#include <macis/mcscf/orbital_energies.hpp>
 #include <macis/util/moller_plesset.hpp>
-#include <macis/util/orbital_energies.hpp>
 
 namespace macis {
 

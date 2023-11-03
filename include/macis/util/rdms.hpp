@@ -103,8 +103,9 @@ inline void rdm_contributions(wfn_t<N> bra_alpha, wfn_t<N> ket_alpha,
                               const IndexType& bra_occ_alpha,
                               const IndexType& bra_occ_beta, T val,
                               matrix_span<T> ordm, rank4_span<T> trdm) {
-  const uint32_t ex_alpha_count = ex_alpha.count();
-  const uint32_t ex_beta_count = ex_beta.count();
+  using wfn_traits = wavefunction_traits<wfn_t<N>>;
+  const uint32_t ex_alpha_count = wfn_traits::count(ex_alpha);
+  const uint32_t ex_beta_count = wfn_traits::count(ex_beta);
 
   if((ex_alpha_count + ex_beta_count) > 4) return;
 

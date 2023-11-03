@@ -11,6 +11,7 @@ project(MACIS VERSION 0.1 LANGUAGES C CXX)
 option( MACIS_ENABLE_MPI    "Enable MPI Bindings"    ON )
 option( MACIS_ENABLE_OPENMP "Enable OpenMP Bindings" ON )
 option( MACIS_ENABLE_BOOST  "Enable Boost" ON )
+option( MACIS_ENABLE_TREXIO "Enable TrexIO" ON )
 
 # CMake Modules
 list( APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake )

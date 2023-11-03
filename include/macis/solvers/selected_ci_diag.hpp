@@ -121,10 +121,9 @@ double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
   return E;
 }
 
-template <size_t N, typename index_t = int32_t>
-double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
-                        wavefunction_iterator_t<N> dets_end,
-                        HamiltonianGenerator<N>& ham_gen, double h_el_tol,
+template <typename index_t, typename WfnType, typename WfnIterator>
+double selected_ci_diag(WfnIterator dets_begin, WfnIterator dets_end,
+                        HamiltonianGenerator<WfnType>& ham_gen, double h_el_tol,
                         size_t davidson_max_m, double davidson_res_tol,
                         std::vector<double>& C_local,
                         MACIS_MPI_CODE(MPI_Comm comm, )
