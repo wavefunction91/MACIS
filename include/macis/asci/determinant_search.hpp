@@ -11,6 +11,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
+#include <omp.h>
 #include <chrono>
 #include <fstream>
 #include <macis/asci/determinant_contributions.hpp>
@@ -159,81 +160,13 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
   using wfn_comp = typename wfn_traits::spin_comparator;
   if(!std::is_sorted(cdets_begin, cdets_end, wfn_comp{}))
-    throw std::runtime_error("PT2 Only Works with Sorted Wfns");
+    throw std::runtime_error("ASCI Search Only Works with Sorted Wfns");
 
   auto logger = spdlog::get("asci_search");
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
 
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
-
-  asci_contrib_container<wfn_t<N>> asci_pairs;
-#if 0
-  std::vector<uint32_t> occ_alpha, vir_alpha;
-  std::vector<uint32_t> occ_beta, vir_beta;
-
-  // Get unique alpha strings
-  std::vector<wfn_t<N>> uniq_alpha_wfn(cdets_begin, cdets_end);
-  std::transform(uniq_alpha_wfn.begin(), uniq_alpha_wfn.end(),
-                 uniq_alpha_wfn.begin(),
-                 [=](const auto& w) { return w & full_mask<N / 2, N>(); });
-  std::sort(uniq_alpha_wfn.begin(), uniq_alpha_wfn.end(),
-            bitset_less_comparator<N>{});
-  {
-    auto it = std::unique(uniq_alpha_wfn.begin(), uniq_alpha_wfn.end());
-    uniq_alpha_wfn.erase(it, uniq_alpha_wfn.end());
-  }
-  const size_t nuniq_alpha = uniq_alpha_wfn.size();
-
-  // For each unique alpha, create a list of beta string and store metadata
-  struct beta_coeff_data {
-    wfn_t<N> beta_string;
-    std::vector<uint32_t> occ_beta;
-    std::vector<uint32_t> vir_beta;
-    std::vector<double> orb_ens_alpha;
-    std::vector<double> orb_ens_beta;
-    double coeff;
-    double h_diag;
-
-    beta_coeff_data(double c, size_t norb,
-                    const std::vector<uint32_t>& occ_alpha, wfn_t<N> w,
-                    const HamiltonianGenerator<wfn_t<N>>& ham_gen) {
-      coeff = c;
-
-      // Compute Beta string
-      const auto beta_shift = w >> N / 2;
-      // Reduce the number of times things shift in inner loop
-      beta_string = beta_shift << N / 2;
-
-      // Compute diagonal matrix element
-      h_diag = ham_gen.matrix_element(w, w);
-
-      // Compute occ/vir for beta string
-      wfn_traits::state_to_occ_vir(norb, beta_shift, occ_beta, vir_beta);
-
-      // Precompute orbital energies
-      orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
-      orb_ens_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
-    }
-  };
-
-  struct unique_alpha_data {
-    std::vector<beta_coeff_data> bcd;
-  };
-
-  std::vector<unique_alpha_data> uad(nuniq_alpha);
-  for(auto i = 0; i < nuniq_alpha; ++i) {
-    const auto wfn_a = uniq_alpha_wfn[i];
-    std::vector<uint32_t> occ_alpha, vir_alpha;
-    wfn_traits::state_to_occ_vir(norb, wfn_a, occ_alpha, vir_alpha);
-    for(auto j = 0; j < ncdets; ++j) {
-      const auto w = *(cdets_begin + j);
-      if((w & full_mask<N / 2, N>()) == wfn_a) {
-        uad[i].bcd.emplace_back(C[j], norb, occ_alpha, w, ham_gen);
-      }
-    }
-  }
-#else
 
   // For each unique alpha, create a list of beta string and store metadata
   struct beta_coeff_data {
@@ -286,7 +219,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     }
   }
 
-#endif
 
   // const auto n_occ_alpha = wfn_traits::count(uniq_alpha_wfn[0]);
   const auto n_occ_alpha = spin_wfn_traits::count(uniq_alpha[0].first);
@@ -326,9 +258,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   }
 
   auto gen_c_st = clock_type::now();
-  auto constraints = dist_constraint_general<wfn_t<N>>(
-      asci_settings.constraint_level, norb, n_sing_beta, n_doub_beta,
-      uniq_alpha_wfn, comm);
+  auto constraints = gen_constraints_general<wfn_t<N>>(
+      asci_settings.constraint_level, norb, n_sing_beta, 
+      n_doub_beta, uniq_alpha, world_size);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
@@ -339,118 +271,35 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
                          n_doub_alpha + n_doub_beta +  // AAAA + BBBB
                          n_sing_alpha * n_sing_beta    // AABB
                          ));
+
+  const size_t ncon_total = constraints.size();
+
+  // Global atomic task-id counter
+  global_atomic<size_t> nxtval(comm);
+
+  asci_contrib_container<wfn_t<N>> asci_pairs_total;
+#pragma omp parallel
+  {
+  // Process ASCI pair contributions for each constraint
+  asci_contrib_container<wfn_t<N>> asci_pairs;
   asci_pairs.reserve(max_size);
 
-  // Process ASCI pair contributions for each constraint
-  for(const auto& con : constraints) {
+  size_t ic = 0;
+  while(ic < ncon_total) {
     auto size_before = asci_pairs.size();
-
     const double h_el_tol = asci_settings.h_el_tol;
 
-#if 0
-    // Loop over unique alpha strings
-    for(size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
-      const auto& det = uniq_alpha_wfn[i_alpha];
-      const auto occ_alpha = bits_to_indices(det);
+    // Atomically get the next task ID and increment for other
+    // MPI ranks and threads
+    size_t ntake = ic < 1000 ? 1 : 10;
+    ic = nxtval.fetch_and_add(ntake);
 
-      // AA excitations
-      for(const auto& bcd : uad[i_alpha].bcd) {
-        const auto& beta = bcd.beta_string;
-        const auto& coeff = bcd.coeff;
-        const auto& h_diag = bcd.h_diag;
-        const auto& occ_beta = bcd.occ_beta;
-        const auto& orb_ens_alpha = bcd.orb_ens_alpha;
-        generate_constraint_singles_contributions_ss(
-            coeff, det | beta, con, occ_alpha, occ_beta, orb_ens_alpha.data(),
-            T_pq, norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
-            ham_gen, asci_pairs);
-      }
-
-      // AAAA excitations
-      for(const auto& bcd : uad[i_alpha].bcd) {
-        const auto& beta = bcd.beta_string;
-        const auto& coeff = bcd.coeff;
-        const auto& h_diag = bcd.h_diag;
-        const auto& occ_beta = bcd.occ_beta;
-        const auto& orb_ens_alpha = bcd.orb_ens_alpha;
-        generate_constraint_doubles_contributions_ss(
-            coeff, det | beta, con, occ_alpha, occ_beta, orb_ens_alpha.data(),
-            G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
-      }
-
-      // AABB excitations
-      for(const auto& bcd : uad[i_alpha].bcd) {
-        const auto& beta = bcd.beta_string;
-        const auto& coeff = bcd.coeff;
-        const auto& h_diag = bcd.h_diag;
-        const auto& occ_beta = bcd.occ_beta;
-        const auto& vir_beta = bcd.vir_beta;
-        const auto& orb_ens_alpha = bcd.orb_ens_alpha;
-        const auto& orb_ens_beta = bcd.orb_ens_beta;
-        generate_constraint_doubles_contributions_os(
-            coeff, det | beta, con, occ_alpha, occ_beta, vir_beta,
-            orb_ens_alpha.data(), orb_ens_beta.data(), V_pqrs, norb, h_el_tol,
-            h_diag, E_ASCI, ham_gen, asci_pairs);
-      }
-
-      // If the alpha determinant satisfies the constraint,
-      // append BB and BBBB excitations
-      if(satisfies_constraint(wfn_traits::alpha_string(det), con)) {
-        for(const auto& bcd : uad[i_alpha].bcd) {
-          const auto& beta = bcd.beta_string;
-          const auto& coeff = bcd.coeff;
-          const auto& h_diag = bcd.h_diag;
-          const auto& occ_beta = bcd.occ_beta;
-          const auto& vir_beta = bcd.vir_beta;
-          const auto& eps_beta = bcd.orb_ens_beta;
-
-          const auto state = det | beta;
-          const auto state_alpha = wfn_traits::alpha_string(state);
-          const auto state_beta = wfn_traits::beta_string(beta);
-          // BB Excitations
-          append_singles_asci_contributions<Spin::Beta>(
-              coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
-              eps_beta.data(), T_pq, norb, G_red, norb, V_red, norb, h_el_tol,
-              h_diag, E_ASCI, ham_gen, asci_pairs);
-
-          // BBBB Excitations
-          append_ss_doubles_asci_contributions<Spin::Beta>(
-              coeff, state, state_beta, state_alpha, occ_beta, vir_beta,
-              occ_alpha, eps_beta.data(), G_pqrs, norb, h_el_tol, h_diag,
-              E_ASCI, ham_gen, asci_pairs);
-
-        }  // Beta Loop
-      }    // Triplet Check
-
-      // Prune Down Contributions
-      if(asci_pairs.size() > asci_settings.pair_size_max) {
-        // Remove small contributions
-        auto it = std::partition(asci_pairs.begin() + size_before,
-                                 asci_pairs.end(), [=](const auto& x) {
-                                   return std::abs(x.rv()) >
-                                          asci_settings.rv_prune_tol;
-                                 });
-        asci_pairs.erase(it, asci_pairs.end());
-
-        auto c_indices = bits_to_indices(con.C());
-        std::string c_string;
-        for(int i = 0; i < c_indices.size(); ++i)
-          c_string += std::to_string(c_indices[i]) + " ";
-        logger->info("  * Pruning at CON = {}, NSZ = {}", c_string,
-                     asci_pairs.size());
-
-        // Extra Pruning if not sufficient
-        if(asci_pairs.size() > asci_settings.pair_size_max) {
-          logger->info("    * Removing Duplicates");
-          auto uit = sort_and_accumulate_asci_pairs(
-              asci_pairs.begin() + size_before, asci_pairs.end());
-          asci_pairs.erase(uit, asci_pairs.end());
-          logger->info("    * NSZ = {}", asci_pairs.size());
-        }
-
-      }  // Pruning
-    }    // Unique Alpha Loop
-#else
+    // Loop over assigned tasks
+    const size_t c_end = std::min(ncon_total, ic + ntake);
+    for(; ic < c_end; ++ic) {
+      const auto& con = constraints[ic].first;
+      printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
+             omp_get_thread_num(), ic, ncon_total);
 
     for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
       const auto& alpha_det = uniq_alpha[i_alpha].first;
@@ -512,7 +361,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
     }  // Unique Alpha Loop
 
-#endif
 
     // Local S&A for each quad
     {
@@ -523,19 +371,29 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       asci_pairs.erase(uit, asci_pairs.end());
 
       // Remove small contributions
-      const auto sz_tmp = asci_pairs.size();
       uit =
           std::partition(asci_pairs.begin() + size_before, asci_pairs.end(),
                          [=](const auto& x) {
                            return std::abs(x.rv()) > asci_settings.rv_prune_tol;
                          });
       asci_pairs.erase(uit, asci_pairs.end());
-      // std::cout << "REMOVED " << sz_tmp - asci_pairs.size() << " PAIRS" <<
-      // std::endl;
     }
+    } // Loc constraint loop
   }  // Constraint Loop
 
-  return asci_pairs;
+  // Insert into list
+  #pragma omp critical
+  {
+  printf("[rank %4d tid:%4d] BEFORE\n", world_rank, omp_get_thread_num());
+  asci_pairs_total.insert(asci_pairs_total.end(), asci_pairs.begin(),
+    asci_pairs.end());
+  asci_contrib_container<wfn_t<N>>().swap(asci_pairs);
+  printf("[rank %4d tid:%4d] AFTER\n", world_rank, omp_get_thread_num());
+  }
+
+  } // OpenMP
+
+  return asci_pairs_total;
 }
 #endif
 
