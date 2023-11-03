@@ -255,8 +255,8 @@ public:
     MPI_Win_free(&window_);
   }
 
-  global_atomic(const global_atomic&) = default;
-  global_atomic(global_atomic&&) noexcept = default;
+  global_atomic(const global_atomic&) = delete;
+  global_atomic(global_atomic&&) noexcept = delete;
   
   T fetch_and_add(T val) {
     T next_val;

@@ -91,15 +91,6 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
     }
   }
 
-  // if(world_rank == 0) {
-  //   std::ofstream ofile("uniq_alpha.txt");
-  //   for(auto [d, c] : uniq_alpha) {
-  //     ofile << to_canonical_string(wfn_traits::from_spin(d,0)) << " " << c <<
-  //     std::endl;
-  //   }
-  // }
-
-  // const auto n_occ_alpha = wfn_traits::count(uniq_alpha_wfn[0]);
   const auto n_occ_alpha = spin_wfn_traits::count(uniq_alpha[0].first);
   const auto n_vir_alpha = norb - n_occ_alpha;
   const auto n_sing_alpha = n_occ_alpha * n_vir_alpha;
@@ -121,56 +112,35 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
 
-  size_t max_size = 100000000ul;
-
   double EPT2 = 0.0;
   size_t NPT2 = 0;
-  auto pt2_st = clock_type::now();
-  std::deque<size_t> print_points(100);
-  for(auto i = 0; i < 100; ++i) {
-    print_points[i] = constraints.size() * (i / 100.);
-  }
-  // std::mutex print_barrier;
 
   const size_t ncon_total = constraints.size();
-#if 0
-  MPI_Win window;
-  // MPI_Win_create( &window_count, sizeof(size_t), sizeof(size_t),
-  // MPI_INFO_NULL, comm, &window );
-  size_t* window_buffer;
-  MPI_Win_allocate(sizeof(size_t), sizeof(size_t), MPI_INFO_NULL, comm,
-                   &window_buffer, &window);
-  if(window == MPI_WIN_NULL) throw std::runtime_error("Window failed");
-  MPI_Win_lock_all(MPI_MODE_NOCHECK, window);
-#else
+
+  // Global atomic task-id counter
   global_atomic<size_t> nxtval(comm);
-#endif
-// Process ASCI pair contributions for each constraint
+  const double h_el_tol = 1e-16;
+
+  auto pt2_st = clock_type::now();
 #pragma omp parallel reduction(+ : EPT2) reduction(+ : NPT2)
   {
+    // Process ASCI pair contributions for each constraint
     asci_contrib_container<wfn_t<N>> asci_pairs;
-    asci_pairs.reserve(max_size);
-    // #pragma omp for
-    // for(size_t ic = 0; ic < constraints.size(); ++ic)
+    asci_pairs.reserve(100000000ul);
     size_t ic = 0;
     while(ic < ncon_total) {
+
+      // Atomically get the next task ID and increment for other
+      // MPI ranks and threads
       size_t ntake = ic < 1000 ? 1 : 10;
-      //MPI_Fetch_and_op(&ntake, &ic, MPI_UINT64_T, 0, 0, MPI_SUM, window);
-      //MPI_Win_flush(0, window);
       ic = nxtval.fetch_and_add(ntake);
 
       // Loop over assigned tasks
       const size_t c_end = std::min(ncon_total, ic + ntake);
       for(; ic < c_end; ++ic) {
         const auto& con = constraints[ic].first;
-        // if(ic >= print_points.front()) {
-        //   //std::lock_guard<std::mutex> lock(print_barrier);
-        //   printf("[rank %d] %.1f  done\n", world_rank,
-        //   double(ic)/constraints.size()*100); print_points.pop_front();
-        // }
-        printf("[rank %4d tid:%4d] %lu / %lu\n", world_rank,
+        printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
                omp_get_thread_num(), ic, ncon_total);
-        const double h_el_tol = 1e-16;
 
         for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const auto& alpha_det = uniq_alpha[i_alpha].first;
@@ -234,7 +204,6 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
           auto uit = sort_and_accumulate_asci_pairs(asci_pairs.begin(),
                                                     asci_pairs.end());
           for(auto it = asci_pairs.begin(); it != uit; ++it) {
-            // if(std::find(cdets_begin, cdets_end, it->state) == cdets_end)
             if(!std::isinf(it->c_times_matel)) {
               EPT2_local +=
                   (it->c_times_matel * it->c_times_matel) / it->h_diag;
@@ -248,7 +217,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
         NPT2 += NPT2_local;
       }  // Loc constraint loop
     }    // Constraint Loop
-  }
+  }      // OpenMP
   auto pt2_en = clock_type::now();
 
   EPT2 = allreduce(EPT2, MPI_SUM, comm);
@@ -266,8 +235,6 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
 
   NPT2 = allreduce(NPT2, MPI_SUM, comm);
   logger->info("* NPT2 = {}", NPT2);
-  //MPI_Win_unlock_all(window);
-  //MPI_Win_free(&window);
 
   return EPT2;
 }
