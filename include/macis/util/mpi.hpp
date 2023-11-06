@@ -229,21 +229,17 @@ struct mpi_traits<std::bitset<N>> {
   }
 };
 
-
-
-
 template <typename T>
 class global_atomic {
   MPI_Win window_;
-  T*      buffer_;
+  T* buffer_;
 
-public:
-
+ public:
   global_atomic() = delete;
 
   global_atomic(MPI_Comm comm, T init = 0) {
     MPI_Win_allocate(sizeof(T), sizeof(T), MPI_INFO_NULL, comm, &buffer_,
-      &window_);
+                     &window_);
     if(window_ == MPI_WIN_NULL) {
       throw std::runtime_error("Window creation failed");
     }
@@ -262,17 +258,14 @@ public:
   T fetch_and_op(T val, MPI_Op op) {
     T next_val;
     MPI_Fetch_and_op(&val, &next_val, mpi_traits<T>::datatype(), 0, 0, op,
-      window_);
-    MPI_Win_flush(0,window_);
+                     window_);
+    MPI_Win_flush(0, window_);
     return next_val;
   }
 
   T fetch_and_add(T val) { return fetch_and_op(val, MPI_SUM); }
   T fetch_and_min(T val) { return fetch_and_op(val, MPI_MIN); }
-
-  
 };
-
 
 }  // namespace macis
 #endif

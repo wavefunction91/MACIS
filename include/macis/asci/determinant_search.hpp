@@ -7,11 +7,11 @@
  */
 
 #pragma once
+#include <omp.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
-#include <omp.h>
 #include <chrono>
 #include <fstream>
 #include <macis/asci/determinant_contributions.hpp>
@@ -220,7 +220,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     }
   }
 
-
   // const auto n_occ_alpha = wfn_traits::count(uniq_alpha_wfn[0]);
   const auto n_occ_alpha = spin_wfn_traits::count(uniq_alpha[0].first);
   const auto n_vir_alpha = norb - n_occ_alpha;
@@ -260,14 +259,14 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
   auto gen_c_st = clock_type::now();
   auto constraints = gen_constraints_general<wfn_t<N>>(
-      asci_settings.constraint_level, norb, n_sing_beta, 
-      n_doub_beta, uniq_alpha, world_size);
+      asci_settings.constraint_level, norb, n_sing_beta, n_doub_beta,
+      uniq_alpha, world_size);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
 
   size_t max_size =
-      std::min(std::min(ntdets,asci_settings.pair_size_max),
+      std::min(std::min(ntdets, asci_settings.pair_size_max),
                ncdets * (n_sing_alpha + n_sing_beta +  // AA + BB
                          n_doub_alpha + n_doub_beta +  // AAAA + BBBB
                          n_sing_alpha * n_sing_beta    // AABB
@@ -281,122 +280,121 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   asci_contrib_container<wfn_t<N>> asci_pairs_total;
 #pragma omp parallel
   {
-  // Process ASCI pair contributions for each constraint
-  asci_contrib_container<wfn_t<N>> asci_pairs;
-  asci_pairs.reserve(max_size);
+    // Process ASCI pair contributions for each constraint
+    asci_contrib_container<wfn_t<N>> asci_pairs;
+    asci_pairs.reserve(max_size);
 
-  size_t ic = 0;
-  while(ic < ncon_total) {
-    auto size_before = asci_pairs.size();
-    const double h_el_tol = asci_settings.h_el_tol;
+    size_t ic = 0;
+    while(ic < ncon_total) {
+      auto size_before = asci_pairs.size();
+      const double h_el_tol = asci_settings.h_el_tol;
 
-    // Atomically get the next task ID and increment for other
-    // MPI ranks and threads
-    size_t ntake = ic < 1000 ? 1 : 10;
-    ic = nxtval.fetch_and_add(ntake);
+      // Atomically get the next task ID and increment for other
+      // MPI ranks and threads
+      size_t ntake = ic < 1000 ? 1 : 10;
+      ic = nxtval.fetch_and_add(ntake);
 
-    // Loop over assigned tasks
-    const size_t c_end = std::min(ncon_total, ic + ntake);
-    for(; ic < c_end; ++ic) {
-      const auto& con = constraints[ic].first;
-      //printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
-      //       omp_get_thread_num(), ic, ncon_total);
+      // Loop over assigned tasks
+      const size_t c_end = std::min(ncon_total, ic + ntake);
+      for(; ic < c_end; ++ic) {
+        const auto& con = constraints[ic].first;
+        // printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
+        //        omp_get_thread_num(), ic, ncon_total);
 
-    for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
-      const auto& alpha_det = uniq_alpha[i_alpha].first;
-      const auto occ_alpha = bits_to_indices(alpha_det);
-      const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
+        for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
+          const auto& alpha_det = uniq_alpha[i_alpha].first;
+          const auto occ_alpha = bits_to_indices(alpha_det);
+          const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
 
-      const auto& bcd = uad[i_alpha];
-      const size_t nbeta = bcd.size();
-      for(size_t j_beta = 0; j_beta < nbeta; ++j_beta, ++iw) {
-        const auto w = *(cdets_begin + iw);
-        const auto c = C[iw];
-        const auto& beta_det = bcd[j_beta].beta_string;
-        const auto h_diag = bcd[j_beta].h_diag;
-        const auto& occ_beta = bcd[j_beta].occ_beta;
-        const auto& vir_beta = bcd[j_beta].vir_beta;
-        const auto& orb_ens_alpha = bcd[j_beta].orb_ens_alpha;
-        const auto& orb_ens_beta = bcd[j_beta].orb_ens_beta;
+          const auto& bcd = uad[i_alpha];
+          const size_t nbeta = bcd.size();
+          for(size_t j_beta = 0; j_beta < nbeta; ++j_beta, ++iw) {
+            const auto w = *(cdets_begin + iw);
+            const auto c = C[iw];
+            const auto& beta_det = bcd[j_beta].beta_string;
+            const auto h_diag = bcd[j_beta].h_diag;
+            const auto& occ_beta = bcd[j_beta].occ_beta;
+            const auto& vir_beta = bcd[j_beta].vir_beta;
+            const auto& orb_ens_alpha = bcd[j_beta].orb_ens_alpha;
+            const auto& orb_ens_beta = bcd[j_beta].orb_ens_beta;
 
-        // AA excitations
-        generate_constraint_singles_contributions_ss(
-            c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), T_pq, norb,
-            G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
-            asci_pairs);
+            // AA excitations
+            generate_constraint_singles_contributions_ss(
+                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), T_pq,
+                norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
+                ham_gen, asci_pairs);
 
-        // AAAA excitations
-        generate_constraint_doubles_contributions_ss(
-            c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs, norb,
-            h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+            // AAAA excitations
+            generate_constraint_doubles_contributions_ss(
+                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
+                norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
 
-        // AABB excitations
-        generate_constraint_doubles_contributions_os(
-            c, w, con, occ_alpha, occ_beta, vir_beta, orb_ens_alpha.data(),
-            orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-            ham_gen, asci_pairs);
+            // AABB excitations
+            generate_constraint_doubles_contributions_os(
+                c, w, con, occ_alpha, occ_beta, vir_beta, orb_ens_alpha.data(),
+                orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+                ham_gen, asci_pairs);
 
-        if(alpha_satisfies_con) {
-          // BB excitations
-          append_singles_asci_contributions<Spin::Beta>(
-              c, w, beta_det, occ_beta, vir_beta, occ_alpha,
-              orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb,
-              h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+            if(alpha_satisfies_con) {
+              // BB excitations
+              append_singles_asci_contributions<Spin::Beta>(
+                  c, w, beta_det, occ_beta, vir_beta, occ_alpha,
+                  orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb,
+                  h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
 
-          // BBBB excitations
-          append_ss_doubles_asci_contributions<Spin::Beta>(
-              c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
-              orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-              ham_gen, asci_pairs);
+              // BBBB excitations
+              append_ss_doubles_asci_contributions<Spin::Beta>(
+                  c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
+                  orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+                  ham_gen, asci_pairs);
 
-          // No excitation (push inf to remove from list)
-          asci_pairs.push_back(
-              {w, std::numeric_limits<double>::infinity(), 1.0});
+              // No excitation (push inf to remove from list)
+              asci_pairs.push_back(
+                  {w, std::numeric_limits<double>::infinity(), 1.0});
+            }
+          }
+
+          // Prune Down Contributions
+          if(asci_pairs.size() > asci_settings.pair_size_max) {
+            throw std::runtime_error("DIE DIE DIE");
+          }
+
+        }  // Unique Alpha Loop
+
+        // Local S&A for each quad
+        {
+          if(size_before > asci_pairs.size())
+            throw std::runtime_error("DIE DIE DIE");
+          auto uit = sort_and_accumulate_asci_pairs(
+              asci_pairs.begin() + size_before, asci_pairs.end());
+          asci_pairs.erase(uit, asci_pairs.end());
+
+          // Remove small contributions
+          uit = std::partition(asci_pairs.begin() + size_before,
+                               asci_pairs.end(), [=](const auto& x) {
+                                 return std::abs(x.rv()) >
+                                        asci_settings.rv_prune_tol;
+                               });
+          asci_pairs.erase(uit, asci_pairs.end());
         }
-      }
+      }  // Loc constraint loop
+    }    // Constraint Loop
 
-      // Prune Down Contributions
-      if(asci_pairs.size() > asci_settings.pair_size_max) {
-        throw std::runtime_error("DIE DIE DIE");
-      }
-
-    }  // Unique Alpha Loop
-
-
-    // Local S&A for each quad
+// Insert into list
+#pragma omp critical
     {
-      if(size_before > asci_pairs.size())
-        throw std::runtime_error("DIE DIE DIE");
-      auto uit = sort_and_accumulate_asci_pairs(
-          asci_pairs.begin() + size_before, asci_pairs.end());
-      asci_pairs.erase(uit, asci_pairs.end());
-
-      // Remove small contributions
-      uit =
-          std::partition(asci_pairs.begin() + size_before, asci_pairs.end(),
-                         [=](const auto& x) {
-                           return std::abs(x.rv()) > asci_settings.rv_prune_tol;
-                         });
-      asci_pairs.erase(uit, asci_pairs.end());
+      if(asci_pairs_total.size()) {
+        // Preallocate space for insertion
+        asci_pairs_total.reserve(asci_pairs.size() + asci_pairs_total.size());
+        asci_pairs_total.insert(asci_pairs_total.end(), asci_pairs.begin(),
+                                asci_pairs.end());
+      } else {
+        asci_pairs_total = std::move(asci_pairs);
+      }
+      asci_contrib_container<wfn_t<N>>().swap(asci_pairs);
     }
-    } // Loc constraint loop
-  }  // Constraint Loop
 
-  // Insert into list
-  #pragma omp critical
-  {
-  if(asci_pairs_total.size()) {
-    // Preallocate space for insertion
-    asci_pairs_total.reserve(asci_pairs.size() + asci_pairs_total.size());
-    asci_pairs_total.insert(asci_pairs_total.end(), asci_pairs.begin(),
-      asci_pairs.end());
-  } else {
-    asci_pairs_total = std::move(asci_pairs);
-  }
-  asci_contrib_container<wfn_t<N>>().swap(asci_pairs);
-  }
-
-  } // OpenMP
+  }  // OpenMP
 
   return asci_pairs_total;
 }
@@ -462,8 +460,8 @@ std::vector<wfn_t<N>> asci_search(
   // #ifdef MACIS_ENABLE_MPI
   // else
   asci_pairs = asci_contributions_constraint(
-      asci_settings, ndets_max, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
-      V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
+      asci_settings, ndets_max, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq,
+      G_red, V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
   // #endif
   auto pairs_en = clock_type::now();
 

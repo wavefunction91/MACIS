@@ -129,7 +129,6 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
     asci_pairs.reserve(100000000ul);
     size_t ic = 0;
     while(ic < ncon_total) {
-
       // Atomically get the next task ID and increment for other
       // MPI ranks and threads
       size_t ntake = ic < 1000 ? 1 : 10;
