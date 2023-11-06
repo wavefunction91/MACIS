@@ -125,6 +125,7 @@ REGISTER_MPI_TYPE(int, MPI_INT);
 REGISTER_MPI_TYPE(double, MPI_DOUBLE);
 REGISTER_MPI_TYPE(float, MPI_FLOAT);
 REGISTER_MPI_TYPE(size_t, MPI_UINT64_T);
+REGISTER_MPI_TYPE(int64_t, MPI_INT64_T);
 
 #undef REGISTER_MPI_TYPE
 
@@ -240,13 +241,13 @@ public:
 
   global_atomic() = delete;
 
-  global_atomic(MPI_Comm comm) {
+  global_atomic(MPI_Comm comm, T init = 0) {
     MPI_Win_allocate(sizeof(T), sizeof(T), MPI_INFO_NULL, comm, &buffer_,
       &window_);
     if(window_ == MPI_WIN_NULL) {
       throw std::runtime_error("Window creation failed");
     }
-    *buffer_ = 0;
+    *buffer_ = init;
     MPI_Win_lock_all(MPI_MODE_NOCHECK, window_);
   }
 
@@ -257,14 +258,19 @@ public:
 
   global_atomic(const global_atomic&) = delete;
   global_atomic(global_atomic&&) noexcept = delete;
-  
-  T fetch_and_add(T val) {
+
+  T fetch_and_op(T val, MPI_Op op) {
     T next_val;
-    MPI_Fetch_and_op(&val, &next_val, mpi_traits<T>::datatype(), 0, 0, MPI_SUM,
+    MPI_Fetch_and_op(&val, &next_val, mpi_traits<T>::datatype(), 0, 0, op,
       window_);
     MPI_Win_flush(0,window_);
     return next_val;
   }
+
+  T fetch_and_add(T val) { return fetch_and_op(val, MPI_SUM); }
+  T fetch_and_min(T val) { return fetch_and_op(val, MPI_MIN); }
+
+  
 };
 
 

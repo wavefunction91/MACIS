@@ -147,7 +147,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
 #ifdef MACIS_ENABLE_MPI
 template <size_t N>
 asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
-    ASCISettings asci_settings, wavefunction_iterator_t<N> cdets_begin,
+    ASCISettings asci_settings, const size_t ntdets,
+    wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
@@ -266,7 +267,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
 
   size_t max_size =
-      std::min(asci_settings.pair_size_max,
+      std::min(std::min(ntdets,asci_settings.pair_size_max),
                ncdets * (n_sing_alpha + n_sing_beta +  // AA + BB
                          n_doub_alpha + n_doub_beta +  // AAAA + BBBB
                          n_sing_alpha * n_sing_beta    // AABB
@@ -298,8 +299,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     const size_t c_end = std::min(ncon_total, ic + ntake);
     for(; ic < c_end; ++ic) {
       const auto& con = constraints[ic].first;
-      printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
-             omp_get_thread_num(), ic, ncon_total);
+      //printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
+      //       omp_get_thread_num(), ic, ncon_total);
 
     for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
       const auto& alpha_det = uniq_alpha[i_alpha].first;
@@ -384,11 +385,15 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   // Insert into list
   #pragma omp critical
   {
-  printf("[rank %4d tid:%4d] BEFORE\n", world_rank, omp_get_thread_num());
-  asci_pairs_total.insert(asci_pairs_total.end(), asci_pairs.begin(),
-    asci_pairs.end());
+  if(asci_pairs_total.size()) {
+    // Preallocate space for insertion
+    asci_pairs_total.reserve(asci_pairs.size() + asci_pairs_total.size());
+    asci_pairs_total.insert(asci_pairs_total.end(), asci_pairs.begin(),
+      asci_pairs.end());
+  } else {
+    asci_pairs_total = std::move(asci_pairs);
+  }
   asci_contrib_container<wfn_t<N>>().swap(asci_pairs);
-  printf("[rank %4d tid:%4d] AFTER\n", world_rank, omp_get_thread_num());
   }
 
   } // OpenMP
@@ -457,7 +462,7 @@ std::vector<wfn_t<N>> asci_search(
   // #ifdef MACIS_ENABLE_MPI
   // else
   asci_pairs = asci_contributions_constraint(
-      asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
+      asci_settings, ndets_max, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
       V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
   // #endif
   auto pairs_en = clock_type::now();
@@ -469,6 +474,8 @@ std::vector<wfn_t<N>> asci_search(
     size_t npairs = asci_pairs.size();
 #endif
     logger->info("  * ASCI Kept {} Pairs", npairs);
+    if(npairs < ndets_max)
+      logger->info("    * WARNING: Kept ASCI pairs less than requested TDETS");
 
 #ifdef MACIS_ENABLE_MPI
     if(world_size > 1) {
@@ -596,6 +603,7 @@ std::vector<wfn_t<N>> asci_search(
           dist_quickselect(scores.begin(), scores.end(), top_k_elements, comm,
                            std::greater<double>{}, std::equal_to<double>{});
 
+      logger->info("  * Kth Score Pivot = {.2e}", kth_score);
       // Partition local pairs into less / eq batches
       auto [g_begin, e_begin, l_begin, _end] = leg_partition(
           asci_pairs.begin(), asci_pairs.end(), kth_score,
