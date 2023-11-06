@@ -134,8 +134,8 @@ void read_fcidump_1body(std::string fname, col_major_span<double, 2> T) {
 void read_fcidump_1body(std::string fname, double* T, size_t LDT) {
   auto norb = read_fcidump_norb(fname);
   col_major_span<double, 2> T_map(T, LDT, norb);
-  read_fcidump_1body(fname, Kokkos::submdspan(T_map, std::pair{0, norb},
-                                                Kokkos::full_extent));
+  read_fcidump_1body(
+      fname, Kokkos::submdspan(T_map, std::pair{0, norb}, Kokkos::full_extent));
 }
 
 void read_fcidump_2body(std::string fname, col_major_span<double, 4> V) {
@@ -177,8 +177,8 @@ void read_fcidump_2body(std::string fname, double* V, size_t LDV) {
   auto norb = read_fcidump_norb(fname);
   col_major_span<double, 4> V_map(V, LDV, LDV, LDV, norb);
   auto sl = std::pair{0, norb};
-  read_fcidump_2body(
-      fname, Kokkos::submdspan(V_map, sl, sl, sl, Kokkos::full_extent));
+  read_fcidump_2body(fname,
+                     Kokkos::submdspan(V_map, sl, sl, sl, Kokkos::full_extent));
 }
 
 bool is_2body_diagonal(std::string fname) {
