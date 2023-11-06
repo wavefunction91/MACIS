@@ -100,6 +100,28 @@ void TREXIOFile::read_mo_2e_int_eri(double* V) const {
 }
 
 
+int64_t TREXIOFile::read_determinant_num() const {
+  int64_t ndet;
+  auto rc = trexio_read_determinant_num_64(file_handle_, &ndet);
+  if(rc != TREXIO_SUCCESS) TREXIO_EXCEPTION(rc);
+  return ndet;
+}
+
+int32_t TREXIOFile::get_determinant_int64_num() const {
+  int32_t n64;
+  auto rc = trexio_get_int64_num(file_handle_, &n64);
+  if(rc != TREXIO_SUCCESS) TREXIO_EXCEPTION(rc);
+  return n64;
+}
+
+void TREXIOFile::read_determinant_list(int64_t ndet, int64_t* dets, int64_t ioff) const {
+  int64_t icount = ndet;
+  auto rc = trexio_read_determinant_list(file_handle_, ioff, &icount, dets);
+  if(rc != TREXIO_SUCCESS) TREXIO_EXCEPTION(rc);
+}
+
+
+
 
 
 
@@ -140,6 +162,12 @@ void TREXIOFile::write_mo_2e_int_eri(const double* V) {
 
   auto rc = trexio_write_mo_2e_int_eri(file_handle_, 0, nquad, 
     idx[0].data(), V_compress.data());
+  if(rc != TREXIO_SUCCESS) TREXIO_EXCEPTION(rc);
+}
+
+void TREXIOFile::write_determinant_list(int64_t ndet, const int64_t* dets, int64_t ioff) {
+  int64_t icount = ndet;
+  auto rc = trexio_write_determinant_list(file_handle_, ioff, icount, dets);
   if(rc != TREXIO_SUCCESS) TREXIO_EXCEPTION(rc);
 }
 

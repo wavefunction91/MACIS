@@ -603,7 +603,7 @@ std::vector<wfn_t<N>> asci_search(
           dist_quickselect(scores.begin(), scores.end(), top_k_elements, comm,
                            std::greater<double>{}, std::equal_to<double>{});
 
-      logger->info("  * Kth Score Pivot = {.2e}", kth_score);
+      logger->info("  * Kth Score Pivot = {:.2e}", kth_score);
       // Partition local pairs into less / eq batches
       auto [g_begin, e_begin, l_begin, _end] = leg_partition(
           asci_pairs.begin(), asci_pairs.end(), kth_score,

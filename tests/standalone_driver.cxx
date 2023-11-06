@@ -195,7 +195,7 @@ int main(int argc, char** argv) {
     macis::ASCISettings asci_settings;
     std::string asci_wfn_fname, asci_wfn_out_fname;
     double asci_E0 = 0.0;
-    bool compute_asci_E0 = true;
+    bool compute_asci_E0 = true, pt2 = true;
     OPT_KEYWORD("ASCI.NTDETS_MAX", asci_settings.ntdets_max, size_t);
     OPT_KEYWORD("ASCI.NTDETS_MIN", asci_settings.ntdets_min, size_t);
     OPT_KEYWORD("ASCI.NCDETS_MAX", asci_settings.ncdets_max, size_t);
@@ -216,6 +216,7 @@ int main(int argc, char** argv) {
       asci_E0 = input.getData<double>("ASCI.E0_WFN");
       compute_asci_E0 = false;
     }
+    OPT_KEYWORD("ASCI.PT2", pt2, bool);
 
     bool mp2_guess = false;
     OPT_KEYWORD("MCSCF.MP2_GUESS", mp2_guess, bool);
@@ -307,10 +308,8 @@ int main(int argc, char** argv) {
     std::vector<double> active_ordm(n_active * n_active);
     std::vector<double> active_trdm(active_ordm.size() * active_ordm.size());
 
-    bool pt2 = true;
     double E0 = 0;
     double EPT2 = 0;
-
     // CI
     if(job == Job::CI) {
       using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
@@ -401,7 +400,16 @@ int main(int argc, char** argv) {
 
         if(asci_wfn_out_fname.size() and !world_rank) {
           console->info("Writing ASCI Wavefunction to {}", asci_wfn_out_fname);
+          //if(reference_data_format == "TREXIO") {
+          //  console->info("  * Format TREXIO");
+          //  macis::TREXIOFile trexio_file(asci_wfn_out_fname, 'w', TREXIO_HDF5);
+          //  trexio_file.write_mo_num(nwfn_bits/2); // Trick TREXIO
+          //  trexio_file.write_determinant_list(dets.size(), 
+          //    reinterpret_cast<int64_t*>(dets.data()));
+          //} else {
+          console->info("  * Format TEXT");
           macis::write_wavefunction(asci_wfn_out_fname, n_active, dets, C);
+          //}
         }
 
         // Dump Hamiltonian

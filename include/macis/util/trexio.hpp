@@ -38,11 +38,15 @@ public:
   double read_nucleus_repulsion() const;
   void read_mo_1e_int_core_hamiltonian(double* h) const;
   void read_mo_2e_int_eri(double* V) const;
+  int64_t read_determinant_num() const;
+  int32_t get_determinant_int64_num() const;
+  void read_determinant_list(int64_t ndet, int64_t* dets, int64_t ioff = 0) const;
 
   void write_mo_num(int64_t nmo);
   void write_nucleus_repulsion(double E);
   void write_mo_1e_int_core_hamiltonian(const double* h);
   void write_mo_2e_int_eri(const double* V);
+  void write_determinant_list(int64_t ndet, const int64_t* dets, int64_t ioff = 0);
   
 };
 
