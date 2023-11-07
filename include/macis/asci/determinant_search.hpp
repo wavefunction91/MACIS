@@ -299,8 +299,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     const size_t c_end = std::min(ncon_total, ic + ntake);
     for(; ic < c_end; ++ic) {
       const auto& con = constraints[ic].first;
-      //printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
-      //       omp_get_thread_num(), ic, ncon_total);
+      printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
+             omp_get_thread_num(), ic, ncon_total);
 
     for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
       const auto& alpha_det = uniq_alpha[i_alpha].first;

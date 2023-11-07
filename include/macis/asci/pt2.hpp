@@ -107,7 +107,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
   // auto constraints = dist_constraint_general<wfn_t<N>>(
   //     5, norb, n_sing_beta, n_doub_beta, uniq_alpha, comm);
   auto constraints = gen_constraints_general<wfn_t<N>>(
-      5, norb, n_sing_beta, n_doub_beta, uniq_alpha, world_size);
+      10, norb, n_sing_beta, n_doub_beta, uniq_alpha, world_size * omp_get_max_threads());
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
@@ -195,6 +195,15 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
             }
           }
 
+          //if(not (i_alpha%10)) {
+          //// Cleanup
+          //auto uit = sort_and_accumulate_asci_pairs(asci_pairs.begin(),
+          //                                          asci_pairs.end());
+          //asci_pairs.erase(uit, asci_pairs.end());
+          //  printf("[rank %4d tid:%4d] IC = %lu / %lu IA = %lu / %lu SZ = %lu\n", world_rank,
+          //         omp_get_thread_num(), ic, ncon_total, i_alpha, nuniq_alpha, asci_pairs.size());
+          //}
+ 
         }  // Unique Alpha Loop
 
         double EPT2_local = 0.0;

@@ -229,6 +229,10 @@ int main(int argc, char** argv) {
       console->info("  * REF_FILE_FMT  = {}", reference_data_format);
       if(fci_out_fname.size())
         console->info("  * FCIDUMP_OUT = {}", fci_out_fname);
+      console->info("  * NORBITAL  = {}", norb);
+      console->info("  * NINACTIVE = {}", n_inactive);
+      console->info("  * NACTIVE   = {}", n_active);
+      console->info("  * NVIRTUAL  = {}", n_virtual);
       console->info("  * MP2_GUESS = {}", mp2_guess);
 
       console->debug("READ {} 1-body integrals and {} 2-body integrals",
