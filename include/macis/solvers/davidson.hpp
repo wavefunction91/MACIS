@@ -378,9 +378,21 @@ auto p_davidson(int64_t N_local, int64_t max_m, const Functor& op,
 
     // Compute new vector
     // (D - LAM(0)*I) * W = -R ==> W = -(D - LAM(0)*I)**-1 * R
+    double E1_denom = 0, E1_num = 0;
     for(auto j = 0; j < N_local; ++j) {
       R_local[j] = -R_local[j] / (D_local[j] - LAM[0]);
+      E1_num   += X_local[j] * R_local[j];
+      E1_denom += X_local[j] * X_local[j] / (D_local[j] - LAM[0]);
     }
+    E1_denom = allreduce(E1_denom, MPI_SUM, comm);
+    E1_num   = allreduce(E1_num,   MPI_SUM, comm);
+    const double E1 = E1_num / E1_denom;
+
+    for(auto j = 0; j < N_local; ++j) {
+      R_local[j] += E1 * X_local[j] / (D_local[j] - LAM[0]);
+    }
+
+    
 
     // Project new vector out form old vectors
     p_gram_schmidt(N_local, k, V_local.data(), N_local, R_local, comm);
