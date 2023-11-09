@@ -84,8 +84,13 @@ class SortedDoubleLoopHamiltonianGenerator
     // size_t skip1 = 0;
     // size_t skip2 = 0;
 
-    std::mutex coo_mat_thread_mutex;
-
+    auto fast_insert = [](auto& old_vec, auto&& new_vec) {
+      if(old_vec.size() == 0) old_vec = std::move(new_vec);
+      else {
+        old_vec.reserve(old_vec.size() + new_vec.size());
+        old_vec.insert(old_vec.end(), new_vec.begin(), new_vec.end());
+      }
+    };
     // Loop over uniq alphas in bra/ket
     auto pop_st = std::chrono::high_resolution_clock::now();
 #pragma omp parallel
@@ -197,12 +202,18 @@ class SortedDoubleLoopHamiltonianGenerator
 // Atomically insert into larger matrix arrays
 #pragma omp critical
       {
+#if 0
         row_ind.insert(row_ind.end(), row_ind_loc.begin(), row_ind_loc.end());
         // row_ind_loc.clear(); row_ind_loc.shrink_to_fit();
         col_ind.insert(col_ind.end(), col_ind_loc.begin(), col_ind_loc.end());
         // col_ind_loc.clear(); col_ind_loc.shrink_to_fit();
         nz_val.insert(nz_val.end(), nz_val_loc.begin(), nz_val_loc.end());
         // nz_val_loc.clear(); nz_val_loc.shrink_to_fit();
+#else
+        fast_insert(row_ind, row_ind_loc);
+        fast_insert(col_ind, col_ind_loc);
+        fast_insert(nz_val,  nz_val_loc );
+#endif
       }
 
     }  // OpenMP

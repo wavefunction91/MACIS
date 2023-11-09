@@ -13,7 +13,7 @@
 
 namespace macis {
 
-template <size_t N, typename index_t = int32_t>
+template <size_t N, typename index_t>
 auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                size_t ndets_max, double E0, std::vector<wfn_t<N>> wfn,
                std::vector<double> X, HamiltonianGenerator<wfn_t<N>>& ham_gen,
