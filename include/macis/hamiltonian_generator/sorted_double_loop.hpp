@@ -85,7 +85,8 @@ class SortedDoubleLoopHamiltonianGenerator
     // size_t skip2 = 0;
 
     auto fast_insert = [](auto& old_vec, auto&& new_vec) {
-      if(old_vec.size() == 0) old_vec = std::move(new_vec);
+      if(old_vec.size() == 0)
+        old_vec = std::move(new_vec);
       else {
         old_vec.reserve(old_vec.size() + new_vec.size());
         old_vec.insert(old_vec.end(), new_vec.begin(), new_vec.end());
@@ -212,7 +213,7 @@ class SortedDoubleLoopHamiltonianGenerator
 #else
         fast_insert(row_ind, row_ind_loc);
         fast_insert(col_ind, col_ind_loc);
-        fast_insert(nz_val,  nz_val_loc );
+        fast_insert(nz_val, nz_val_loc);
 #endif
       }
 
