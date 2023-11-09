@@ -76,140 +76,142 @@ class SortedDoubleLoopHamiltonianGenerator
     //     << std::endl;
 
     // Populate COO matrix locally
-    //sparsexx::coo_matrix<double, index_t> coo_mat(nbra_dets, nket_dets, 0, 0);
+    // sparsexx::coo_matrix<double, index_t> coo_mat(nbra_dets, nket_dets, 0,
+    // 0);
     std::vector<index_t> row_ind, col_ind;
-    std::vector<double>  nz_val;
+    std::vector<double> nz_val;
 
-    //size_t skip1 = 0;
-    //size_t skip2 = 0;
+    // size_t skip1 = 0;
+    // size_t skip2 = 0;
 
     std::mutex coo_mat_thread_mutex;
 
     // Loop over uniq alphas in bra/ket
     auto pop_st = std::chrono::high_resolution_clock::now();
-    #pragma omp parallel
+#pragma omp parallel
     {
-    std::vector<index_t> row_ind_loc, col_ind_loc;
-    std::vector<double>  nz_val_loc;
-    std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
-    #pragma omp for schedule(dynamic)
-    for(size_t ia_bra = 0; ia_bra < nuniq_bra; ++ia_bra) {
-      if(unique_alpha_bra[ia_bra].first.any()) {
-        // Extract alpha bra
-        const auto bra_alpha = unique_alpha_bra[ia_bra].first;
-        const size_t beta_st_bra = unique_alpha_bra_idx[ia_bra];
-        const size_t beta_en_bra = unique_alpha_bra_idx[ia_bra + 1];
-        spin_wfn_traits::state_to_occ(bra_alpha, bra_occ_alpha);
+      std::vector<index_t> row_ind_loc, col_ind_loc;
+      std::vector<double> nz_val_loc;
+      std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
+#pragma omp for schedule(dynamic)
+      for(size_t ia_bra = 0; ia_bra < nuniq_bra; ++ia_bra) {
+        if(unique_alpha_bra[ia_bra].first.any()) {
+          // Extract alpha bra
+          const auto bra_alpha = unique_alpha_bra[ia_bra].first;
+          const size_t beta_st_bra = unique_alpha_bra_idx[ia_bra];
+          const size_t beta_en_bra = unique_alpha_bra_idx[ia_bra + 1];
+          spin_wfn_traits::state_to_occ(bra_alpha, bra_occ_alpha);
 
-        const auto ket_lower = is_symm ? ia_bra : 0;
-        for(size_t ia_ket = ket_lower; ia_ket < nuniq_ket; ++ia_ket) {
-          if(unique_alpha_ket[ia_ket].first.any()) {
-            // Extract alpha ket
-            const auto ket_alpha = unique_alpha_ket[ia_ket].first;
+          const auto ket_lower = is_symm ? ia_bra : 0;
+          for(size_t ia_ket = ket_lower; ia_ket < nuniq_ket; ++ia_ket) {
+            if(unique_alpha_ket[ia_ket].first.any()) {
+              // Extract alpha ket
+              const auto ket_alpha = unique_alpha_ket[ia_ket].first;
 
-            // Compute alpha excitation
-            const auto ex_alpha = bra_alpha ^ ket_alpha;
-            const auto ex_alpha_count = spin_wfn_traits::count(ex_alpha);
+              // Compute alpha excitation
+              const auto ex_alpha = bra_alpha ^ ket_alpha;
+              const auto ex_alpha_count = spin_wfn_traits::count(ex_alpha);
 
-            // Early exit
-            if(ex_alpha_count > 4) {
-              //skip1++;
-              continue;
-            }
+              // Early exit
+              if(ex_alpha_count > 4) {
+                // skip1++;
+                continue;
+              }
 
-            // Precompute all-alpha excitation if it will be used
-            const double mat_el_4_alpha =
-                (ex_alpha_count == 4)
-                    ? this->matrix_element_4(bra_alpha, ket_alpha, ex_alpha)
-                    : 0.0;
-            if(ex_alpha_count == 4 and std::abs(mat_el_4_alpha) < H_thresh) {
-              // The only possible matrix element is too-small, skip everyhing
-              //skip2++;
-              continue;
-            }
+              // Precompute all-alpha excitation if it will be used
+              const double mat_el_4_alpha =
+                  (ex_alpha_count == 4)
+                      ? this->matrix_element_4(bra_alpha, ket_alpha, ex_alpha)
+                      : 0.0;
+              if(ex_alpha_count == 4 and std::abs(mat_el_4_alpha) < H_thresh) {
+                // The only possible matrix element is too-small, skip everyhing
+                // skip2++;
+                continue;
+              }
 
-            const size_t beta_st_ket = unique_alpha_ket_idx[ia_ket];
-            const size_t beta_en_ket = unique_alpha_ket_idx[ia_ket + 1];
+              const size_t beta_st_ket = unique_alpha_ket_idx[ia_ket];
+              const size_t beta_en_ket = unique_alpha_ket_idx[ia_ket + 1];
 
-            // Loop over local betas according to their global indices
-            for(size_t ibra = beta_st_bra; ibra < beta_en_bra; ++ibra) {
-              const auto bra_beta =
-                  wfn_traits::beta_string(*(bra_begin + ibra));
-              spin_wfn_traits::state_to_occ(bra_beta, bra_occ_beta);
-              for(size_t iket = beta_st_ket; iket < beta_en_ket; ++iket) {
-                if(is_symm and (iket < ibra)) continue;
-                const auto ket_beta =
-                    wfn_traits::beta_string(*(ket_begin + iket));
+              // Loop over local betas according to their global indices
+              for(size_t ibra = beta_st_bra; ibra < beta_en_bra; ++ibra) {
+                const auto bra_beta =
+                    wfn_traits::beta_string(*(bra_begin + ibra));
+                spin_wfn_traits::state_to_occ(bra_beta, bra_occ_beta);
+                for(size_t iket = beta_st_ket; iket < beta_en_ket; ++iket) {
+                  if(is_symm and (iket < ibra)) continue;
+                  const auto ket_beta =
+                      wfn_traits::beta_string(*(ket_begin + iket));
 
-                // Compute beta excitation
-                const auto ex_beta = bra_beta ^ ket_beta;
-                const auto ex_beta_count = spin_wfn_traits::count(ex_beta);
+                  // Compute beta excitation
+                  const auto ex_beta = bra_beta ^ ket_beta;
+                  const auto ex_beta_count = spin_wfn_traits::count(ex_beta);
 
-                if((ex_alpha_count + ex_beta_count) > 4) continue;
+                  if((ex_alpha_count + ex_beta_count) > 4) continue;
 
-                double h_el = 0.0;
-                if(ex_alpha_count == 4) {
-                  // Use precomputed value
-                  h_el = mat_el_4_alpha;
-                } else if(ex_beta_count == 4) {
-                  h_el = this->matrix_element_4(bra_beta, ket_beta, ex_beta);
-                } else if(ex_alpha_count == 2) {
-                  if(ex_beta_count == 2) {
-                    h_el =
-                        this->matrix_element_22(bra_alpha, ket_alpha, ex_alpha,
-                                                bra_beta, ket_beta, ex_beta);
+                  double h_el = 0.0;
+                  if(ex_alpha_count == 4) {
+                    // Use precomputed value
+                    h_el = mat_el_4_alpha;
+                  } else if(ex_beta_count == 4) {
+                    h_el = this->matrix_element_4(bra_beta, ket_beta, ex_beta);
+                  } else if(ex_alpha_count == 2) {
+                    if(ex_beta_count == 2) {
+                      h_el = this->matrix_element_22(bra_alpha, ket_alpha,
+                                                     ex_alpha, bra_beta,
+                                                     ket_beta, ex_beta);
+                    } else {
+                      h_el =
+                          this->matrix_element_2(bra_alpha, ket_alpha, ex_alpha,
+                                                 bra_occ_alpha, bra_occ_beta);
+                    }
+                  } else if(ex_beta_count == 2) {
+                    h_el = this->matrix_element_2(bra_beta, ket_beta, ex_beta,
+                                                  bra_occ_beta, bra_occ_alpha);
                   } else {
+                    // Diagonal matrix element
                     h_el =
-                        this->matrix_element_2(bra_alpha, ket_alpha, ex_alpha,
-                                               bra_occ_alpha, bra_occ_beta);
+                        this->matrix_element_diag(bra_occ_alpha, bra_occ_beta);
                   }
-                } else if(ex_beta_count == 2) {
-                  h_el = this->matrix_element_2(bra_beta, ket_beta, ex_beta,
-                                                bra_occ_beta, bra_occ_alpha);
-                } else {
-                  // Diagonal matrix element
-                  h_el = this->matrix_element_diag(bra_occ_alpha, bra_occ_beta);
-                }
 
-                // Insert matrix element
-                if(std::abs(h_el) > H_thresh) {
-                  //coo_mat.template insert<false>(ibra, iket, h_el);
-                  row_ind_loc.emplace_back(ibra);
-                  col_ind_loc.emplace_back(iket);
-                  nz_val_loc. emplace_back(h_el);
-                  if(is_symm and ibra != iket) {
-                    //coo_mat.template insert<false>(iket, ibra, h_el);
-                    row_ind_loc.emplace_back(iket);
-                    col_ind_loc.emplace_back(ibra);
-                    nz_val_loc. emplace_back(h_el);
+                  // Insert matrix element
+                  if(std::abs(h_el) > H_thresh) {
+                    // coo_mat.template insert<false>(ibra, iket, h_el);
+                    row_ind_loc.emplace_back(ibra);
+                    col_ind_loc.emplace_back(iket);
+                    nz_val_loc.emplace_back(h_el);
+                    if(is_symm and ibra != iket) {
+                      // coo_mat.template insert<false>(iket, ibra, h_el);
+                      row_ind_loc.emplace_back(iket);
+                      col_ind_loc.emplace_back(ibra);
+                      nz_val_loc.emplace_back(h_el);
+                    }
                   }
-                }
 
-              }  // ket beta
-            }    // bra beta
+                }  // ket beta
+              }    // bra beta
+            }
+          }  // Loop over ket alphas
+        }
+      }  // Loop over bra alphas
 
-          }  
-        } // Loop over ket alphas
-      }      
-    } // Loop over bra alphas
+// Atomically insert into larger matrix arrays
+#pragma omp critical
+      {
+        row_ind.insert(row_ind.end(), row_ind_loc.begin(), row_ind_loc.end());
+        // row_ind_loc.clear(); row_ind_loc.shrink_to_fit();
+        col_ind.insert(col_ind.end(), col_ind_loc.begin(), col_ind_loc.end());
+        // col_ind_loc.clear(); col_ind_loc.shrink_to_fit();
+        nz_val.insert(nz_val.end(), nz_val_loc.begin(), nz_val_loc.end());
+        // nz_val_loc.clear(); nz_val_loc.shrink_to_fit();
+      }
 
-    // Atomically insert into larger matrix arrays
-    #pragma omp critical
-    {
-      row_ind.insert(row_ind.end(), row_ind_loc.begin(), row_ind_loc.end());
-      //row_ind_loc.clear(); row_ind_loc.shrink_to_fit();
-      col_ind.insert(col_ind.end(), col_ind_loc.begin(), col_ind_loc.end());
-      //col_ind_loc.clear(); col_ind_loc.shrink_to_fit();
-      nz_val.insert(nz_val.end(), nz_val_loc.begin(), nz_val_loc.end());
-      //nz_val_loc.clear(); nz_val_loc.shrink_to_fit();
-    }
-
-    } // OpenMP
+    }  // OpenMP
     auto pop_en = std::chrono::high_resolution_clock::now();
 
     // Generate Sparse Matrix
-    sparsexx::coo_matrix<double, index_t> coo_mat(nbra_dets, nket_dets,
-      std::move(col_ind), std::move(row_ind), std::move(nz_val), 0);
+    sparsexx::coo_matrix<double, index_t> coo_mat(
+        nbra_dets, nket_dets, std::move(col_ind), std::move(row_ind),
+        std::move(nz_val), 0);
 
     // Sort for CSR Conversion
     auto sort_st = std::chrono::high_resolution_clock::now();

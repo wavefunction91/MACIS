@@ -23,11 +23,11 @@
 #include <macis/mcscf/fock_matrices.hpp>
 #include <macis/util/detail/rdm_files.hpp>
 #include <macis/util/fcidump.hpp>
-#include <macis/util/trexio.hpp>
 #include <macis/util/memory.hpp>
 #include <macis/util/moller_plesset.hpp>
 #include <macis/util/mpi.hpp>
 #include <macis/util/transform.hpp>
+#include <macis/util/trexio.hpp>
 #include <macis/wavefunction_io.hpp>
 #include <map>
 #include <sparsexx/io/write_dist_mm.hpp>
@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
   spdlog::cfg::load_env_levels();
   spdlog::set_pattern("[%n] %v");
 
-  constexpr size_t nwfn_bits = 128;
+  constexpr size_t nwfn_bits = 256;
   using wfn_type = macis::wfn_t<nwfn_bits>;
   using wfn_traits = macis::wavefunction_traits<wfn_type>;
 
@@ -101,9 +101,10 @@ int main(int argc, char** argv) {
     auto nalpha = input.getData<size_t>("CI.NALPHA");
     auto nbeta = input.getData<size_t>("CI.NBETA");
 
-    std::string reference_data_format = input.getData<std::string>("CI.REF_DATA_FORMAT");
-    std::string reference_data_file   = input.getData<std::string>("CI.REF_DATA_FILE");
-
+    std::string reference_data_format =
+        input.getData<std::string>("CI.REF_DATA_FORMAT");
+    std::string reference_data_file =
+        input.getData<std::string>("CI.REF_DATA_FILE");
 
     size_t norb, norb2, norb3, norb4;
     std::vector<double> T, V;
@@ -116,11 +117,12 @@ int main(int argc, char** argv) {
       norb4 = norb2 * norb2;
 
       // XXX: Consider reading this into shared memory to avoid replication
-      T.resize(norb2); V.resize(norb4);
+      T.resize(norb2);
+      V.resize(norb4);
       E_core = macis::read_fcidump_core(reference_data_file);
       macis::read_fcidump_1body(reference_data_file, T.data(), norb);
       macis::read_fcidump_2body(reference_data_file, V.data(), norb);
-    } else { // TREXIO
+    } else {  // TREXIO
       macis::TREXIOFile trexio_file(reference_data_file, 'r', TREXIO_AUTO);
       norb = trexio_file.read_mo_num();
       norb2 = norb * norb;
@@ -128,7 +130,8 @@ int main(int argc, char** argv) {
       norb4 = norb2 * norb2;
 
       // XXX: Consider reading this into shared memory to avoid replication
-      T.resize(norb2); V.resize(norb4);
+      T.resize(norb2);
+      V.resize(norb4);
       E_core = trexio_file.read_nucleus_repulsion();
       trexio_file.read_mo_1e_int_core_hamiltonian(T.data());
       trexio_file.read_mo_2e_int_eri(V.data());
@@ -404,13 +407,13 @@ int main(int argc, char** argv) {
 
         if(asci_wfn_out_fname.size() and !world_rank) {
           console->info("Writing ASCI Wavefunction to {}", asci_wfn_out_fname);
-          //if(reference_data_format == "TREXIO") {
-          //  console->info("  * Format TREXIO");
-          //  macis::TREXIOFile trexio_file(asci_wfn_out_fname, 'w', TREXIO_HDF5);
-          //  trexio_file.write_mo_num(nwfn_bits/2); // Trick TREXIO
-          //  trexio_file.write_determinant_list(dets.size(), 
-          //    reinterpret_cast<int64_t*>(dets.data()));
-          //} else {
+          // if(reference_data_format == "TREXIO") {
+          //   console->info("  * Format TREXIO");
+          //   macis::TREXIOFile trexio_file(asci_wfn_out_fname, 'w',
+          //   TREXIO_HDF5); trexio_file.write_mo_num(nwfn_bits/2); // Trick
+          //   TREXIO trexio_file.write_determinant_list(dets.size(),
+          //     reinterpret_cast<int64_t*>(dets.data()));
+          // } else {
           console->info("  * Format TEXT");
           macis::write_wavefunction(asci_wfn_out_fname, n_active, dets, C);
           //}
