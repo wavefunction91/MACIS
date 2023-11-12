@@ -390,13 +390,13 @@ int main(int argc, char** argv) {
         auto asci_st = hrt_t::now();
 
         // Growth phase
-        std::tie(E0, dets, C) = macis::asci_grow(
+        std::tie(E0, dets, C) = macis::asci_grow<nwfn_bits,int64_t>(
             asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
             ham_gen, n_active MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
         // Refinement phase
         if(asci_settings.max_refine_iter) {
-          std::tie(E0, dets, C) = macis::asci_refine(
+          std::tie(E0, dets, C) = macis::asci_refine<nwfn_bits,int64_t>(
               asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
               ham_gen, n_active MACIS_MPI_CODE(, MPI_COMM_WORLD));
         }

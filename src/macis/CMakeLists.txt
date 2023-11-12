@@ -24,8 +24,9 @@ if(MACIS_ENABLE_TREXIO)
   FetchContent_Declare( trexio
     #GIT_REPOSITORY https://github.com/TREX-CoE/trexio
     GIT_REPOSITORY https://github.com/wavefunction91/trexio
+    GIT_TAG cmake_fixup
   )
-  FetchContent_MakeAvailable( trexio )
+  FetchContent_MakeAvailable(trexio)
   target_link_libraries(macis PUBLIC trexio::trexio)
   target_sources(macis PRIVATE trexio.cxx)
 endif()

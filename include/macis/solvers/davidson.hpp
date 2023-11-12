@@ -13,6 +13,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <fstream>
 #include <lobpcgxx/lobpcg.hpp>
 #include <macis/util/mpi.hpp>
 #include <random>
@@ -96,6 +97,7 @@ void p_diagonal_guess(size_t N_local, const SpMatType& A, double* X) {
   // Determine min index
   auto D_min = std::min_element(D.begin(), D.end());
   auto min_idx = std::distance(D.begin(), D_min);
+  //printf("[rank %d] DMIN %lu %.6e\n", world_rank, min_idx, *D_min);
 
   // Zero out guess
   for(size_t i = 0; i < N_local; ++i) X[i] = 0.;
@@ -252,6 +254,8 @@ inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
   double dot = blas::dot(N_local, V_new, 1, V_new, 1);
   dot = allreduce(dot, MPI_SUM, comm);
   double nrm = std::sqrt(dot);
+  //printf("[rank %d] GS DOT %.6e NRM %.6e\n", comm_rank(comm), 
+  //  dot, nrm);
   blas::scal(N_local, 1. / nrm, V_new, 1);
 }
 
