@@ -642,6 +642,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   // Generate triplets + heuristic
   std::vector<std::pair<constraint_type, size_t>> constraint_sizes;
   constraint_sizes.reserve(norb * norb * norb);
+  #if 0
   size_t total_work = 0;
   for(int t_i = 0; t_i < norb; ++t_i)
     for(int t_j = 0; t_j < t_i; ++t_j)
@@ -662,6 +663,63 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
       }
 
   size_t local_average = (0.8 * total_work) / world_size;
+  #else
+  // Generate all the triplets
+  for(int t_i = 0; t_i < norb; ++t_i)
+    for(int t_j = 0; t_j < t_i; ++t_j)
+      for(int t_k = 0; t_k < t_j; ++t_k) {
+        auto constraint = constraint_type::make_triplet(t_i, t_j, t_k);
+        constraint_sizes.emplace_back(constraint, 0ul);
+  }
+
+  struct atomic_wrapper {
+    std::atomic<size_t> value;
+    atomic_wrapper(size_t i = 0) : value(i) {};
+    atomic_wrapper(const atomic_wrapper& other) :
+      atomic_wrapper(other.value.load()) {};
+    atomic_wrapper& operator=(const atomic_wrapper& other) {
+      value.store(other.value.load());
+      return *this;
+    }
+  };
+
+  // Compute histogram
+  const auto ntrip_full = constraint_sizes.size(); 
+  std::vector<atomic_wrapper> constraint_work(ntrip_full, 0ul);
+  #pragma omp parallel for schedule(dynamic)
+  for(auto i_trip = 0; i_trip < ntrip_full; ++i_trip) {
+    auto& [constraint, __nw] = constraint_sizes[i_trip];
+    auto& c_nw = constraint_work[i_trip];
+    size_t nw = 0;
+    for(const auto& alpha : unique_alpha) {
+      if constexpr(flat_container)
+        nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
+                                   nd_othr, constraint);
+      else
+        nw += alpha.second * constraint_histogram(alpha.first, ns_othr,
+                                                  nd_othr, constraint);
+    }
+    if(nw) c_nw.value.fetch_add(nw);
+  }
+
+  // Copy over constraint work
+  for(auto i_trip = 0; i_trip < ntrip_full; ++i_trip) {
+    constraint_sizes[i_trip].second = constraint_work[i_trip].value.load();
+  }
+
+  // Remove zeros
+  {
+  auto it = std::partition(constraint_sizes.begin(), constraint_sizes.end(),
+            [](const auto& p) { return p.second > 0; });
+  constraint_sizes.erase(it, constraint_sizes.end());
+  }
+
+  // Compute average
+  size_t total_work = std::accumulate(constraint_sizes.begin(), constraint_sizes.end(),
+    0ul, [](auto s, const auto& p){ return s + p.second; });
+  size_t local_average = total_work / world_size;
+
+  #endif
 
   for(size_t ilevel = 0; ilevel < nlevels; ++ilevel) {
     // Select constraints larger than average to be broken apart

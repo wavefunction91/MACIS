@@ -271,11 +271,16 @@ inline void p_rayleigh_ritz(int64_t N_local, int64_t K, const double* X,
 
   // Reduce result
   if(LDC != K) throw std::runtime_error("DIE DIE DIE RR");
-  allreduce(C, K * K, MPI_SUM, comm);
+  //allreduce(C, K * K, MPI_SUM, comm);
+  std::allocator<double> alloc;
+  double* tmp_c = world_rank ? nullptr: alloc.allocate(K*K);
+  reduce(C, tmp_c, K*K, MPI_SUM, 0, comm);
 
   // Do local diagonalization on rank-0
   if(!world_rank) {
+    memcpy(C, tmp_c, K*K*sizeof(double));
     lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, K, C, LDC, W);
+    alloc.deallocate(tmp_c, K*K);
   }
 
   // Broadcast results

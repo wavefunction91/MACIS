@@ -197,7 +197,7 @@ double selected_ci_diag(WfnIterator dets_begin, WfnIterator dets_end,
 #endif
   logger->info("  {} = {:.2e} GiB", "HMEM_LOC",
                H.mem_footprint() / 1073741824.);
-  logger->info("  {} = {:.2f}%", "H_SPARSE",
+  logger->info("  {} = {:.2e}%", "H_SPARSE",
                total_nnz / double(H.n() * H.n()) * 100);
 #ifdef MACIS_ENABLE_MPI
   if(world_size > 1) {

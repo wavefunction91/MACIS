@@ -146,6 +146,20 @@ mpi_datatype make_contiguous_mpi_datatype(int n) {
   return make_managed_mpi_datatype(contig_dtype);
 }
 
+
+template <typename T>
+void reduce(const T* send, T* recv, size_t count, MPI_Op op, int root, 
+            MPI_Comm comm) {
+  auto dtype = mpi_traits<T>::datatype();
+
+  size_t intmax = std::numeric_limits<int>::max();
+  size_t nchunk = count / intmax;
+  if(nchunk) throw std::runtime_error("Msg over INT_MAX not yet tested");
+    
+  MPI_Reduce( send, recv, count, dtype, op, root, comm );
+
+}
+
 /**
  * @brief Type-safe wrapper for MPI_Allreduce
  *
