@@ -220,6 +220,11 @@ int main(int argc, char** argv) {
       compute_asci_E0 = false;
     }
     OPT_KEYWORD("ASCI.PT2", pt2, bool);
+    OPT_KEYWORD("ASCI.PT2_TOL", asci_settings.pt2_tol, double);
+    OPT_KEYWORD("ASCI.PT2_RESERVE_COUNT", asci_settings.pt2_reserve_count, size_t);
+    OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL", asci_settings.pt2_constraint_level, int);
+    OPT_KEYWORD("ASCI.PT2_PRUNE", asci_settings.pt2_prune, bool);
+    OPT_KEYWORD("ASCI.PT2_PRECOMPUTE_EPS", asci_settings.pt2_precompute_eps, bool);
 
     bool mp2_guess = false;
     OPT_KEYWORD("MCSCF.MP2_GUESS", mp2_guess, bool);
@@ -430,7 +435,7 @@ int main(int argc, char** argv) {
         if(pt2) {
           MPI_Barrier(MPI_COMM_WORLD);
           auto pt2_st = hrt_t::now();
-          EPT2 = macis::asci_pt2_constraint(
+          EPT2 = macis::asci_pt2_constraint(asci_settings,
               dets.begin(), dets.end(), E0 - (E_inactive + E_core), C, n_active,
               ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(), ham_gen.G(),
               ham_gen.V(), ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));

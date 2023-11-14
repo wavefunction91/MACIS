@@ -20,6 +20,7 @@ struct asci_contrib {
   double h_diag;
 
   auto rv() const { return c_times_matel / h_diag; }
+  auto pt2() const { return rv() * c_times_matel; }
 };
 
 template <typename WfnT>
@@ -48,7 +49,7 @@ void append_singles_asci_contributions(
       for(auto p : occ_othr) h_el += V_ov[p];
 
       // Early Exit
-      if(std::abs(h_el) < h_el_tol) continue;
+      if(std::abs(coeff * h_el) < h_el_tol) continue;
 
       // Calculate Excited Determinant
       auto ex_det = wfn_traits::template single_excitation_no_check<Sigma>(
@@ -97,7 +98,7 @@ void append_ss_doubles_asci_contributions(
           const auto jb = b + j * LDG;
           const auto G_aibj = G_ai[jb];
 
-          if(std::abs(G_aibj) < h_el_tol) continue;
+          if(std::abs(coeff * G_aibj) < h_el_tol) continue;
 
 #if 0
           // Calculate excited determinant string (spin)
@@ -165,7 +166,7 @@ void append_os_doubles_asci_contributions(
           const auto jb = b + j * LDV;
           const auto V_aibj = V_ai[jb * LDV2];
 
-          if(std::abs(V_aibj) < h_el_tol) continue;
+          if(std::abs(coeff * V_aibj) < h_el_tol) continue;
 
           double sign_beta = single_excitation_sign(state_beta, b, j);
           double sign = sign_alpha * sign_beta;

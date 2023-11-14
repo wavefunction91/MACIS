@@ -8,13 +8,16 @@
 
 #pragma once
 #include <deque>
+#include <fstream>
+#include <sstream>
 #include <macis/asci/determinant_contributions.hpp>
 #include <macis/asci/determinant_sort.hpp>
 
 namespace macis {
 
 template <size_t N>
-double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
+double asci_pt2_constraint(ASCISettings asci_settings,
+                           wavefunction_iterator_t<N> cdets_begin,
                            wavefunction_iterator_t<N> cdets_end,
                            const double E_ASCI, const std::vector<double>& C,
                            size_t norb, const double* T_pq, const double* G_red,
@@ -39,12 +42,20 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
                         : spdlog::stdout_color_mt("asci_pt2");
 
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
+  logger->info("[ASCI PT2 Settings]");
+  logger->info("  * NDETS              = {}", ncdets);
+  logger->info("  * PT2_TOL            = {}", asci_settings.pt2_tol);
+  logger->info("  * PT2_RESERVE_COUNT  = {}", asci_settings.pt2_reserve_count);
+  logger->info("  * PT2_CONSTRAINT_LVL = {}", asci_settings.pt2_constraint_level);
+  logger->info("  * PT2_PRUNE          = {}", asci_settings.pt2_prune);
+  logger->info("  * PT2_PRECMP_EPS     = {}", asci_settings.pt2_precompute_eps);
+  logger->info("");
 
   // For each unique alpha, create a list of beta string and store metadata
   struct beta_coeff_data {
     spin_wfn_type beta_string;
-    std::vector<uint32_t> occ_beta;
-    std::vector<uint32_t> vir_beta;
+    std::vector<uint8_t> occ_beta;
+    std::vector<uint8_t> vir_beta;
     std::vector<double> orb_ens_alpha;
     std::vector<double> orb_ens_beta;
     double coeff;
@@ -52,13 +63,13 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
 
     size_t mem() const {
       return sizeof(spin_wfn_type) + 
-             (occ_beta.capacity() + vir_beta.capacity()) * sizeof(uint32_t) +
+             (occ_beta.capacity() + vir_beta.capacity()) * sizeof(uint8_t) +
              (2 + orb_ens_alpha.capacity() + orb_ens_beta.capacity()) * sizeof(double); 
     }
 
     beta_coeff_data(double c, size_t norb,
                     const std::vector<uint32_t>& occ_alpha, wfn_t<N> w,
-                    const HamiltonianGenerator<wfn_t<N>>& ham_gen) {
+                    const HamiltonianGenerator<wfn_t<N>>& ham_gen, bool pce) {
       coeff = c;
 
       beta_string = wfn_traits::beta_string(w);
@@ -67,16 +78,24 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
       h_diag = ham_gen.matrix_element(w, w);
 
       // Compute occ/vir for beta string
-      spin_wfn_traits::state_to_occ_vir(norb, beta_string, occ_beta, vir_beta);
+      std::vector<uint32_t> o_32, v_32;
+      spin_wfn_traits::state_to_occ_vir(norb, beta_string, o_32, v_32);
+      occ_beta.resize(o_32.size()); 
+      std::copy(o_32.begin(), o_32.end(), occ_beta.begin());
+      vir_beta.resize(v_32.size());
+      std::copy(v_32.begin(), v_32.end(), vir_beta.begin());
 
       // Precompute orbital energies
-      //orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
-      //orb_ens_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
+      if(pce) {
+        orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, o_32);
+        orb_ens_beta = ham_gen.single_orbital_ens(norb, o_32, occ_alpha);
+      }
     }
   };
 
   auto uniq_alpha = get_unique_alpha(cdets_begin, cdets_end);
   const size_t nuniq_alpha = uniq_alpha.size();
+  logger->info("  * NUNIQ_ALPHA = {}", nuniq_alpha);
 
   using unique_alpha_data = std::vector<beta_coeff_data>;
   std::vector<unique_alpha_data> uad(nuniq_alpha);
@@ -89,7 +108,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
     uad[i].reserve(nbeta);
     for(auto j = 0; j < nbeta; ++j, ++iw) {
       const auto& w = *(cdets_begin + iw);
-      uad[i].emplace_back(C[iw], norb, occ_alpha, w, ham_gen);
+      uad[i].emplace_back(C[iw], norb, occ_alpha, w, ham_gen,asci_settings.pt2_precompute_eps);
     }
   }
 
@@ -105,7 +124,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
       }
     }
     printf("MEM REQ ALPH = %.2e\n", mem_alpha / gib);
-    printf("MEM REQ CONT = %.2e\n", 70000000 * sizeof(asci_contrib<wfn_t<N>>)/ 1024./1024./1024);
+    printf("MEM REQ CONT = %.2e\n", asci_settings.pt2_reserve_count * sizeof(asci_contrib<wfn_t<N>>)/ gib);
   }
   MPI_Barrier(comm);
 
@@ -125,11 +144,29 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
   // auto constraints = dist_constraint_general<wfn_t<N>>(
   //     5, norb, n_sing_beta, n_doub_beta, uniq_alpha, comm);
   auto constraints = gen_constraints_general<wfn_t<N>>(
-      10, norb, n_sing_beta, n_doub_beta, uniq_alpha,
-      world_size * omp_get_max_threads());
+      asci_settings.pt2_constraint_level, norb, n_sing_beta, 
+      n_doub_beta, uniq_alpha, world_size * omp_get_max_threads(), 0);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
+  //if(!world_rank) {
+  //  std::ofstream c_file("constraint_work.txt");
+  //  std::stringstream ss; 
+  //  for(auto [c,s] : constraints) {
+  //    ss << c.C() << " " << s << std::endl;
+  //  }
+  //  auto str = ss.str();
+  //  c_file.write(str.c_str(), str.size());
+  //}
+  //if(!world_rank) {
+  //  std::ofstream c_file("unique_alpha.txt");
+  //  std::stringstream ss; 
+  //  for(size_t i = 0; i < nuniq_alpha; ++i) {
+  //    ss << uniq_alpha[i].first << " " << uniq_alpha[i].second << std::endl;
+  //  }
+  //  auto str = ss.str();
+  //  c_file.write(str.c_str(), str.size());
+  //}
 
   double EPT2 = 0.0;
   size_t NPT2 = 0;
@@ -138,14 +175,14 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
 
   // Global atomic task-id counter
   global_atomic<size_t> nxtval(comm);
-  const double h_el_tol = 1e-6;
+  const double h_el_tol = asci_settings.pt2_tol;
 
   auto pt2_st = clock_type::now();
 #pragma omp parallel reduction(+ : EPT2) reduction(+ : NPT2)
   {
     // Process ASCI pair contributions for each constraint
     asci_contrib_container<wfn_t<N>> asci_pairs;
-    asci_pairs.reserve(70000000ul);
+    //asci_pairs.reserve(asci_settings.pt2_reserve_count);
     size_t ic = 0;
     while(ic < ncon_total) {
       // Atomically get the next task ID and increment for other
@@ -173,12 +210,22 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
             const auto c = C[iw];
             const auto& beta_det = bcd[j_beta].beta_string;
             const auto h_diag = bcd[j_beta].h_diag;
-            const auto& occ_beta = bcd[j_beta].occ_beta;
-            const auto& vir_beta = bcd[j_beta].vir_beta;
-            //const auto& orb_ens_alpha = bcd[j_beta].orb_ens_alpha;
-            //const auto& orb_ens_beta = bcd[j_beta].orb_ens_beta;
-            auto orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
-            auto orb_ens_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
+
+            // TODO: These copies are slow
+            const auto& occ_beta_8 = bcd[j_beta].occ_beta;
+            const auto& vir_beta_8 = bcd[j_beta].vir_beta;
+            std::vector<uint32_t> occ_beta(occ_beta_8.size()), vir_beta(vir_beta_8.size());
+            std::copy(occ_beta_8.begin(), occ_beta_8.end(), occ_beta.begin());
+            std::copy(vir_beta_8.begin(), vir_beta_8.end(), vir_beta.begin());
+
+            std::vector<double> orb_ens_alpha, orb_ens_beta;
+            if(asci_settings.pt2_precompute_eps) {
+              orb_ens_alpha = bcd[j_beta].orb_ens_alpha;
+              orb_ens_beta  = bcd[j_beta].orb_ens_beta;
+            } else {
+              orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
+              orb_ens_beta  = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
+            }
 
             // AA excitations
             generate_constraint_singles_contributions_ss(
@@ -215,10 +262,12 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
                   {w, std::numeric_limits<double>::infinity(), 1.0});
             }
           }
-          if(asci_pairs.size() > 70000000 and asci_pairs.size() != old_pair_size) {
+          if(asci_settings.pt2_prune and asci_pairs.size() > asci_settings.pt2_reserve_count and asci_pairs.size() != old_pair_size) {
           // Cleanup
-          auto uit = sort_and_accumulate_asci_pairs(asci_pairs.begin(),
+          auto uit = stable_sort_and_accumulate_asci_pairs(asci_pairs.begin(),
                                                     asci_pairs.end());
+          asci_pairs.erase(uit, asci_pairs.end());
+          uit = std::stable_partition(asci_pairs.begin(), asci_pairs.end(), [&](const auto& p){ return std::abs(p.pt2()) > h_el_tol; });
           asci_pairs.erase(uit, asci_pairs.end());
             printf("[rank %4d tid:%4d] IC = %lu / %lu IA = %lu / %lu SZ = %lu\n", world_rank,
                    omp_get_thread_num(), ic, ncon_total, i_alpha,
@@ -235,8 +284,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
                                                     asci_pairs.end());
           for(auto it = asci_pairs.begin(); it != uit; ++it) {
             if(!std::isinf(it->c_times_matel)) {
-              EPT2_local +=
-                  (it->c_times_matel * it->c_times_matel) / it->h_diag;
+              EPT2_local += it->pt2();
               NPT2_local++;
             }
           }

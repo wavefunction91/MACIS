@@ -39,6 +39,12 @@ struct ASCISettings {
   double h_el_tol = 1e-8;
   double rv_prune_tol = 1e-8;
   size_t pair_size_max = 5e8;
+
+  double pt2_tol = 1e-16;
+  size_t pt2_reserve_count = 70000000;
+  bool   pt2_prune = false;
+  bool   pt2_precompute_eps = false;
+
   bool just_singles = false;
   size_t grow_factor = 8;
   size_t max_refine_iter = 6;
@@ -49,6 +55,7 @@ struct ASCISettings {
 
   // bool dist_triplet_random = false;
   int constraint_level = 2;  // Up To Quints
+  int pt2_constraint_level = 5;
 };
 
 template <size_t N>

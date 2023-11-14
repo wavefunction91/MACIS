@@ -630,7 +630,7 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
 template <typename WfnType, typename ContainerType>
 auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
                              size_t nd_othr, const ContainerType& unique_alpha,
-                             int world_size) {
+                             int world_size, size_t nlevel_min = 0) {
   using wfn_traits = wavefunction_traits<WfnType>;
   using constraint_type = alpha_constraint<wfn_traits>;
   using string_type = typename constraint_type::constraint_type;
@@ -671,6 +671,21 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
         auto constraint = constraint_type::make_triplet(t_i, t_j, t_k);
         constraint_sizes.emplace_back(constraint, 0ul);
   }
+  // Build up higher-order constraints as base if requested
+  for(size_t ilevel = 0; ilevel < nlevel_min; ++ilevel) {
+    std::vector cur_constraints = constraint_sizes;
+    for(auto [c,nw] : cur_constraints) {
+      const auto C_min = c.C_min();
+      for(auto q_l = 0; q_l < C_min; ++q_l) {
+        // Generate masks / counts
+        string_type cn_C = c.C();
+        cn_C.flip(q_l);
+        string_type cn_B = c.B() >> (C_min - q_l);
+        constraint_type c_next(cn_C, cn_B, q_l);
+        constraint_sizes.emplace_back(c_next, 0ul);
+      }
+    }
+  }
 
   struct atomic_wrapper {
     std::atomic<size_t> value;
@@ -686,8 +701,10 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   // Compute histogram
   const auto ntrip_full = constraint_sizes.size(); 
   std::vector<atomic_wrapper> constraint_work(ntrip_full, 0ul);
+  int world_rank = comm_rank(MPI_COMM_WORLD);
   #pragma omp parallel for schedule(dynamic)
-  for(auto i_trip = 0; i_trip < ntrip_full; ++i_trip) {
+  for(auto i_trip = 0ul; i_trip < ntrip_full; ++i_trip) {
+    if(!world_rank and !(i_trip%1000)) printf("cgen %lu / %lu\n", i_trip, ntrip_full);
     auto& [constraint, __nw] = constraint_sizes[i_trip];
     auto& c_nw = constraint_work[i_trip];
     size_t nw = 0;

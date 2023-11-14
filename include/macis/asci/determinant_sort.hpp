@@ -11,6 +11,7 @@
 #if __has_include(<boost/sort/pdqsort/pdqsort.hpp>)
 #define MACIS_USE_BOOST_SORT
 #include <boost/sort/pdqsort/pdqsort.hpp>
+#include <boost/sort/sort.hpp>
 #endif
 
 namespace macis {
@@ -61,24 +62,10 @@ void reorder_ci_on_alpha(WfnIterator begin, WfnIterator end, double* C) {
   std::copy(reorder_C.begin(), reorder_C.end(), C);
 }
 
+
 template <typename PairIterator>
-PairIterator sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
-                                            PairIterator pairs_end) {
-  const size_t npairs = std::distance(pairs_begin, pairs_end);
-
-  if(!npairs) return pairs_end;
-
-  auto comparator = [](const auto& x, const auto& y) {
-    return bitset_less(x.state, y.state);
-  };
-
-// Sort by bitstring
-#ifdef MACIS_USE_BOOST_SORT
-  boost::sort::pdqsort_branchless
-#else
-  std::sort
-#endif
-      (pairs_begin, pairs_end, comparator);
+PairIterator accumulate_asci_pairs(PairIterator pairs_begin,
+                                   PairIterator pairs_end) {
 
   // Accumulate the ASCI scores into first instance of unique bitstrings
   auto cur_it = pairs_begin;
@@ -98,6 +85,50 @@ PairIterator sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
   // Remote duplicate bitstrings
   return std::unique(pairs_begin, pairs_end,
                      [](auto x, auto y) { return x.state == y.state; });
+}
+
+template <typename PairIterator>
+PairIterator sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
+                                            PairIterator pairs_end) {
+  const size_t npairs = std::distance(pairs_begin, pairs_end);
+
+  if(!npairs) return pairs_end;
+
+  auto comparator = [](const auto& x, const auto& y) {
+    return bitset_less(x.state, y.state);
+  };
+
+// Sort by bitstring
+#ifdef MACIS_USE_BOOST_SORT
+  boost::sort::pdqsort_branchless
+#else
+  std::sort
+#endif
+      (pairs_begin, pairs_end, comparator);
+
+  return accumulate_asci_pairs(pairs_begin, pairs_end);
+}
+
+template <typename PairIterator>
+PairIterator stable_sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
+                                                   PairIterator pairs_end) {
+  const size_t npairs = std::distance(pairs_begin, pairs_end);
+
+  if(!npairs) return pairs_end;
+
+  auto comparator = [](const auto& x, const auto& y) {
+    return bitset_less(x.state, y.state);
+  };
+
+// Sort by bitstring
+#ifdef MACIS_USE_BOOST_SORT
+  boost::sort::flat_stable_sort
+#else
+  std::stable_sort
+#endif
+      (pairs_begin, pairs_end, comparator);
+
+  return accumulate_asci_pairs(pairs_begin, pairs_end);
 }
 
 template <typename WfnT>
