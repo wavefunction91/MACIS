@@ -50,6 +50,12 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
     double coeff;
     double h_diag;
 
+    size_t mem() const {
+      return sizeof(spin_wfn_type) + 
+             (occ_beta.capacity() + vir_beta.capacity()) * sizeof(uint32_t) +
+             (2 + orb_ens_alpha.capacity() + orb_ens_beta.capacity()) * sizeof(double); 
+    }
+
     beta_coeff_data(double c, size_t norb,
                     const std::vector<uint32_t>& occ_alpha, wfn_t<N> w,
                     const HamiltonianGenerator<wfn_t<N>>& ham_gen) {
@@ -64,17 +70,13 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
       spin_wfn_traits::state_to_occ_vir(norb, beta_string, occ_beta, vir_beta);
 
       // Precompute orbital energies
-      orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
-      orb_ens_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
+      //orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
+      //orb_ens_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
     }
   };
 
   auto uniq_alpha = get_unique_alpha(cdets_begin, cdets_end);
   const size_t nuniq_alpha = uniq_alpha.size();
-  std::vector<wfn_t<N>> uniq_alpha_wfn(nuniq_alpha);
-  std::transform(
-      uniq_alpha.begin(), uniq_alpha.end(), uniq_alpha_wfn.begin(),
-      [](const auto& p) { return wfn_traits::from_spin(p.first, 0); });
 
   using unique_alpha_data = std::vector<beta_coeff_data>;
   std::vector<unique_alpha_data> uad(nuniq_alpha);
@@ -90,6 +92,22 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
       uad[i].emplace_back(C[iw], norb, occ_alpha, w, ham_gen);
     }
   }
+
+  if(world_rank == 0) {
+    constexpr double gib = 1024 * 1024 * 1024;
+    printf("MEM REQ DETS = %.2e\n", ncdets * sizeof(wfn_t<N>) / gib);
+    printf("MEM REQ C    = %.2e\n", ncdets * sizeof(double) / gib);
+    size_t mem_alpha = 0;
+    for( auto i = 0ul; i < nuniq_alpha; ++i) {
+      mem_alpha += sizeof(spin_wfn_type);
+      for(auto j = 0ul; j < uad[i].size(); ++j) {
+        mem_alpha += uad[i][j].mem();
+      }
+    }
+    printf("MEM REQ ALPH = %.2e\n", mem_alpha / gib);
+    printf("MEM REQ CONT = %.2e\n", 70000000 * sizeof(asci_contrib<wfn_t<N>>)/ 1024./1024./1024);
+  }
+  MPI_Barrier(comm);
 
   const auto n_occ_alpha = spin_wfn_traits::count(uniq_alpha[0].first);
   const auto n_vir_alpha = norb - n_occ_alpha;
@@ -120,14 +138,14 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
 
   // Global atomic task-id counter
   global_atomic<size_t> nxtval(comm);
-  const double h_el_tol = 1e-16;
+  const double h_el_tol = 1e-6;
 
   auto pt2_st = clock_type::now();
 #pragma omp parallel reduction(+ : EPT2) reduction(+ : NPT2)
   {
     // Process ASCI pair contributions for each constraint
     asci_contrib_container<wfn_t<N>> asci_pairs;
-    asci_pairs.reserve(100000000ul);
+    asci_pairs.reserve(70000000ul);
     size_t ic = 0;
     while(ic < ncon_total) {
       // Atomically get the next task ID and increment for other
@@ -143,6 +161,7 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
                omp_get_thread_num(), ic, ncon_total);
 
         for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
+          const size_t old_pair_size = asci_pairs.size();
           const auto& alpha_det = uniq_alpha[i_alpha].first;
           const auto occ_alpha = bits_to_indices(alpha_det);
           const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
@@ -156,8 +175,10 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
             const auto h_diag = bcd[j_beta].h_diag;
             const auto& occ_beta = bcd[j_beta].occ_beta;
             const auto& vir_beta = bcd[j_beta].vir_beta;
-            const auto& orb_ens_alpha = bcd[j_beta].orb_ens_alpha;
-            const auto& orb_ens_beta = bcd[j_beta].orb_ens_beta;
+            //const auto& orb_ens_alpha = bcd[j_beta].orb_ens_alpha;
+            //const auto& orb_ens_beta = bcd[j_beta].orb_ens_beta;
+            auto orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
+            auto orb_ens_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
 
             // AA excitations
             generate_constraint_singles_contributions_ss(
@@ -194,17 +215,15 @@ double asci_pt2_constraint(wavefunction_iterator_t<N> cdets_begin,
                   {w, std::numeric_limits<double>::infinity(), 1.0});
             }
           }
-
-          // if(not (i_alpha%10)) {
-          //// Cleanup
-          // auto uit = sort_and_accumulate_asci_pairs(asci_pairs.begin(),
-          //                                           asci_pairs.end());
-          // asci_pairs.erase(uit, asci_pairs.end());
-          //   printf("[rank %4d tid:%4d] IC = %lu / %lu IA = %lu / %lu SZ =
-          //   %lu\n", world_rank,
-          //          omp_get_thread_num(), ic, ncon_total, i_alpha,
-          //          nuniq_alpha, asci_pairs.size());
-          // }
+          if(asci_pairs.size() > 70000000 and asci_pairs.size() != old_pair_size) {
+          // Cleanup
+          auto uit = sort_and_accumulate_asci_pairs(asci_pairs.begin(),
+                                                    asci_pairs.end());
+          asci_pairs.erase(uit, asci_pairs.end());
+            printf("[rank %4d tid:%4d] IC = %lu / %lu IA = %lu / %lu SZ = %lu\n", world_rank,
+                   omp_get_thread_num(), ic, ncon_total, i_alpha,
+                   nuniq_alpha, asci_pairs.size());
+          }
 
         }  // Unique Alpha Loop
 
