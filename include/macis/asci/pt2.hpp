@@ -96,6 +96,10 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   auto uniq_alpha = get_unique_alpha(cdets_begin, cdets_end);
   const size_t nuniq_alpha = uniq_alpha.size();
   logger->info("  * NUNIQ_ALPHA = {}", nuniq_alpha);
+  std::vector<size_t> uniq_alpha_ioff(nuniq_alpha);
+  std::transform_exclusive_scan(uniq_alpha.begin(), uniq_alpha.end(),
+    uniq_alpha_ioff.begin(), 0ul, std::plus<size_t>(), 
+    [](const auto& p){ return p.second; });
 
   using unique_alpha_data = std::vector<beta_coeff_data>;
   std::vector<unique_alpha_data> uad(nuniq_alpha);
@@ -172,12 +176,154 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   size_t NPT2 = 0;
 
   const size_t ncon_total = constraints.size();
+  const size_t ncon_big   = 250;
+  const size_t ncon_small = ncon_total - ncon_big;
 
   // Global atomic task-id counter
-  global_atomic<size_t> nxtval(comm);
+  global_atomic<size_t> nxtval_big(comm, 0);
+  global_atomic<size_t> nxtval_small(comm, ncon_big);
   const double h_el_tol = asci_settings.pt2_tol;
 
   auto pt2_st = clock_type::now();
+  // Assign each "big" constraint to an MPI rank, thread over contributions
+  {
+    size_t ic = 0;
+    while(ic < ncon_big) {
+      // Atomically get the next task ID and increment for other
+      // MPI ranks
+      ic = nxtval_big.fetch_and_add(1); 
+      if(ic >= ncon_big) continue;
+      printf("[pt2_big rank %4d] %10lu / %10lu\n", world_rank, ic, ncon_total);
+      const auto& con = constraints[ic].first;
+
+      asci_contrib_container<wfn_t<N>> asci_pairs_con;
+      #pragma omp parallel
+      {
+      asci_contrib_container<wfn_t<N>> asci_pairs;
+      #pragma omp for schedule(dynamic)
+      for(size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
+        const size_t old_pair_size = asci_pairs.size();
+        const auto& alpha_det = uniq_alpha[i_alpha].first;
+        const auto ncon_alpha = constraint_histogram(alpha_det,1,1,con);
+        if(!ncon_alpha) continue;
+        const auto occ_alpha = bits_to_indices(alpha_det);
+        const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
+
+        const auto& bcd = uad[i_alpha];
+        const size_t nbeta = bcd.size();
+        for(size_t j_beta = 0; j_beta < nbeta; ++j_beta) {
+          const size_t iw = uniq_alpha_ioff[i_alpha] + j_beta;
+          const auto w = *(cdets_begin + iw);
+          const auto c = C[iw];
+          const auto& beta_det = bcd[j_beta].beta_string;
+          const auto h_diag = bcd[j_beta].h_diag;
+
+          // TODO: These copies are slow
+          const auto& occ_beta_8 = bcd[j_beta].occ_beta;
+          const auto& vir_beta_8 = bcd[j_beta].vir_beta;
+          std::vector<uint32_t> occ_beta(occ_beta_8.size()), vir_beta(vir_beta_8.size());
+          std::copy(occ_beta_8.begin(), occ_beta_8.end(), occ_beta.begin());
+          std::copy(vir_beta_8.begin(), vir_beta_8.end(), vir_beta.begin());
+
+          std::vector<double> orb_ens_alpha, orb_ens_beta;
+          if(asci_settings.pt2_precompute_eps) {
+            orb_ens_alpha = bcd[j_beta].orb_ens_alpha;
+            orb_ens_beta  = bcd[j_beta].orb_ens_beta;
+          } else {
+            orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
+            orb_ens_beta  = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
+          }
+
+          // AA excitations
+          generate_constraint_singles_contributions_ss(
+              c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), T_pq,
+              norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
+              ham_gen, asci_pairs);
+
+          // AAAA excitations
+          generate_constraint_doubles_contributions_ss(
+              c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
+              norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+
+          // AABB excitations
+          generate_constraint_doubles_contributions_os(
+              c, w, con, occ_alpha, occ_beta, vir_beta, orb_ens_alpha.data(),
+              orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+              ham_gen, asci_pairs);
+
+          if(alpha_satisfies_con) {
+            // BB excitations
+            append_singles_asci_contributions<Spin::Beta>(
+                c, w, beta_det, occ_beta, vir_beta, occ_alpha,
+                orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb,
+                h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+
+            // BBBB excitations
+            append_ss_doubles_asci_contributions<Spin::Beta>(
+                c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
+                orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+                ham_gen, asci_pairs);
+
+            // No excitation (push inf to remove from list)
+            asci_pairs.push_back(
+                {w, std::numeric_limits<double>::infinity(), 1.0});
+          }
+        }
+        #if 0
+        if(asci_settings.pt2_prune and asci_pairs.size() > asci_settings.pt2_reserve_count and asci_pairs.size() != old_pair_size) {
+        // Cleanup
+        auto uit = stable_sort_and_accumulate_asci_pairs(asci_pairs.begin(),
+                                                  asci_pairs.end());
+        asci_pairs.erase(uit, asci_pairs.end());
+        //uit = std::stable_partition(asci_pairs.begin(), asci_pairs.end(), [&](const auto& p){ return std::abs(p.pt2()) > h_el_tol; });
+        //asci_pairs.erase(uit, asci_pairs.end());
+          printf("[pt2_prune rank %4d tid:%4d] IC = %lu / %lu IA = %lu / %lu SZ = %lu\n", world_rank,
+                 omp_get_thread_num(), ic, ncon_total, i_alpha,
+                 nuniq_alpha, asci_pairs.size());
+        }
+        #endif
+
+      }  // Unique Alpha Loop
+
+      // S&A Thread local pairs
+      sort_and_accumulate_asci_pairs(asci_pairs); 
+
+
+      // Insert
+      #pragma omp critical
+      {
+      if(asci_pairs_con.size()) {
+        asci_pairs_con.reserve(asci_pairs.size() + asci_pairs_con.size());
+        asci_pairs_con.insert(asci_pairs_con.end(), asci_pairs.begin(), asci_pairs.end());
+      } else {
+        asci_pairs_con = std::move(asci_pairs);
+      }
+      }
+
+      } // OpenMP
+
+      double EPT2_local = 0.0;
+      size_t NPT2_local = 0;
+      // Local S&A for each quad + update EPT2
+      {
+        auto uit = sort_and_accumulate_asci_pairs(asci_pairs_con.begin(),
+                                                  asci_pairs_con.end());
+        for(auto it = asci_pairs_con.begin(); it != uit; ++it) {
+          if(!std::isinf(it->c_times_matel)) {
+            EPT2_local += it->pt2();
+            NPT2_local++;
+          }
+        }
+        asci_pairs_con.clear();
+      }
+
+      EPT2 += EPT2_local;
+      NPT2 += NPT2_local;
+    } // Constraint "loop"
+  } // "Big constraints"
+
+
+  // Parallelize over both MPI + threads for "small" constraints
 #pragma omp parallel reduction(+ : EPT2) reduction(+ : NPT2)
   {
     // Process ASCI pair contributions for each constraint
@@ -188,24 +334,27 @@ double asci_pt2_constraint(ASCISettings asci_settings,
       // Atomically get the next task ID and increment for other
       // MPI ranks and threads
       size_t ntake = ic < 1000 ? 1 : 10;
-      ic = nxtval.fetch_and_add(ntake);
+      ic = nxtval_small.fetch_and_add(ntake);
 
       // Loop over assigned tasks
       const size_t c_end = std::min(ncon_total, ic + ntake);
       for(; ic < c_end; ++ic) {
         const auto& con = constraints[ic].first;
-        printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
+        printf("[pt2_small rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
                omp_get_thread_num(), ic, ncon_total);
 
-        for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
+        for(size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const size_t old_pair_size = asci_pairs.size();
           const auto& alpha_det = uniq_alpha[i_alpha].first;
+          const auto ncon_alpha = constraint_histogram(alpha_det,1,1,con);
+          if(!ncon_alpha) continue;
           const auto occ_alpha = bits_to_indices(alpha_det);
           const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
 
           const auto& bcd = uad[i_alpha];
           const size_t nbeta = bcd.size();
-          for(size_t j_beta = 0; j_beta < nbeta; ++j_beta, ++iw) {
+          for(size_t j_beta = 0; j_beta < nbeta; ++j_beta) {
+            const size_t iw = uniq_alpha_ioff[i_alpha] + j_beta;
             const auto w = *(cdets_begin + iw);
             const auto c = C[iw];
             const auto& beta_det = bcd[j_beta].beta_string;
@@ -267,8 +416,8 @@ double asci_pt2_constraint(ASCISettings asci_settings,
           auto uit = stable_sort_and_accumulate_asci_pairs(asci_pairs.begin(),
                                                     asci_pairs.end());
           asci_pairs.erase(uit, asci_pairs.end());
-          uit = std::stable_partition(asci_pairs.begin(), asci_pairs.end(), [&](const auto& p){ return std::abs(p.pt2()) > h_el_tol; });
-          asci_pairs.erase(uit, asci_pairs.end());
+          //uit = std::stable_partition(asci_pairs.begin(), asci_pairs.end(), [&](const auto& p){ return std::abs(p.pt2()) > h_el_tol; });
+          //asci_pairs.erase(uit, asci_pairs.end());
             printf("[rank %4d tid:%4d] IC = %lu / %lu IA = %lu / %lu SZ = %lu\n", world_rank,
                    omp_get_thread_num(), ic, ncon_total, i_alpha,
                    nuniq_alpha, asci_pairs.size());
@@ -289,6 +438,9 @@ double asci_pt2_constraint(ASCISettings asci_settings,
             }
           }
           asci_pairs.clear();
+          // Deallocate 
+          if(asci_pairs.capacity() > asci_settings.pt2_reserve_count) 
+            asci_contrib_container<wfn_t<N>>().swap(asci_pairs);
         }
 
         EPT2 += EPT2_local;
