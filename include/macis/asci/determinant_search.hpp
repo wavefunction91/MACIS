@@ -44,6 +44,10 @@ struct ASCISettings {
   size_t pt2_reserve_count = 70000000;
   bool   pt2_prune = false;
   bool   pt2_precompute_eps = false;
+  size_t pt2_bigcon_thresh = 250;
+
+  size_t nxtval_bcount_thresh = 1000;
+  size_t nxtval_bcount_inc    = 10;
 
   bool just_singles = false;
   size_t grow_factor = 8;
@@ -298,7 +302,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
       // Atomically get the next task ID and increment for other
       // MPI ranks and threads
-      size_t ntake = ic < 1000 ? 1 : 10;
+      size_t ntake = ic < asci_settings.nxtval_bcount_thresh ? 1 : asci_settings.nxtval_bcount_inc;
       ic = nxtval.fetch_and_add(ntake);
 
       // Loop over assigned tasks

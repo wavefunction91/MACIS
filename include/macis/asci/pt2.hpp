@@ -43,12 +43,17 @@ double asci_pt2_constraint(ASCISettings asci_settings,
 
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
   logger->info("[ASCI PT2 Settings]");
-  logger->info("  * NDETS              = {}", ncdets);
-  logger->info("  * PT2_TOL            = {}", asci_settings.pt2_tol);
-  logger->info("  * PT2_RESERVE_COUNT  = {}", asci_settings.pt2_reserve_count);
-  logger->info("  * PT2_CONSTRAINT_LVL = {}", asci_settings.pt2_constraint_level);
-  logger->info("  * PT2_PRUNE          = {}", asci_settings.pt2_prune);
-  logger->info("  * PT2_PRECMP_EPS     = {}", asci_settings.pt2_precompute_eps);
+  logger->info("  * NDETS                = {}", ncdets);
+  logger->info("  * PT2_TOL              = {}", asci_settings.pt2_tol);
+  logger->info("  * PT2_RESERVE_COUNT    = {}", asci_settings.pt2_reserve_count);
+  logger->info("  * PT2_CONSTRAINT_LVL   = {}", asci_settings.pt2_constraint_level);
+  logger->info("  * PT2_PRUNE            = {}", asci_settings.pt2_prune);
+  logger->info("  * PT2_PRECOMP_EPS      = {}", asci_settings.pt2_precompute_eps);
+  logger->info("  * PT2_BIGCON_THRESH    = {}", asci_settings.pt2_bigcon_thresh);
+  logger->info("  * NXTVAL_BCOUNT_THRESH = {}",
+               asci_settings.nxtval_bcount_thresh);
+  logger->info("  * NXTVAL_BCOUNT_INC    = {}",
+               asci_settings.nxtval_bcount_inc);
   logger->info("");
 
   // For each unique alpha, create a list of beta string and store metadata
@@ -176,7 +181,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   size_t NPT2 = 0;
 
   const size_t ncon_total = constraints.size();
-  const size_t ncon_big   = 250;
+  const size_t ncon_big   = asci_settings.pt2_bigcon_thresh;
   const size_t ncon_small = ncon_total - ncon_big;
 
   // Global atomic task-id counter
@@ -333,7 +338,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
     while(ic < ncon_total) {
       // Atomically get the next task ID and increment for other
       // MPI ranks and threads
-      size_t ntake = ic < 1000 ? 1 : 10;
+      size_t ntake = ic < asci_settings.nxtval_bcount_thresh ? 1 : asci_settings.nxtval_bcount_inc;
       ic = nxtval_small.fetch_and_add(ntake);
 
       // Loop over assigned tasks

@@ -225,6 +225,9 @@ int main(int argc, char** argv) {
     OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL", asci_settings.pt2_constraint_level, int);
     OPT_KEYWORD("ASCI.PT2_PRUNE", asci_settings.pt2_prune, bool);
     OPT_KEYWORD("ASCI.PT2_PRECOMPUTE_EPS", asci_settings.pt2_precompute_eps, bool);
+    OPT_KEYWORD("ASCI.PT2_BIGCON_THRESH", asci_settings.pt2_bigcon_thresh, size_t);
+    OPT_KEYWORD("ASCI.NXTVAL_BCOUNT_THRESH", asci_settings.nxtval_bcount_thresh, size_t);
+    OPT_KEYWORD("ASCI.NXTVAL_BCOUNT_INC", asci_settings.nxtval_bcount_inc, size_t);
 
     bool mp2_guess = false;
     OPT_KEYWORD("MCSCF.MP2_GUESS", mp2_guess, bool);
