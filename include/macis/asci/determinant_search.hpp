@@ -453,6 +453,9 @@ std::vector<wfn_t<N>> asci_search(
       ncdets, ndets_max, asci_settings.h_el_tol, asci_settings.rv_prune_tol);
   logger->info("  MAX_RV_SIZE = {}, JUST_SINGLES = {}",
                asci_settings.pair_size_max, asci_settings.just_singles);
+  logger->info("  CDET_SUM = {:.2e}",
+               std::accumulate(C.begin(),C.begin() + ncdets, 0.0,
+                 [](auto s, auto c){ return s + c*c; }));
 
   MACIS_MPI_CODE(MPI_Barrier(comm);)
   auto asci_search_st = clock_type::now();
