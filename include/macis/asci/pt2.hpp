@@ -43,16 +43,17 @@ double asci_pt2_constraint(ASCISettings asci_settings,
 
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
   logger->info("[ASCI PT2 Settings]");
-  logger->info("  * NDETS                = {}", ncdets);
-  logger->info("  * PT2_TOL              = {}", asci_settings.pt2_tol);
-  logger->info("  * PT2_RESERVE_COUNT    = {}", asci_settings.pt2_reserve_count);
-  logger->info("  * PT2_CONSTRAINT_LVL   = {}", asci_settings.pt2_constraint_level);
-  logger->info("  * PT2_PRUNE            = {}", asci_settings.pt2_prune);
-  logger->info("  * PT2_PRECOMP_EPS      = {}", asci_settings.pt2_precompute_eps);
-  logger->info("  * PT2_BIGCON_THRESH    = {}", asci_settings.pt2_bigcon_thresh);
-  logger->info("  * NXTVAL_BCOUNT_THRESH = {}",
+  logger->info("  * NDETS                  = {}", ncdets);
+  logger->info("  * PT2_TOL                = {}", asci_settings.pt2_tol);
+  logger->info("  * PT2_RESERVE_COUNT      = {}", asci_settings.pt2_reserve_count);
+  logger->info("  * PT2_CONSTRAINT_LVL_MAX = {}", asci_settings.pt2_max_constraint_level);
+  logger->info("  * PT2_CONSTRAINT_LVL_MIN = {}", asci_settings.pt2_min_constraint_level);
+  logger->info("  * PT2_PRUNE              = {}", asci_settings.pt2_prune);
+  logger->info("  * PT2_PRECOMP_EPS        = {}", asci_settings.pt2_precompute_eps);
+  logger->info("  * PT2_BIGCON_THRESH      = {}", asci_settings.pt2_bigcon_thresh);
+  logger->info("  * NXTVAL_BCOUNT_THRESH   = {}",
                asci_settings.nxtval_bcount_thresh);
-  logger->info("  * NXTVAL_BCOUNT_INC    = {}",
+  logger->info("  * NXTVAL_BCOUNT_INC      = {}",
                asci_settings.nxtval_bcount_inc);
   logger->info("");
 
@@ -74,7 +75,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
 
     beta_coeff_data(double c, size_t norb,
                     const std::vector<uint32_t>& occ_alpha, wfn_t<N> w,
-                    const HamiltonianGenerator<wfn_t<N>>& ham_gen, bool pce) {
+                    const HamiltonianGenerator<wfn_t<N>>& ham_gen, bool pce, bool pci) {
       coeff = c;
 
       beta_string = wfn_traits::beta_string(w);
@@ -84,11 +85,13 @@ double asci_pt2_constraint(ASCISettings asci_settings,
 
       // Compute occ/vir for beta string
       std::vector<uint32_t> o_32, v_32;
-      spin_wfn_traits::state_to_occ_vir(norb, beta_string, o_32, v_32);
-      occ_beta.resize(o_32.size()); 
-      std::copy(o_32.begin(), o_32.end(), occ_beta.begin());
-      vir_beta.resize(v_32.size());
-      std::copy(v_32.begin(), v_32.end(), vir_beta.begin());
+      if(pce or pci) {
+        spin_wfn_traits::state_to_occ_vir(norb, beta_string, o_32, v_32);
+        occ_beta.resize(o_32.size()); 
+        std::copy(o_32.begin(), o_32.end(), occ_beta.begin());
+        vir_beta.resize(v_32.size());
+        std::copy(v_32.begin(), v_32.end(), vir_beta.begin());
+      }
 
       // Precompute orbital energies
       if(pce) {
@@ -117,14 +120,14 @@ double asci_pt2_constraint(ASCISettings asci_settings,
     uad[i].reserve(nbeta);
     for(auto j = 0; j < nbeta; ++j, ++iw) {
       const auto& w = *(cdets_begin + iw);
-      uad[i].emplace_back(C[iw], norb, occ_alpha, w, ham_gen,asci_settings.pt2_precompute_eps);
+      uad[i].emplace_back(C[iw], norb, occ_alpha, w, ham_gen,asci_settings.pt2_precompute_eps, asci_settings.pt2_precompute_idx);
     }
   }
 
   if(world_rank == 0) {
     constexpr double gib = 1024 * 1024 * 1024;
-    printf("MEM REQ DETS = %.2e\n", ncdets * sizeof(wfn_t<N>) / gib);
-    printf("MEM REQ C    = %.2e\n", ncdets * sizeof(double) / gib);
+    logger->info("MEM REQ DETS = {:.2e}", ncdets * sizeof(wfn_t<N>) / gib);
+    logger->info("MEM REQ C    = {:.2e}", ncdets * sizeof(double) / gib);
     size_t mem_alpha = 0;
     for( auto i = 0ul; i < nuniq_alpha; ++i) {
       mem_alpha += sizeof(spin_wfn_type);
@@ -132,8 +135,8 @@ double asci_pt2_constraint(ASCISettings asci_settings,
         mem_alpha += uad[i][j].mem();
       }
     }
-    printf("MEM REQ ALPH = %.2e\n", mem_alpha / gib);
-    printf("MEM REQ CONT = %.2e\n", asci_settings.pt2_reserve_count * sizeof(asci_contrib<wfn_t<N>>)/ gib);
+    logger->info("MEM REQ ALPH = {:.2e}", mem_alpha / gib);
+    logger->info("MEM REQ CONT = {:.2e}", asci_settings.pt2_reserve_count * sizeof(asci_contrib<wfn_t<N>>)/ gib);
   }
   MPI_Barrier(comm);
 
@@ -153,8 +156,9 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   // auto constraints = dist_constraint_general<wfn_t<N>>(
   //     5, norb, n_sing_beta, n_doub_beta, uniq_alpha, comm);
   auto constraints = gen_constraints_general<wfn_t<N>>(
-      asci_settings.pt2_constraint_level, norb, n_sing_beta, 
-      n_doub_beta, uniq_alpha, world_size * omp_get_max_threads(), 0);
+      asci_settings.pt2_max_constraint_level, norb, n_sing_beta, 
+      n_doub_beta, uniq_alpha, world_size * omp_get_max_threads(), 
+      asci_settings.pt2_min_constraint_level);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
@@ -198,7 +202,8 @@ double asci_pt2_constraint(ASCISettings asci_settings,
       // MPI ranks
       ic = nxtval_big.fetch_and_add(1); 
       if(ic >= ncon_big) continue;
-      printf("[pt2_big rank %4d] %10lu / %10lu\n", world_rank, ic, ncon_total);
+      if(asci_settings.pt2_print_progress)
+        printf("[pt2_big rank %4d] %10lu / %10lu\n", world_rank, ic, ncon_total);
       const auto& con = constraints[ic].first;
 
       asci_contrib_container<wfn_t<N>> asci_pairs_con;
@@ -224,11 +229,16 @@ double asci_pt2_constraint(ASCISettings asci_settings,
           const auto h_diag = bcd[j_beta].h_diag;
 
           // TODO: These copies are slow
+          #if 0
           const auto& occ_beta_8 = bcd[j_beta].occ_beta;
           const auto& vir_beta_8 = bcd[j_beta].vir_beta;
           std::vector<uint32_t> occ_beta(occ_beta_8.size()), vir_beta(vir_beta_8.size());
           std::copy(occ_beta_8.begin(), occ_beta_8.end(), occ_beta.begin());
           std::copy(vir_beta_8.begin(), vir_beta_8.end(), vir_beta.begin());
+          #else
+          std::vector<uint32_t> occ_beta, vir_beta;
+          spin_wfn_traits::state_to_occ_vir(norb, beta_det, occ_beta, vir_beta);
+          #endif
 
           std::vector<double> orb_ens_alpha, orb_ens_beta;
           if(asci_settings.pt2_precompute_eps) {
@@ -309,10 +319,12 @@ double asci_pt2_constraint(ASCISettings asci_settings,
 
       double EPT2_local = 0.0;
       size_t NPT2_local = 0;
+      size_t pair_size = 0;
       // Local S&A for each quad + update EPT2
       {
         auto uit = sort_and_accumulate_asci_pairs(asci_pairs_con.begin(),
                                                   asci_pairs_con.end());
+        pair_size = std::distance(asci_pairs_con.begin(), uit);
         for(auto it = asci_pairs_con.begin(); it != uit; ++it) {
           if(!std::isinf(it->c_times_matel)) {
             EPT2_local += it->pt2();
@@ -320,6 +332,8 @@ double asci_pt2_constraint(ASCISettings asci_settings,
           }
         }
         asci_pairs_con.clear();
+        if(asci_settings.pt2_print_progress)
+          printf("[pt2_big rank %4d] CAPACITY %lu SZ %lu\n", world_rank, asci_pairs_con.capacity(), pair_size);
       }
 
       EPT2 += EPT2_local;
@@ -345,8 +359,9 @@ double asci_pt2_constraint(ASCISettings asci_settings,
       const size_t c_end = std::min(ncon_total, ic + ntake);
       for(; ic < c_end; ++ic) {
         const auto& con = constraints[ic].first;
-        printf("[pt2_small rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
-               omp_get_thread_num(), ic, ncon_total);
+        if(asci_settings.pt2_print_progress)
+          printf("[pt2_small rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
+                 omp_get_thread_num(), ic, ncon_total);
 
         for(size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const size_t old_pair_size = asci_pairs.size();
@@ -366,11 +381,16 @@ double asci_pt2_constraint(ASCISettings asci_settings,
             const auto h_diag = bcd[j_beta].h_diag;
 
             // TODO: These copies are slow
+            #if 0
             const auto& occ_beta_8 = bcd[j_beta].occ_beta;
             const auto& vir_beta_8 = bcd[j_beta].vir_beta;
             std::vector<uint32_t> occ_beta(occ_beta_8.size()), vir_beta(vir_beta_8.size());
             std::copy(occ_beta_8.begin(), occ_beta_8.end(), occ_beta.begin());
             std::copy(vir_beta_8.begin(), vir_beta_8.end(), vir_beta.begin());
+            #else
+            std::vector<uint32_t> occ_beta, vir_beta;
+            spin_wfn_traits::state_to_occ_vir(norb, beta_det, occ_beta, vir_beta);
+            #endif
 
             std::vector<double> orb_ens_alpha, orb_ens_beta;
             if(asci_settings.pt2_precompute_eps) {
@@ -423,9 +443,14 @@ double asci_pt2_constraint(ASCISettings asci_settings,
           asci_pairs.erase(uit, asci_pairs.end());
           //uit = std::stable_partition(asci_pairs.begin(), asci_pairs.end(), [&](const auto& p){ return std::abs(p.pt2()) > h_el_tol; });
           //asci_pairs.erase(uit, asci_pairs.end());
-            printf("[rank %4d tid:%4d] IC = %lu / %lu IA = %lu / %lu SZ = %lu\n", world_rank,
-                   omp_get_thread_num(), ic, ncon_total, i_alpha,
-                   nuniq_alpha, asci_pairs.size());
+            if(asci_settings.pt2_print_progress)
+              printf("[pt2_prune rank %4d tid:%4d] IC = %lu / %lu IA = %lu / %lu SZ = %lu\n", world_rank,
+                     omp_get_thread_num(), ic, ncon_total, i_alpha,
+                     nuniq_alpha, asci_pairs.size());
+
+            if(asci_pairs.size() > asci_settings.pt2_reserve_count) {
+              printf("* WARNING: PRUNED SIZE LARGER THAN RESERVE COUNT\n");
+            }
           }
 
         }  // Unique Alpha Loop

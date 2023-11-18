@@ -673,8 +673,9 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   }
   // Build up higher-order constraints as base if requested
   for(size_t ilevel = 0; ilevel < nlevel_min; ++ilevel) {
-    std::vector cur_constraints = constraint_sizes;
-    for(auto [c,nw] : cur_constraints) {
+    decltype(constraint_sizes) cur_constraints;
+    cur_constraints.reserve(constraint_sizes.size() * norb); 
+    for(auto [c,nw] : constraint_sizes) {
       const auto C_min = c.C_min();
       for(auto q_l = 0; q_l < C_min; ++q_l) {
         // Generate masks / counts
@@ -682,9 +683,10 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
         cn_C.flip(q_l);
         string_type cn_B = c.B() >> (C_min - q_l);
         constraint_type c_next(cn_C, cn_B, q_l);
-        constraint_sizes.emplace_back(c_next, 0ul);
+        cur_constraints.emplace_back(c_next, 0ul);
       }
     }
+    constraint_sizes = std::move(cur_constraints);
   }
 
   struct atomic_wrapper {
@@ -701,10 +703,14 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   // Compute histogram
   const auto ntrip_full = constraint_sizes.size(); 
   std::vector<atomic_wrapper> constraint_work(ntrip_full, 0ul);
-  int world_rank = comm_rank(MPI_COMM_WORLD);
-  #pragma omp parallel for schedule(dynamic)
-  for(auto i_trip = 0ul; i_trip < ntrip_full; ++i_trip) {
-    if(!world_rank and !(i_trip%1000)) printf("cgen %lu / %lu\n", i_trip, ntrip_full);
+  global_atomic<size_t> nxtval(MPI_COMM_WORLD);
+  #pragma omp parallel
+  {
+  size_t i_trip = 0;
+  while(i_trip < ntrip_full) {
+    i_trip = nxtval.fetch_and_add(1);
+    if(i_trip >= ntrip_full) break;
+    if(!(i_trip%1000)) printf("cgen %lu / %lu\n", i_trip, ntrip_full);
     auto& [constraint, __nw] = constraint_sizes[i_trip];
     auto& c_nw = constraint_work[i_trip];
     size_t nw = 0;
@@ -718,10 +724,17 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
     }
     if(nw) c_nw.value.fetch_add(nw);
   }
+  }
+
+  std::vector<size_t> constraint_work_bare(ntrip_full);
+  for(auto i_trip = 0; i_trip < ntrip_full; ++i_trip) {
+    constraint_work_bare[i_trip] = constraint_work[i_trip].value.load();
+  }
+  allreduce(constraint_work_bare.data(), ntrip_full, MPI_SUM, MPI_COMM_WORLD);
 
   // Copy over constraint work
   for(auto i_trip = 0; i_trip < ntrip_full; ++i_trip) {
-    constraint_sizes[i_trip].second = constraint_work[i_trip].value.load();
+    constraint_sizes[i_trip].second = constraint_work_bare[i_trip];
   }
 
   // Remove zeros

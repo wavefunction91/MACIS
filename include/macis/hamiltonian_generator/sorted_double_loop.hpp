@@ -40,6 +40,7 @@ class SortedDoubleLoopHamiltonianGenerator
     const size_t nket_dets = std::distance(ket_begin, ket_end);
 
     const bool is_symm = bra_begin == ket_begin and bra_end == ket_end;
+    auto world_rank = comm_rank(MPI_COMM_WORLD);
 
     // Get unique alpha strings
     auto setup_st = std::chrono::high_resolution_clock::now();
@@ -102,6 +103,7 @@ class SortedDoubleLoopHamiltonianGenerator
 #pragma omp for schedule(dynamic)
       for(size_t ia_bra = 0; ia_bra < nuniq_bra; ++ia_bra) {
         if(unique_alpha_bra[ia_bra].first.any()) {
+          if(!(ia_bra%100))printf("[ham_gen rank %d] IA_BRA = %lu / %lu\n", world_rank, ia_bra, nuniq_bra);
           // Extract alpha bra
           const auto bra_alpha = unique_alpha_bra[ia_bra].first;
           const size_t beta_st_bra = unique_alpha_bra_idx[ia_bra];
@@ -227,10 +229,12 @@ class SortedDoubleLoopHamiltonianGenerator
 
     // Sort for CSR Conversion
     auto sort_st = std::chrono::high_resolution_clock::now();
+    printf("[ham_gen rank %d] BEFORE SORT\n", world_rank);
     coo_mat.sort_by_row_index();
     auto sort_en = std::chrono::high_resolution_clock::now();
 
     auto conv_st = std::chrono::high_resolution_clock::now();
+    printf("[ham_gen rank %d] BEFORE CONV\n", world_rank);
     sparse_matrix_type<index_t> csr_mat(coo_mat);  // Convert to CSR Matrix
     auto conv_en = std::chrono::high_resolution_clock::now();
 

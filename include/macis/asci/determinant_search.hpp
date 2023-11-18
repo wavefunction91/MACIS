@@ -44,6 +44,8 @@ struct ASCISettings {
   size_t pt2_reserve_count = 70000000;
   bool   pt2_prune = false;
   bool   pt2_precompute_eps = false;
+  bool   pt2_precompute_idx = false;
+  bool   pt2_print_progress = false;
   size_t pt2_bigcon_thresh = 250;
 
   size_t nxtval_bcount_thresh = 1000;
@@ -59,7 +61,8 @@ struct ASCISettings {
 
   // bool dist_triplet_random = false;
   int constraint_level = 2;  // Up To Quints
-  int pt2_constraint_level = 5;
+  int pt2_max_constraint_level = 5;
+  int pt2_min_constraint_level = 0;
 };
 
 template <size_t N>
@@ -309,8 +312,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       const size_t c_end = std::min(ncon_total, ic + ntake);
       for(; ic < c_end; ++ic) {
         const auto& con = constraints[ic].first;
-        printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
-               omp_get_thread_num(), ic, ncon_total);
+        //printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
+        //       omp_get_thread_num(), ic, ncon_total);
 
         for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const auto& alpha_det = uniq_alpha[i_alpha].first;

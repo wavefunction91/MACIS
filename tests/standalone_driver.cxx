@@ -222,9 +222,12 @@ int main(int argc, char** argv) {
     OPT_KEYWORD("ASCI.PT2", pt2, bool);
     OPT_KEYWORD("ASCI.PT2_TOL", asci_settings.pt2_tol, double);
     OPT_KEYWORD("ASCI.PT2_RESERVE_COUNT", asci_settings.pt2_reserve_count, size_t);
-    OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL", asci_settings.pt2_constraint_level, int);
+    OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL_MAX", asci_settings.pt2_max_constraint_level, int);
+    OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL_MIN", asci_settings.pt2_min_constraint_level, int);
     OPT_KEYWORD("ASCI.PT2_PRUNE", asci_settings.pt2_prune, bool);
     OPT_KEYWORD("ASCI.PT2_PRECOMPUTE_EPS", asci_settings.pt2_precompute_eps, bool);
+    OPT_KEYWORD("ASCI.PT2_PRECOMPUTE_IDX", asci_settings.pt2_precompute_idx, bool);
+    OPT_KEYWORD("ASCI.PT2_PRINT_PROGRESS", asci_settings.pt2_print_progress, bool);
     OPT_KEYWORD("ASCI.PT2_BIGCON_THRESH", asci_settings.pt2_bigcon_thresh, size_t);
     OPT_KEYWORD("ASCI.NXTVAL_BCOUNT_THRESH", asci_settings.nxtval_bcount_thresh, size_t);
     OPT_KEYWORD("ASCI.NXTVAL_BCOUNT_INC", asci_settings.nxtval_bcount_inc, size_t);
@@ -233,6 +236,9 @@ int main(int argc, char** argv) {
     OPT_KEYWORD("MCSCF.MP2_GUESS", mp2_guess, bool);
 
     if(!world_rank) {
+      console->info("[Standalone MACIS Driver]:");
+      console->info("  * NMPI          = {}", world_size);
+      console->info("  * NTHREADS      = {}", omp_get_max_threads());
       console->info("[Wavefunction Data]:");
       console->info("  * JOB           = {}", job_str);
       console->info("  * CIEXP         = {}", ciexp_str);
