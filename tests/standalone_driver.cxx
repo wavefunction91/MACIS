@@ -224,6 +224,7 @@ int main(int argc, char** argv) {
     OPT_KEYWORD("ASCI.PT2_RESERVE_COUNT", asci_settings.pt2_reserve_count, size_t);
     OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL_MAX", asci_settings.pt2_max_constraint_level, int);
     OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL_MIN", asci_settings.pt2_min_constraint_level, int);
+    OPT_KEYWORD("ASCI.PT2_CNSTRNT_RFNE_FORCE", asci_settings.pt2_constraint_refine_force,int64_t);
     OPT_KEYWORD("ASCI.PT2_PRUNE", asci_settings.pt2_prune, bool);
     OPT_KEYWORD("ASCI.PT2_PRECOMPUTE_EPS", asci_settings.pt2_precompute_eps, bool);
     OPT_KEYWORD("ASCI.PT2_PRECOMPUTE_IDX", asci_settings.pt2_precompute_idx, bool);

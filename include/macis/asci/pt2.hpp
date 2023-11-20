@@ -48,6 +48,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   logger->info("  * PT2_RESERVE_COUNT      = {}", asci_settings.pt2_reserve_count);
   logger->info("  * PT2_CONSTRAINT_LVL_MAX = {}", asci_settings.pt2_max_constraint_level);
   logger->info("  * PT2_CONSTRAINT_LVL_MIN = {}", asci_settings.pt2_min_constraint_level);
+  logger->info("  * PT2_CNSTRNT_RFNE_FORCE = {}", asci_settings.pt2_constraint_refine_force);
   logger->info("  * PT2_PRUNE              = {}", asci_settings.pt2_prune);
   logger->info("  * PT2_PRECOMP_EPS        = {}", asci_settings.pt2_precompute_eps);
   logger->info("  * PT2_BIGCON_THRESH      = {}", asci_settings.pt2_bigcon_thresh);
@@ -158,7 +159,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   auto constraints = gen_constraints_general<wfn_t<N>>(
       asci_settings.pt2_max_constraint_level, norb, n_sing_beta, 
       n_doub_beta, uniq_alpha, world_size * omp_get_max_threads(), 
-      asci_settings.pt2_min_constraint_level);
+      asci_settings.pt2_min_constraint_level, asci_settings.pt2_constraint_refine_force );
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());

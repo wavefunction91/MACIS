@@ -630,7 +630,8 @@ auto dist_constraint_general(size_t nlevels, size_t norb, size_t ns_othr,
 template <typename WfnType, typename ContainerType>
 auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
                              size_t nd_othr, const ContainerType& unique_alpha,
-                             int world_size, size_t nlevel_min = 0) {
+                             int world_size, size_t nlevel_min = 0,
+                             int64_t nrec_min = -1) {
   using wfn_traits = wavefunction_traits<WfnType>;
   using constraint_type = alpha_constraint<wfn_traits>;
   using string_type = typename constraint_type::constraint_type;
@@ -671,7 +672,9 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
         auto constraint = constraint_type::make_triplet(t_i, t_j, t_k);
         constraint_sizes.emplace_back(constraint, 0ul);
   }
+
   // Build up higher-order constraints as base if requested
+  if(nrec_min < 0 or nrec_min >= constraint_sizes.size()) // nrec_min < 0 implies that you want all the constraints upfront
   for(size_t ilevel = 0; ilevel < nlevel_min; ++ilevel) {
     decltype(constraint_sizes) cur_constraints;
     cur_constraints.reserve(constraint_sizes.size() * norb); 
@@ -703,6 +706,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   // Compute histogram
   const auto ntrip_full = constraint_sizes.size(); 
   std::vector<atomic_wrapper> constraint_work(ntrip_full, 0ul);
+  {
   global_atomic<size_t> nxtval(MPI_COMM_WORLD);
   #pragma omp parallel
   {
@@ -710,7 +714,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   while(i_trip < ntrip_full) {
     i_trip = nxtval.fetch_and_add(1);
     if(i_trip >= ntrip_full) break;
-    if(!(i_trip%1000)) printf("cgen %lu / %lu\n", i_trip, ntrip_full);
+    //if(!(i_trip%1000)) printf("cgen %lu / %lu\n", i_trip, ntrip_full);
     auto& [constraint, __nw] = constraint_sizes[i_trip];
     auto& c_nw = constraint_work[i_trip];
     size_t nw = 0;
@@ -725,6 +729,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
     if(nw) c_nw.value.fetch_add(nw);
   }
   }
+  } // Scope nxtval
 
   std::vector<size_t> constraint_work_bare(ntrip_full);
   for(auto i_trip = 0; i_trip < ntrip_full; ++i_trip) {
@@ -748,6 +753,99 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   size_t total_work = std::accumulate(constraint_sizes.begin(), constraint_sizes.end(),
     0ul, [](auto s, const auto& p){ return s + p.second; });
   size_t local_average = total_work / world_size;
+
+
+  // Manual refinement of top configurations
+  if(nrec_min > 0 and nrec_min < constraint_sizes.size()) {
+  
+    const size_t nleave = constraint_sizes.size() - nrec_min;
+    std::vector<std::pair<constraint_type, size_t>> constraint_to_refine, 
+      constraint_to_leave;
+    constraint_to_refine.reserve(nrec_min);
+    constraint_to_refine.reserve(nleave);
+
+    std::copy_n(constraint_sizes.begin(), nrec_min, std::back_inserter(constraint_to_refine));
+    std::copy_n(constraint_sizes.begin() + nrec_min, nleave, 
+                std::back_inserter(constraint_to_leave));
+
+    // Deallocate original array
+    decltype(constraint_sizes)().swap(constraint_sizes);
+
+    // Generate refined constraints
+    for(size_t ilevel = 0; ilevel < nlevel_min; ++ilevel) {
+      decltype(constraint_sizes) cur_constraints;
+      cur_constraints.reserve(constraint_to_refine.size() * norb); 
+      for(auto [c,nw] : constraint_to_refine) {
+        const auto C_min = c.C_min();
+        for(auto q_l = 0; q_l < C_min; ++q_l) {
+          // Generate masks / counts
+          string_type cn_C = c.C();
+          cn_C.flip(q_l);
+          string_type cn_B = c.B() >> (C_min - q_l);
+          constraint_type c_next(cn_C, cn_B, q_l);
+          cur_constraints.emplace_back(c_next, 0ul);
+        }
+      }
+      constraint_to_refine = std::move(cur_constraints);
+    }
+
+    const size_t nrefine = constraint_to_refine.size();
+
+    global_atomic<size_t> nxtval(MPI_COMM_WORLD);
+    std::vector<atomic_wrapper>().swap(constraint_work);
+    std::vector<size_t>().swap(constraint_work_bare);
+    constraint_work.resize(nrefine, 0ul);
+    #pragma omp parallel
+    {
+    size_t i_ref = 0;
+    while(i_ref < nrefine) {
+      i_ref = nxtval.fetch_and_add(1);
+      if(i_ref >= nrefine) break;
+      //if(!(i_ref%1000)) printf("cgen %lu / %lu\n", i_ref, nrefine);
+      auto& [constraint, __nw] = constraint_to_refine[i_ref];
+      auto& c_nw = constraint_work[i_ref];
+      size_t nw = 0;
+      for(const auto& alpha : unique_alpha) {
+        if constexpr(flat_container)
+          nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
+                                     nd_othr, constraint);
+        else
+          nw += alpha.second * constraint_histogram(alpha.first, ns_othr,
+                                                    nd_othr, constraint);
+      }
+      if(nw) c_nw.value.fetch_add(nw);
+    } // constraint "loop"
+    } // OpenMP Context
+
+    constraint_work_bare.resize(nrefine);
+    for(auto i_ref = 0; i_ref < nrefine; ++i_ref) {
+      constraint_work_bare[i_ref] = constraint_work[i_ref].value.load();
+    }
+    allreduce(constraint_work_bare.data(), nrefine, MPI_SUM, MPI_COMM_WORLD);
+
+    // Copy over constraint work
+    for(auto i_ref = 0; i_ref < nrefine; ++i_ref) {
+      constraint_to_refine[i_ref].second = constraint_work_bare[i_ref];
+    }
+
+    // Remove zeros
+    {
+    auto it = std::partition(constraint_to_refine.begin(), constraint_to_refine.end(),
+              [](const auto& p) { return p.second > 0; });
+    constraint_to_refine.erase(it, constraint_to_refine.end());
+    }
+
+    // Concatenate the arrays
+    constraint_sizes.reserve(nrefine + nleave);
+    std::copy_n(constraint_to_refine.begin(), nrefine, std::back_inserter(constraint_sizes));
+    std::copy_n(constraint_to_leave.begin(), nleave, std::back_inserter(constraint_sizes));
+
+    size_t tmp = std::accumulate(constraint_sizes.begin(), constraint_sizes.end(),
+      0ul, [](auto s, const auto& p){ return s + p.second; });
+    if(tmp != total_work) throw std::runtime_error("Incorrect Refinement");
+  } // Selective refinement logic
+
+
 
   #endif
 

@@ -63,6 +63,7 @@ struct ASCISettings {
   int constraint_level = 2;  // Up To Quints
   int pt2_max_constraint_level = 5;
   int pt2_min_constraint_level = 0;
+  int64_t pt2_constraint_refine_force = 0;
 };
 
 template <size_t N>
