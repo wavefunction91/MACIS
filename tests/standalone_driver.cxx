@@ -221,17 +221,27 @@ int main(int argc, char** argv) {
     }
     OPT_KEYWORD("ASCI.PT2", pt2, bool);
     OPT_KEYWORD("ASCI.PT2_TOL", asci_settings.pt2_tol, double);
-    OPT_KEYWORD("ASCI.PT2_RESERVE_COUNT", asci_settings.pt2_reserve_count, size_t);
-    OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL_MAX", asci_settings.pt2_max_constraint_level, int);
-    OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL_MIN", asci_settings.pt2_min_constraint_level, int);
-    OPT_KEYWORD("ASCI.PT2_CNSTRNT_RFNE_FORCE", asci_settings.pt2_constraint_refine_force,int64_t);
+    OPT_KEYWORD("ASCI.PT2_RESERVE_COUNT", asci_settings.pt2_reserve_count,
+                size_t);
+    OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL_MAX",
+                asci_settings.pt2_max_constraint_level, int);
+    OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL_MIN",
+                asci_settings.pt2_min_constraint_level, int);
+    OPT_KEYWORD("ASCI.PT2_CNSTRNT_RFNE_FORCE",
+                asci_settings.pt2_constraint_refine_force, int64_t);
     OPT_KEYWORD("ASCI.PT2_PRUNE", asci_settings.pt2_prune, bool);
-    OPT_KEYWORD("ASCI.PT2_PRECOMPUTE_EPS", asci_settings.pt2_precompute_eps, bool);
-    OPT_KEYWORD("ASCI.PT2_PRECOMPUTE_IDX", asci_settings.pt2_precompute_idx, bool);
-    OPT_KEYWORD("ASCI.PT2_PRINT_PROGRESS", asci_settings.pt2_print_progress, bool);
-    OPT_KEYWORD("ASCI.PT2_BIGCON_THRESH", asci_settings.pt2_bigcon_thresh, size_t);
-    OPT_KEYWORD("ASCI.NXTVAL_BCOUNT_THRESH", asci_settings.nxtval_bcount_thresh, size_t);
-    OPT_KEYWORD("ASCI.NXTVAL_BCOUNT_INC", asci_settings.nxtval_bcount_inc, size_t);
+    OPT_KEYWORD("ASCI.PT2_PRECOMPUTE_EPS", asci_settings.pt2_precompute_eps,
+                bool);
+    OPT_KEYWORD("ASCI.PT2_PRECOMPUTE_IDX", asci_settings.pt2_precompute_idx,
+                bool);
+    OPT_KEYWORD("ASCI.PT2_PRINT_PROGRESS", asci_settings.pt2_print_progress,
+                bool);
+    OPT_KEYWORD("ASCI.PT2_BIGCON_THRESH", asci_settings.pt2_bigcon_thresh,
+                size_t);
+    OPT_KEYWORD("ASCI.NXTVAL_BCOUNT_THRESH", asci_settings.nxtval_bcount_thresh,
+                size_t);
+    OPT_KEYWORD("ASCI.NXTVAL_BCOUNT_INC", asci_settings.nxtval_bcount_inc,
+                size_t);
 
     bool mp2_guess = false;
     OPT_KEYWORD("MCSCF.MP2_GUESS", mp2_guess, bool);
@@ -405,13 +415,13 @@ int main(int argc, char** argv) {
         auto asci_st = hrt_t::now();
 
         // Growth phase
-        std::tie(E0, dets, C) = macis::asci_grow<nwfn_bits,int64_t>(
+        std::tie(E0, dets, C) = macis::asci_grow<nwfn_bits, int64_t>(
             asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
             ham_gen, n_active MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
         // Refinement phase
         if(asci_settings.max_refine_iter) {
-          std::tie(E0, dets, C) = macis::asci_refine<nwfn_bits,int64_t>(
+          std::tie(E0, dets, C) = macis::asci_refine<nwfn_bits, int64_t>(
               asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
               ham_gen, n_active MACIS_MPI_CODE(, MPI_COMM_WORLD));
         }
@@ -445,10 +455,11 @@ int main(int argc, char** argv) {
         if(pt2) {
           MPI_Barrier(MPI_COMM_WORLD);
           auto pt2_st = hrt_t::now();
-          EPT2 = macis::asci_pt2_constraint(asci_settings,
-              dets.begin(), dets.end(), E0 - (E_inactive + E_core), C, n_active,
-              ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(), ham_gen.G(),
-              ham_gen.V(), ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));
+          EPT2 = macis::asci_pt2_constraint(
+              asci_settings, dets.begin(), dets.end(),
+              E0 - (E_inactive + E_core), C, n_active, ham_gen.T(),
+              ham_gen.G_red(), ham_gen.V_red(), ham_gen.G(), ham_gen.V(),
+              ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));
           MPI_Barrier(MPI_COMM_WORLD);
           auto pt2_en = hrt_t::now();
           dur_t pt2_dur = pt2_en - pt2_st;
