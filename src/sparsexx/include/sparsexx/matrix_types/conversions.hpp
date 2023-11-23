@@ -74,8 +74,8 @@ csr_matrix<T, index_t, Alloc>::csr_matrix(
   const auto& colind_coo = other.colind();
   const auto& nzval_coo = other.nzval();
 
-// Compute rowptr
-#if 0
+  // Compute rowptr
+  #if 0
   rowptr_.at(0) = other.indexing();
   auto cur_row = 0;
   for(size_type i = 0; i < nnz_; ++i)
@@ -84,30 +84,29 @@ csr_matrix<T, index_t, Alloc>::csr_matrix(
       rowptr_.at(cur_row) = i + indexing_;
     }
   rowptr_.at(m_) = nnz_ + indexing_;
-#else
+  #else
   if(indexing_) throw std::runtime_error("NONZERO INDEXING");
   for(size_type i = 0; i < nnz_; ++i) {
     rowptr_[rowind_coo[i] - indexing_ + 1]++;
   }
   for(size_type i = 0; i < m_; ++i) {
-    rowptr_[i + 1] += rowptr_[i];
+    rowptr_[i+1] += rowptr_[i];
   }
   if(indexing_)
-    for(size_type i = 0; i < m_ + 1; ++i) {
-      rowptr_[i] += indexing_;
-    }
-#endif
+  for(size_type i = 0; i < m_+1; ++i) {
+    rowptr_[i] += indexing_;
+  }
+  #endif
 
-  // for(size_type i = 0; i < m_; ++i) {
-  //   auto row_st = rowptr_[i];
-  //   auto row_en = rowptr_[i+1];
-  //   for(size_type j = row_st; j < row_en; ++j) {
-  //     if(rowind_coo[j] != i) throw std::runtime_error("ROWPTR WRONG");
-  //   }
-  //   if(!std::is_sorted(colind_coo.begin() + row_st, colind_coo.begin() +
-  //   row_en))
-  //     throw std::runtime_error("COLIND WRONG");
-  // }
+  //for(size_type i = 0; i < m_; ++i) {
+  //  auto row_st = rowptr_[i];
+  //  auto row_en = rowptr_[i+1];
+  //  for(size_type j = row_st; j < row_en; ++j) {
+  //    if(rowind_coo[j] != i) throw std::runtime_error("ROWPTR WRONG");
+  //  }
+  //  if(!std::is_sorted(colind_coo.begin() + row_st, colind_coo.begin() + row_en))
+  //    throw std::runtime_error("COLIND WRONG");
+  //}
 
   std::copy(colind_coo.begin(), colind_coo.end(), colind_.begin());
   std::copy(nzval_coo.begin(), nzval_coo.end(), nzval_.begin());

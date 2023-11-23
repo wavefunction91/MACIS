@@ -42,14 +42,14 @@ struct ASCISettings {
 
   double pt2_tol = 1e-16;
   size_t pt2_reserve_count = 70000000;
-  bool pt2_prune = false;
-  bool pt2_precompute_eps = false;
-  bool pt2_precompute_idx = false;
-  bool pt2_print_progress = false;
+  bool   pt2_prune = false;
+  bool   pt2_precompute_eps = false;
+  bool   pt2_precompute_idx = false;
+  bool   pt2_print_progress = false;
   size_t pt2_bigcon_thresh = 250;
 
   size_t nxtval_bcount_thresh = 1000;
-  size_t nxtval_bcount_inc = 10;
+  size_t nxtval_bcount_inc    = 10;
 
   bool just_singles = false;
   size_t grow_factor = 8;
@@ -306,17 +306,15 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
       // Atomically get the next task ID and increment for other
       // MPI ranks and threads
-      size_t ntake = ic < asci_settings.nxtval_bcount_thresh
-                         ? 1
-                         : asci_settings.nxtval_bcount_inc;
+      size_t ntake = ic < asci_settings.nxtval_bcount_thresh ? 1 : asci_settings.nxtval_bcount_inc;
       ic = nxtval.fetch_and_add(ntake);
 
       // Loop over assigned tasks
       const size_t c_end = std::min(ncon_total, ic + ntake);
       for(; ic < c_end; ++ic) {
         const auto& con = constraints[ic].first;
-        // printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
-        //        omp_get_thread_num(), ic, ncon_total);
+        //printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
+        //       omp_get_thread_num(), ic, ncon_total);
 
         for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const auto& alpha_det = uniq_alpha[i_alpha].first;
@@ -464,8 +462,8 @@ std::vector<wfn_t<N>> asci_search(
   logger->info("  MAX_RV_SIZE = {}, JUST_SINGLES = {}",
                asci_settings.pair_size_max, asci_settings.just_singles);
   logger->info("  CDET_SUM = {:.2e}",
-               std::accumulate(C.begin(), C.begin() + ncdets, 0.0,
-                               [](auto s, auto c) { return s + c * c; }));
+               std::accumulate(C.begin(),C.begin() + ncdets, 0.0,
+                 [](auto s, auto c){ return s + c*c; }));
 
   MACIS_MPI_CODE(MPI_Barrier(comm);)
   auto asci_search_st = clock_type::now();

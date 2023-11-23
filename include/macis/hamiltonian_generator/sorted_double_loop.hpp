@@ -103,9 +103,7 @@ class SortedDoubleLoopHamiltonianGenerator
 #pragma omp for schedule(dynamic)
       for(size_t ia_bra = 0; ia_bra < nuniq_bra; ++ia_bra) {
         if(unique_alpha_bra[ia_bra].first.any()) {
-          if(!(ia_bra % 100))
-            printf("[ham_gen rank %d] IA_BRA = %lu / %lu\n", world_rank, ia_bra,
-                   nuniq_bra);
+          if(!(ia_bra%100))printf("[ham_gen rank %d] IA_BRA = %lu / %lu\n", world_rank, ia_bra, nuniq_bra);
           // Extract alpha bra
           const auto bra_alpha = unique_alpha_bra[ia_bra].first;
           const size_t beta_st_bra = unique_alpha_bra_idx[ia_bra];

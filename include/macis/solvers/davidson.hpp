@@ -11,9 +11,9 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
-#include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <fstream>
 #include <lobpcgxx/lobpcg.hpp>
 #include <macis/util/mpi.hpp>
 #include <random>
@@ -97,7 +97,7 @@ void p_diagonal_guess(size_t N_local, const SpMatType& A, double* X) {
   // Determine min index
   auto D_min = std::min_element(D.begin(), D.end());
   auto min_idx = std::distance(D.begin(), D_min);
-  // printf("[rank %d] DMIN %lu %.6e\n", world_rank, min_idx, *D_min);
+  //printf("[rank %d] DMIN %lu %.6e\n", world_rank, min_idx, *D_min);
 
   // Zero out guess
   for(size_t i = 0; i < N_local; ++i) X[i] = 0.;
@@ -254,8 +254,8 @@ inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
   double dot = blas::dot(N_local, V_new, 1, V_new, 1);
   dot = allreduce(dot, MPI_SUM, comm);
   double nrm = std::sqrt(dot);
-  // printf("[rank %d] GS DOT %.6e NRM %.6e\n", comm_rank(comm),
-  //   dot, nrm);
+  //printf("[rank %d] GS DOT %.6e NRM %.6e\n", comm_rank(comm), 
+  //  dot, nrm);
   blas::scal(N_local, 1. / nrm, V_new, 1);
 }
 
@@ -271,16 +271,16 @@ inline void p_rayleigh_ritz(int64_t N_local, int64_t K, const double* X,
 
   // Reduce result
   if(LDC != K) throw std::runtime_error("DIE DIE DIE RR");
-  // allreduce(C, K * K, MPI_SUM, comm);
+  //allreduce(C, K * K, MPI_SUM, comm);
   std::allocator<double> alloc;
-  double* tmp_c = world_rank ? nullptr : alloc.allocate(K * K);
-  reduce(C, tmp_c, K * K, MPI_SUM, 0, comm);
+  double* tmp_c = world_rank ? nullptr: alloc.allocate(K*K);
+  reduce(C, tmp_c, K*K, MPI_SUM, 0, comm);
 
   // Do local diagonalization on rank-0
   if(!world_rank) {
-    memcpy(C, tmp_c, K * K * sizeof(double));
+    memcpy(C, tmp_c, K*K*sizeof(double));
     lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, K, C, LDC, W);
-    alloc.deallocate(tmp_c, K * K);
+    alloc.deallocate(tmp_c, K*K);
   }
 
   // Broadcast results
@@ -390,16 +390,18 @@ auto p_davidson(int64_t N_local, int64_t max_m, const Functor& op,
     double E1_denom = 0, E1_num = 0;
     for(auto j = 0; j < N_local; ++j) {
       R_local[j] = -R_local[j] / (D_local[j] - LAM[0]);
-      E1_num += X_local[j] * R_local[j];
+      E1_num   += X_local[j] * R_local[j];
       E1_denom += X_local[j] * X_local[j] / (D_local[j] - LAM[0]);
     }
     E1_denom = allreduce(E1_denom, MPI_SUM, comm);
-    E1_num = allreduce(E1_num, MPI_SUM, comm);
+    E1_num   = allreduce(E1_num,   MPI_SUM, comm);
     const double E1 = E1_num / E1_denom;
 
     for(auto j = 0; j < N_local; ++j) {
       R_local[j] += E1 * X_local[j] / (D_local[j] - LAM[0]);
     }
+
+    
 
     // Project new vector out form old vectors
     p_gram_schmidt(N_local, k, V_local.data(), N_local, R_local, comm);

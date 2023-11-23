@@ -62,9 +62,11 @@ void reorder_ci_on_alpha(WfnIterator begin, WfnIterator end, double* C) {
   std::copy(reorder_C.begin(), reorder_C.end(), C);
 }
 
+
 template <typename PairIterator>
 PairIterator accumulate_asci_pairs(PairIterator pairs_begin,
                                    PairIterator pairs_end) {
+
   // Accumulate the ASCI scores into first instance of unique bitstrings
   auto cur_it = pairs_begin;
   for(auto it = cur_it + 1; it != pairs_end; ++it) {

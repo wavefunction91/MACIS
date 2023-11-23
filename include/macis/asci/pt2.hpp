@@ -9,9 +9,9 @@
 #pragma once
 #include <deque>
 #include <fstream>
+#include <sstream>
 #include <macis/asci/determinant_contributions.hpp>
 #include <macis/asci/determinant_sort.hpp>
-#include <sstream>
 
 namespace macis {
 
@@ -45,19 +45,13 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   logger->info("[ASCI PT2 Settings]");
   logger->info("  * NDETS                  = {}", ncdets);
   logger->info("  * PT2_TOL                = {}", asci_settings.pt2_tol);
-  logger->info("  * PT2_RESERVE_COUNT      = {}",
-               asci_settings.pt2_reserve_count);
-  logger->info("  * PT2_CONSTRAINT_LVL_MAX = {}",
-               asci_settings.pt2_max_constraint_level);
-  logger->info("  * PT2_CONSTRAINT_LVL_MIN = {}",
-               asci_settings.pt2_min_constraint_level);
-  logger->info("  * PT2_CNSTRNT_RFNE_FORCE = {}",
-               asci_settings.pt2_constraint_refine_force);
+  logger->info("  * PT2_RESERVE_COUNT      = {}", asci_settings.pt2_reserve_count);
+  logger->info("  * PT2_CONSTRAINT_LVL_MAX = {}", asci_settings.pt2_max_constraint_level);
+  logger->info("  * PT2_CONSTRAINT_LVL_MIN = {}", asci_settings.pt2_min_constraint_level);
+  logger->info("  * PT2_CNSTRNT_RFNE_FORCE = {}", asci_settings.pt2_constraint_refine_force);
   logger->info("  * PT2_PRUNE              = {}", asci_settings.pt2_prune);
-  logger->info("  * PT2_PRECOMP_EPS        = {}",
-               asci_settings.pt2_precompute_eps);
-  logger->info("  * PT2_BIGCON_THRESH      = {}",
-               asci_settings.pt2_bigcon_thresh);
+  logger->info("  * PT2_PRECOMP_EPS        = {}", asci_settings.pt2_precompute_eps);
+  logger->info("  * PT2_BIGCON_THRESH      = {}", asci_settings.pt2_bigcon_thresh);
   logger->info("  * NXTVAL_BCOUNT_THRESH   = {}",
                asci_settings.nxtval_bcount_thresh);
   logger->info("  * NXTVAL_BCOUNT_INC      = {}",
@@ -75,16 +69,14 @@ double asci_pt2_constraint(ASCISettings asci_settings,
     double h_diag;
 
     size_t mem() const {
-      return sizeof(spin_wfn_type) +
+      return sizeof(spin_wfn_type) + 
              (occ_beta.capacity() + vir_beta.capacity()) * sizeof(uint8_t) +
-             (2 + orb_ens_alpha.capacity() + orb_ens_beta.capacity()) *
-                 sizeof(double);
+             (2 + orb_ens_alpha.capacity() + orb_ens_beta.capacity()) * sizeof(double); 
     }
 
     beta_coeff_data(double c, size_t norb,
                     const std::vector<uint32_t>& occ_alpha, wfn_t<N> w,
-                    const HamiltonianGenerator<wfn_t<N>>& ham_gen, bool pce,
-                    bool pci) {
+                    const HamiltonianGenerator<wfn_t<N>>& ham_gen, bool pce, bool pci) {
       coeff = c;
 
       beta_string = wfn_traits::beta_string(w);
@@ -96,7 +88,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
       std::vector<uint32_t> o_32, v_32;
       if(pce or pci) {
         spin_wfn_traits::state_to_occ_vir(norb, beta_string, o_32, v_32);
-        occ_beta.resize(o_32.size());
+        occ_beta.resize(o_32.size()); 
         std::copy(o_32.begin(), o_32.end(), occ_beta.begin());
         vir_beta.resize(v_32.size());
         std::copy(v_32.begin(), v_32.end(), vir_beta.begin());
@@ -114,9 +106,9 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   const size_t nuniq_alpha = uniq_alpha.size();
   logger->info("  * NUNIQ_ALPHA = {}", nuniq_alpha);
   std::vector<size_t> uniq_alpha_ioff(nuniq_alpha);
-  std::transform_exclusive_scan(
-      uniq_alpha.begin(), uniq_alpha.end(), uniq_alpha_ioff.begin(), 0ul,
-      std::plus<size_t>(), [](const auto& p) { return p.second; });
+  std::transform_exclusive_scan(uniq_alpha.begin(), uniq_alpha.end(),
+    uniq_alpha_ioff.begin(), 0ul, std::plus<size_t>(), 
+    [](const auto& p){ return p.second; });
 
   using unique_alpha_data = std::vector<beta_coeff_data>;
   std::vector<unique_alpha_data> uad(nuniq_alpha);
@@ -129,9 +121,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
     uad[i].reserve(nbeta);
     for(auto j = 0; j < nbeta; ++j, ++iw) {
       const auto& w = *(cdets_begin + iw);
-      uad[i].emplace_back(C[iw], norb, occ_alpha, w, ham_gen,
-                          asci_settings.pt2_precompute_eps,
-                          asci_settings.pt2_precompute_idx);
+      uad[i].emplace_back(C[iw], norb, occ_alpha, w, ham_gen,asci_settings.pt2_precompute_eps, asci_settings.pt2_precompute_idx);
     }
   }
 
@@ -140,16 +130,14 @@ double asci_pt2_constraint(ASCISettings asci_settings,
     logger->info("MEM REQ DETS = {:.2e}", ncdets * sizeof(wfn_t<N>) / gib);
     logger->info("MEM REQ C    = {:.2e}", ncdets * sizeof(double) / gib);
     size_t mem_alpha = 0;
-    for(auto i = 0ul; i < nuniq_alpha; ++i) {
+    for( auto i = 0ul; i < nuniq_alpha; ++i) {
       mem_alpha += sizeof(spin_wfn_type);
       for(auto j = 0ul; j < uad[i].size(); ++j) {
         mem_alpha += uad[i][j].mem();
       }
     }
     logger->info("MEM REQ ALPH = {:.2e}", mem_alpha / gib);
-    logger->info(
-        "MEM REQ CONT = {:.2e}",
-        asci_settings.pt2_reserve_count * sizeof(asci_contrib<wfn_t<N>>) / gib);
+    logger->info("MEM REQ CONT = {:.2e}", asci_settings.pt2_reserve_count * sizeof(asci_contrib<wfn_t<N>>)/ gib);
   }
   MPI_Barrier(comm);
 
@@ -169,37 +157,36 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   // auto constraints = dist_constraint_general<wfn_t<N>>(
   //     5, norb, n_sing_beta, n_doub_beta, uniq_alpha, comm);
   auto constraints = gen_constraints_general<wfn_t<N>>(
-      asci_settings.pt2_max_constraint_level, norb, n_sing_beta, n_doub_beta,
-      uniq_alpha, world_size * omp_get_max_threads(),
-      asci_settings.pt2_min_constraint_level,
-      asci_settings.pt2_constraint_refine_force);
+      asci_settings.pt2_max_constraint_level, norb, n_sing_beta, 
+      n_doub_beta, uniq_alpha, world_size * omp_get_max_threads(), 
+      asci_settings.pt2_min_constraint_level, asci_settings.pt2_constraint_refine_force );
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
-  // if(!world_rank) {
-  //   std::ofstream c_file("constraint_work.txt");
-  //   std::stringstream ss;
-  //   for(auto [c,s] : constraints) {
-  //     ss << c.C() << " " << s << std::endl;
-  //   }
-  //   auto str = ss.str();
-  //   c_file.write(str.c_str(), str.size());
-  // }
-  // if(!world_rank) {
-  //   std::ofstream c_file("unique_alpha.txt");
-  //   std::stringstream ss;
-  //   for(size_t i = 0; i < nuniq_alpha; ++i) {
-  //     ss << uniq_alpha[i].first << " " << uniq_alpha[i].second << std::endl;
-  //   }
-  //   auto str = ss.str();
-  //   c_file.write(str.c_str(), str.size());
-  // }
+  //if(!world_rank) {
+  //  std::ofstream c_file("constraint_work.txt");
+  //  std::stringstream ss; 
+  //  for(auto [c,s] : constraints) {
+  //    ss << c.C() << " " << s << std::endl;
+  //  }
+  //  auto str = ss.str();
+  //  c_file.write(str.c_str(), str.size());
+  //}
+  //if(!world_rank) {
+  //  std::ofstream c_file("unique_alpha.txt");
+  //  std::stringstream ss; 
+  //  for(size_t i = 0; i < nuniq_alpha; ++i) {
+  //    ss << uniq_alpha[i].first << " " << uniq_alpha[i].second << std::endl;
+  //  }
+  //  auto str = ss.str();
+  //  c_file.write(str.c_str(), str.size());
+  //}
 
   double EPT2 = 0.0;
   size_t NPT2 = 0;
 
   const size_t ncon_total = constraints.size();
-  const size_t ncon_big = asci_settings.pt2_bigcon_thresh;
+  const size_t ncon_big   = asci_settings.pt2_bigcon_thresh;
   const size_t ncon_small = ncon_total - ncon_big;
 
   // Global atomic task-id counter
@@ -214,95 +201,91 @@ double asci_pt2_constraint(ASCISettings asci_settings,
     while(ic < ncon_big) {
       // Atomically get the next task ID and increment for other
       // MPI ranks
-      ic = nxtval_big.fetch_and_add(1);
+      ic = nxtval_big.fetch_and_add(1); 
       if(ic >= ncon_big) continue;
       if(asci_settings.pt2_print_progress)
-        printf("[pt2_big rank %4d] %10lu / %10lu\n", world_rank, ic,
-               ncon_total);
+        printf("[pt2_big rank %4d] %10lu / %10lu\n", world_rank, ic, ncon_total);
       const auto& con = constraints[ic].first;
 
       asci_contrib_container<wfn_t<N>> asci_pairs_con;
-#pragma omp parallel
+      #pragma omp parallel
       {
-        asci_contrib_container<wfn_t<N>> asci_pairs;
-#pragma omp for schedule(dynamic)
-        for(size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
-          const size_t old_pair_size = asci_pairs.size();
-          const auto& alpha_det = uniq_alpha[i_alpha].first;
-          const auto ncon_alpha = constraint_histogram(alpha_det, 1, 1, con);
-          if(!ncon_alpha) continue;
-          const auto occ_alpha = bits_to_indices(alpha_det);
-          const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
+      asci_contrib_container<wfn_t<N>> asci_pairs;
+      #pragma omp for schedule(dynamic)
+      for(size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
+        const size_t old_pair_size = asci_pairs.size();
+        const auto& alpha_det = uniq_alpha[i_alpha].first;
+        const auto ncon_alpha = constraint_histogram(alpha_det,1,1,con);
+        if(!ncon_alpha) continue;
+        const auto occ_alpha = bits_to_indices(alpha_det);
+        const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
 
-          const auto& bcd = uad[i_alpha];
-          const size_t nbeta = bcd.size();
-          for(size_t j_beta = 0; j_beta < nbeta; ++j_beta) {
-            const size_t iw = uniq_alpha_ioff[i_alpha] + j_beta;
-            const auto w = *(cdets_begin + iw);
-            const auto c = C[iw];
-            const auto& beta_det = bcd[j_beta].beta_string;
-            const auto h_diag = bcd[j_beta].h_diag;
+        const auto& bcd = uad[i_alpha];
+        const size_t nbeta = bcd.size();
+        for(size_t j_beta = 0; j_beta < nbeta; ++j_beta) {
+          const size_t iw = uniq_alpha_ioff[i_alpha] + j_beta;
+          const auto w = *(cdets_begin + iw);
+          const auto c = C[iw];
+          const auto& beta_det = bcd[j_beta].beta_string;
+          const auto h_diag = bcd[j_beta].h_diag;
 
-// TODO: These copies are slow
-#if 0
+          // TODO: These copies are slow
+          #if 0
           const auto& occ_beta_8 = bcd[j_beta].occ_beta;
           const auto& vir_beta_8 = bcd[j_beta].vir_beta;
           std::vector<uint32_t> occ_beta(occ_beta_8.size()), vir_beta(vir_beta_8.size());
           std::copy(occ_beta_8.begin(), occ_beta_8.end(), occ_beta.begin());
           std::copy(vir_beta_8.begin(), vir_beta_8.end(), vir_beta.begin());
-#else
-            std::vector<uint32_t> occ_beta, vir_beta;
-            spin_wfn_traits::state_to_occ_vir(norb, beta_det, occ_beta,
-                                              vir_beta);
-#endif
+          #else
+          std::vector<uint32_t> occ_beta, vir_beta;
+          spin_wfn_traits::state_to_occ_vir(norb, beta_det, occ_beta, vir_beta);
+          #endif
 
-            std::vector<double> orb_ens_alpha, orb_ens_beta;
-            if(asci_settings.pt2_precompute_eps) {
-              orb_ens_alpha = bcd[j_beta].orb_ens_alpha;
-              orb_ens_beta = bcd[j_beta].orb_ens_beta;
-            } else {
-              orb_ens_alpha =
-                  ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
-              orb_ens_beta =
-                  ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
-            }
-
-            // AA excitations
-            generate_constraint_singles_contributions_ss(
-                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), T_pq,
-                norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, asci_pairs);
-
-            // AAAA excitations
-            generate_constraint_doubles_contributions_ss(
-                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
-                norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
-
-            // AABB excitations
-            generate_constraint_doubles_contributions_os(
-                c, w, con, occ_alpha, occ_beta, vir_beta, orb_ens_alpha.data(),
-                orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, asci_pairs);
-
-            if(alpha_satisfies_con) {
-              // BB excitations
-              append_singles_asci_contributions<Spin::Beta>(
-                  c, w, beta_det, occ_beta, vir_beta, occ_alpha,
-                  orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb,
-                  h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
-
-              // BBBB excitations
-              append_ss_doubles_asci_contributions<Spin::Beta>(
-                  c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
-                  orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                  ham_gen, asci_pairs);
-
-              // No excitation (push inf to remove from list)
-              asci_pairs.push_back(
-                  {w, std::numeric_limits<double>::infinity(), 1.0});
-            }
+          std::vector<double> orb_ens_alpha, orb_ens_beta;
+          if(asci_settings.pt2_precompute_eps) {
+            orb_ens_alpha = bcd[j_beta].orb_ens_alpha;
+            orb_ens_beta  = bcd[j_beta].orb_ens_beta;
+          } else {
+            orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
+            orb_ens_beta  = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
           }
-#if 0
+
+          // AA excitations
+          generate_constraint_singles_contributions_ss(
+              c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), T_pq,
+              norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
+              ham_gen, asci_pairs);
+
+          // AAAA excitations
+          generate_constraint_doubles_contributions_ss(
+              c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
+              norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+
+          // AABB excitations
+          generate_constraint_doubles_contributions_os(
+              c, w, con, occ_alpha, occ_beta, vir_beta, orb_ens_alpha.data(),
+              orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+              ham_gen, asci_pairs);
+
+          if(alpha_satisfies_con) {
+            // BB excitations
+            append_singles_asci_contributions<Spin::Beta>(
+                c, w, beta_det, occ_beta, vir_beta, occ_alpha,
+                orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb,
+                h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+
+            // BBBB excitations
+            append_ss_doubles_asci_contributions<Spin::Beta>(
+                c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
+                orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+                ham_gen, asci_pairs);
+
+            // No excitation (push inf to remove from list)
+            asci_pairs.push_back(
+                {w, std::numeric_limits<double>::infinity(), 1.0});
+          }
+        }
+        #if 0
         if(asci_settings.pt2_prune and asci_pairs.size() > asci_settings.pt2_reserve_count and asci_pairs.size() != old_pair_size) {
         // Cleanup
         auto uit = stable_sort_and_accumulate_asci_pairs(asci_pairs.begin(),
@@ -314,26 +297,26 @@ double asci_pt2_constraint(ASCISettings asci_settings,
                  omp_get_thread_num(), ic, ncon_total, i_alpha,
                  nuniq_alpha, asci_pairs.size());
         }
-#endif
+        #endif
 
-        }  // Unique Alpha Loop
+      }  // Unique Alpha Loop
 
-        // S&A Thread local pairs
-        sort_and_accumulate_asci_pairs(asci_pairs);
+      // S&A Thread local pairs
+      sort_and_accumulate_asci_pairs(asci_pairs); 
 
-// Insert
-#pragma omp critical
-        {
-          if(asci_pairs_con.size()) {
-            asci_pairs_con.reserve(asci_pairs.size() + asci_pairs_con.size());
-            asci_pairs_con.insert(asci_pairs_con.end(), asci_pairs.begin(),
-                                  asci_pairs.end());
-          } else {
-            asci_pairs_con = std::move(asci_pairs);
-          }
-        }
 
-      }  // OpenMP
+      // Insert
+      #pragma omp critical
+      {
+      if(asci_pairs_con.size()) {
+        asci_pairs_con.reserve(asci_pairs.size() + asci_pairs_con.size());
+        asci_pairs_con.insert(asci_pairs_con.end(), asci_pairs.begin(), asci_pairs.end());
+      } else {
+        asci_pairs_con = std::move(asci_pairs);
+      }
+      }
+
+      } // OpenMP
 
       double EPT2_local = 0.0;
       size_t NPT2_local = 0;
@@ -351,28 +334,26 @@ double asci_pt2_constraint(ASCISettings asci_settings,
         }
         asci_pairs_con.clear();
         if(asci_settings.pt2_print_progress)
-          printf("[pt2_big rank %4d] CAPACITY %lu SZ %lu\n", world_rank,
-                 asci_pairs_con.capacity(), pair_size);
+          printf("[pt2_big rank %4d] CAPACITY %lu SZ %lu\n", world_rank, asci_pairs_con.capacity(), pair_size);
       }
 
       EPT2 += EPT2_local;
       NPT2 += NPT2_local;
-    }  // Constraint "loop"
-  }    // "Big constraints"
+    } // Constraint "loop"
+  } // "Big constraints"
+
 
   // Parallelize over both MPI + threads for "small" constraints
 #pragma omp parallel reduction(+ : EPT2) reduction(+ : NPT2)
   {
     // Process ASCI pair contributions for each constraint
     asci_contrib_container<wfn_t<N>> asci_pairs;
-    // asci_pairs.reserve(asci_settings.pt2_reserve_count);
+    //asci_pairs.reserve(asci_settings.pt2_reserve_count);
     size_t ic = 0;
     while(ic < ncon_total) {
       // Atomically get the next task ID and increment for other
       // MPI ranks and threads
-      size_t ntake = ic < asci_settings.nxtval_bcount_thresh
-                         ? 1
-                         : asci_settings.nxtval_bcount_inc;
+      size_t ntake = ic < asci_settings.nxtval_bcount_thresh ? 1 : asci_settings.nxtval_bcount_inc;
       ic = nxtval_small.fetch_and_add(ntake);
 
       // Loop over assigned tasks
@@ -386,7 +367,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
         for(size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const size_t old_pair_size = asci_pairs.size();
           const auto& alpha_det = uniq_alpha[i_alpha].first;
-          const auto ncon_alpha = constraint_histogram(alpha_det, 1, 1, con);
+          const auto ncon_alpha = constraint_histogram(alpha_det,1,1,con);
           if(!ncon_alpha) continue;
           const auto occ_alpha = bits_to_indices(alpha_det);
           const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
@@ -400,28 +381,25 @@ double asci_pt2_constraint(ASCISettings asci_settings,
             const auto& beta_det = bcd[j_beta].beta_string;
             const auto h_diag = bcd[j_beta].h_diag;
 
-// TODO: These copies are slow
-#if 0
+            // TODO: These copies are slow
+            #if 0
             const auto& occ_beta_8 = bcd[j_beta].occ_beta;
             const auto& vir_beta_8 = bcd[j_beta].vir_beta;
             std::vector<uint32_t> occ_beta(occ_beta_8.size()), vir_beta(vir_beta_8.size());
             std::copy(occ_beta_8.begin(), occ_beta_8.end(), occ_beta.begin());
             std::copy(vir_beta_8.begin(), vir_beta_8.end(), vir_beta.begin());
-#else
+            #else
             std::vector<uint32_t> occ_beta, vir_beta;
-            spin_wfn_traits::state_to_occ_vir(norb, beta_det, occ_beta,
-                                              vir_beta);
-#endif
+            spin_wfn_traits::state_to_occ_vir(norb, beta_det, occ_beta, vir_beta);
+            #endif
 
             std::vector<double> orb_ens_alpha, orb_ens_beta;
             if(asci_settings.pt2_precompute_eps) {
               orb_ens_alpha = bcd[j_beta].orb_ens_alpha;
-              orb_ens_beta = bcd[j_beta].orb_ens_beta;
+              orb_ens_beta  = bcd[j_beta].orb_ens_beta;
             } else {
-              orb_ens_alpha =
-                  ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
-              orb_ens_beta =
-                  ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
+              orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
+              orb_ens_beta  = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
             }
 
             // AA excitations
@@ -459,22 +437,17 @@ double asci_pt2_constraint(ASCISettings asci_settings,
                   {w, std::numeric_limits<double>::infinity(), 1.0});
             }
           }
-          if(asci_settings.pt2_prune and
-             asci_pairs.size() > asci_settings.pt2_reserve_count and
-             asci_pairs.size() != old_pair_size) {
-            // Cleanup
-            auto uit = stable_sort_and_accumulate_asci_pairs(asci_pairs.begin(),
-                                                             asci_pairs.end());
-            asci_pairs.erase(uit, asci_pairs.end());
-            // uit = std::stable_partition(asci_pairs.begin(), asci_pairs.end(),
-            // [&](const auto& p){ return std::abs(p.pt2()) > h_el_tol; });
-            // asci_pairs.erase(uit, asci_pairs.end());
+          if(asci_settings.pt2_prune and asci_pairs.size() > asci_settings.pt2_reserve_count and asci_pairs.size() != old_pair_size) {
+          // Cleanup
+          auto uit = stable_sort_and_accumulate_asci_pairs(asci_pairs.begin(),
+                                                    asci_pairs.end());
+          asci_pairs.erase(uit, asci_pairs.end());
+          //uit = std::stable_partition(asci_pairs.begin(), asci_pairs.end(), [&](const auto& p){ return std::abs(p.pt2()) > h_el_tol; });
+          //asci_pairs.erase(uit, asci_pairs.end());
             if(asci_settings.pt2_print_progress)
-              printf(
-                  "[pt2_prune rank %4d tid:%4d] IC = %lu / %lu IA = %lu / %lu "
-                  "SZ = %lu\n",
-                  world_rank, omp_get_thread_num(), ic, ncon_total, i_alpha,
-                  nuniq_alpha, asci_pairs.size());
+              printf("[pt2_prune rank %4d tid:%4d] IC = %lu / %lu IA = %lu / %lu SZ = %lu\n", world_rank,
+                     omp_get_thread_num(), ic, ncon_total, i_alpha,
+                     nuniq_alpha, asci_pairs.size());
 
             if(asci_pairs.size() > asci_settings.pt2_reserve_count) {
               printf("* WARNING: PRUNED SIZE LARGER THAN RESERVE COUNT\n");
@@ -496,8 +469,8 @@ double asci_pt2_constraint(ASCISettings asci_settings,
             }
           }
           asci_pairs.clear();
-          // Deallocate
-          if(asci_pairs.capacity() > asci_settings.pt2_reserve_count)
+          // Deallocate 
+          if(asci_pairs.capacity() > asci_settings.pt2_reserve_count) 
             asci_contrib_container<wfn_t<N>>().swap(asci_pairs);
         }
 

@@ -50,8 +50,7 @@ struct spmv_info {
     int comm_size = recv_offsets.size();
     for(int i = 0; i < comm_size; ++i)
       if(recv_counts[i]) {
-        if(recv_counts[i] > std::numeric_limits<int32_t>::max())
-          throw "DIE IN RECV";
+        if(recv_counts[i] > std::numeric_limits<int32_t>::max()) throw "DIE IN RECV";
         reqs.emplace_back(
             detail::mpi_irecv(X + recv_offsets[i], recv_counts[i], i, 0, comm));
       }
@@ -64,8 +63,7 @@ struct spmv_info {
     int comm_size = send_offsets.size();
     for(int i = 0; i < comm_size; ++i)
       if(send_counts[i]) {
-        if(send_counts[i] > std::numeric_limits<int32_t>::max())
-          throw "DIE IN SEND";
+        if(send_counts[i] > std::numeric_limits<int32_t>::max()) throw "DIE IN SEND";
         reqs.emplace_back(
             detail::mpi_isend(X + send_offsets[i], send_counts[i], i, 0, comm));
       }
