@@ -371,7 +371,13 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
           // Prune Down Contributions
           if(asci_pairs.size() > asci_settings.pair_size_max) {
-            throw std::runtime_error("DIE DIE DIE");
+            logger->info("  * PRUNING AT CON = {} IALPHA = {}",
+              ic, i_alpha);
+            auto uit = sort_and_accumulate_asci_pairs(
+                asci_pairs.begin() + size_before, asci_pairs.end());
+            asci_pairs.erase(uit, asci_pairs.end());
+            if(asci_pairs.size() > asci_settings.pair_size_max) 
+              throw std::runtime_error("DIE DIE DIE");
           }
 
         }  // Unique Alpha Loop
