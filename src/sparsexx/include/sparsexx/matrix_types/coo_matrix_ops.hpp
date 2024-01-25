@@ -9,10 +9,11 @@
 #pragma once
 
 #include <iostream>
+#include <sparsexx/sparsexx_config.hpp>
 
 #include "coo_matrix.hpp"
 
-#if SPARSEXX_ENABLE_RANGES_V3
+#ifdef SPARSEXX_ENABLE_RANGES_V3
 #include <range/v3/all.hpp>
 #endif
 #include <algorithm>
@@ -22,7 +23,7 @@ namespace sparsexx {
 
 template <typename T, typename index_t, typename Alloc>
 void coo_matrix<T, index_t, Alloc>::sort_by_row_index() {
-#if SPARSEXX_ENABLE_RANGES_V3
+#ifdef SPARSEXX_ENABLE_RANGES_V3
   auto coo_zip = ranges::views::zip(rowind_, colind_, nzval_);
 
   // Sort lex by row index
@@ -72,9 +73,7 @@ void coo_matrix<T, index_t, Alloc>::sort_by_row_index() {
 
 template <typename T, typename index_t, typename Alloc>
 void coo_matrix<T, index_t, Alloc>::expand_from_triangle() {
-  std::cout << "Expanding Triangle" << std::endl;
-
-#if SPARSEXX_ENABLE_RANGES_V3
+#ifdef SPARSEXX_ENABLE_RANGES_V3
 
   auto idx_zip = ranges::views::zip(rowind_, colind_);
 
@@ -110,7 +109,7 @@ void coo_matrix<T, index_t, Alloc>::expand_from_triangle() {
   std::cout << "UT " << upper_triangle << std::endl;
   if(diagonal or full_matrix) return;
 
-  std::cout << "Performing Expansion..." << std::endl;
+  // std::cout << "Performing Expansion..." << std::endl;
   size_t new_nnz = 2 * nnz_ - n_;
   rowind_.reserve(new_nnz);
   colind_.reserve(new_nnz);
@@ -132,7 +131,7 @@ void coo_matrix<T, index_t, Alloc>::expand_from_triangle() {
 
 template <typename T, typename index_t, typename Alloc>
 void coo_matrix<T, index_t, Alloc>::sort_by_col_index() {
-#if SPARSEXX_ENABLE_RANGES_V3
+#ifdef SPARSEXX_ENABLE_RANGES_V3
   auto coo_zip = ranges::views::zip(rowind_, colind_, nzval_);
 
   // Sort lex by row index

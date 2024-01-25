@@ -15,16 +15,19 @@
 #include <iomanip>
 #include <iostream>
 #include <macis/asci/grow.hpp>
+#include <macis/asci/pt2.hpp>
 #include <macis/asci/refine.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
-#include <macis/util/cas.hpp>
+#include <macis/hamiltonian_generator/sorted_double_loop.hpp>
+#include <macis/mcscf/cas.hpp>
+#include <macis/mcscf/fock_matrices.hpp>
 #include <macis/util/detail/rdm_files.hpp>
 #include <macis/util/fcidump.hpp>
-#include <macis/util/fock_matrices.hpp>
 #include <macis/util/memory.hpp>
 #include <macis/util/moller_plesset.hpp>
 #include <macis/util/mpi.hpp>
 #include <macis/util/transform.hpp>
+#include <macis/util/trexio.hpp>
 #include <macis/wavefunction_io.hpp>
 #include <map>
 #include <sparsexx/io/write_dist_mm.hpp>
@@ -61,9 +64,14 @@ int main(int argc, char** argv) {
   spdlog::cfg::load_env_levels();
   spdlog::set_pattern("[%n] %v");
 
-  constexpr size_t nwfn_bits = 64;
+  constexpr size_t nwfn_bits = 256;
+  using wfn_type = macis::wfn_t<nwfn_bits>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
 
-  MACIS_MPI_CODE(MPI_Init(&argc, &argv);)
+  MACIS_MPI_CODE(int dummy;
+                 MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &dummy);
+                 if(dummy != MPI_THREAD_MULTIPLE) throw std::runtime_error(
+                     "MPI Thread Init Failed");)
 
 #ifdef MACIS_ENABLE_MPI
   auto world_rank = macis::comm_rank(MPI_COMM_WORLD);
@@ -84,29 +92,50 @@ int main(int argc, char** argv) {
     auto input_file = opts.at(1);
     INIFile input(input_file);
 
-    // Required Keywords
-    auto fcidump_fname = input.getData<std::string>("CI.FCIDUMP");
-    auto nalpha = input.getData<size_t>("CI.NALPHA");
-    auto nbeta = input.getData<size_t>("CI.NBETA");
-
-    if(nalpha != nbeta) throw std::runtime_error("NALPHA != NBETA");
-
-    // Read FCIDUMP File
-    size_t norb = macis::read_fcidump_norb(fcidump_fname);
-    size_t norb2 = norb * norb;
-    size_t norb3 = norb2 * norb;
-    size_t norb4 = norb2 * norb2;
-
-    // XXX: Consider reading this into shared memory to avoid replication
-    std::vector<double> T(norb2), V(norb4);
-    auto E_core = macis::read_fcidump_core(fcidump_fname);
-    macis::read_fcidump_1body(fcidump_fname, T.data(), norb);
-    macis::read_fcidump_2body(fcidump_fname, V.data(), norb);
-
 #define OPT_KEYWORD(STR, RES, DTYPE) \
   if(input.containsData(STR)) {      \
     RES = input.getData<DTYPE>(STR); \
   }
+
+    // Required Keywords
+    auto nalpha = input.getData<size_t>("CI.NALPHA");
+    auto nbeta = input.getData<size_t>("CI.NBETA");
+
+    std::string reference_data_format =
+        input.getData<std::string>("CI.REF_DATA_FORMAT");
+    std::string reference_data_file =
+        input.getData<std::string>("CI.REF_DATA_FILE");
+
+    size_t norb, norb2, norb3, norb4;
+    std::vector<double> T, V;
+    double E_core;
+    if(reference_data_format == "FCIDUMP") {
+      // Read FCIDUMP File
+      norb = macis::read_fcidump_norb(reference_data_file);
+      norb2 = norb * norb;
+      norb3 = norb2 * norb;
+      norb4 = norb2 * norb2;
+
+      // XXX: Consider reading this into shared memory to avoid replication
+      T.resize(norb2);
+      V.resize(norb4);
+      E_core = macis::read_fcidump_core(reference_data_file);
+      macis::read_fcidump_1body(reference_data_file, T.data(), norb);
+      macis::read_fcidump_2body(reference_data_file, V.data(), norb);
+    } else {  // TREXIO
+      macis::TREXIOFile trexio_file(reference_data_file, 'r', TREXIO_AUTO);
+      norb = trexio_file.read_mo_num();
+      norb2 = norb * norb;
+      norb3 = norb2 * norb;
+      norb4 = norb2 * norb2;
+
+      // XXX: Consider reading this into shared memory to avoid replication
+      T.resize(norb2);
+      V.resize(norb4);
+      E_core = trexio_file.read_nucleus_repulsion();
+      trexio_file.read_mo_1e_int_core_hamiltonian(T.data());
+      trexio_file.read_mo_2e_int_eri(V.data());
+    }
 
     // Set up job
     std::string job_str = "MCSCF";
@@ -169,7 +198,7 @@ int main(int argc, char** argv) {
     macis::ASCISettings asci_settings;
     std::string asci_wfn_fname, asci_wfn_out_fname;
     double asci_E0 = 0.0;
-    bool compute_asci_E0 = true;
+    bool compute_asci_E0 = true, pt2 = true;
     OPT_KEYWORD("ASCI.NTDETS_MAX", asci_settings.ntdets_max, size_t);
     OPT_KEYWORD("ASCI.NTDETS_MIN", asci_settings.ntdets_min, size_t);
     OPT_KEYWORD("ASCI.NCDETS_MAX", asci_settings.ncdets_max, size_t);
@@ -190,17 +219,48 @@ int main(int argc, char** argv) {
       asci_E0 = input.getData<double>("ASCI.E0_WFN");
       compute_asci_E0 = false;
     }
+    OPT_KEYWORD("ASCI.PT2", pt2, bool);
+    OPT_KEYWORD("ASCI.PT2_TOL", asci_settings.pt2_tol, double);
+    OPT_KEYWORD("ASCI.PT2_RESERVE_COUNT", asci_settings.pt2_reserve_count,
+                size_t);
+    OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL_MAX",
+                asci_settings.pt2_max_constraint_level, int);
+    OPT_KEYWORD("ASCI.PT2_CONSTRAINT_LVL_MIN",
+                asci_settings.pt2_min_constraint_level, int);
+    OPT_KEYWORD("ASCI.PT2_CNSTRNT_RFNE_FORCE",
+                asci_settings.pt2_constraint_refine_force, int64_t);
+    OPT_KEYWORD("ASCI.PT2_PRUNE", asci_settings.pt2_prune, bool);
+    OPT_KEYWORD("ASCI.PT2_PRECOMPUTE_EPS", asci_settings.pt2_precompute_eps,
+                bool);
+    OPT_KEYWORD("ASCI.PT2_PRECOMPUTE_IDX", asci_settings.pt2_precompute_idx,
+                bool);
+    OPT_KEYWORD("ASCI.PT2_PRINT_PROGRESS", asci_settings.pt2_print_progress,
+                bool);
+    OPT_KEYWORD("ASCI.PT2_BIGCON_THRESH", asci_settings.pt2_bigcon_thresh,
+                size_t);
+    OPT_KEYWORD("ASCI.NXTVAL_BCOUNT_THRESH", asci_settings.nxtval_bcount_thresh,
+                size_t);
+    OPT_KEYWORD("ASCI.NXTVAL_BCOUNT_INC", asci_settings.nxtval_bcount_inc,
+                size_t);
 
     bool mp2_guess = false;
     OPT_KEYWORD("MCSCF.MP2_GUESS", mp2_guess, bool);
 
     if(!world_rank) {
+      console->info("[Standalone MACIS Driver]:");
+      console->info("  * NMPI          = {}", world_size);
+      console->info("  * NTHREADS      = {}", omp_get_max_threads());
       console->info("[Wavefunction Data]:");
-      console->info("  * JOB     = {}", job_str);
-      console->info("  * CIEXP   = {}", ciexp_str);
-      console->info("  * FCIDUMP = {}", fcidump_fname);
+      console->info("  * JOB           = {}", job_str);
+      console->info("  * CIEXP         = {}", ciexp_str);
+      console->info("  * REF_FILE_NAME = {}", reference_data_file);
+      console->info("  * REF_FILE_FMT  = {}", reference_data_format);
       if(fci_out_fname.size())
         console->info("  * FCIDUMP_OUT = {}", fci_out_fname);
+      console->info("  * NORBITAL  = {}", norb);
+      console->info("  * NINACTIVE = {}", n_inactive);
+      console->info("  * NACTIVE   = {}", n_active);
+      console->info("  * NVIRTUAL  = {}", n_virtual);
       console->info("  * MP2_GUESS = {}", mp2_guess);
 
       console->debug("READ {} 1-body integrals and {} 2-body integrals",
@@ -234,6 +294,9 @@ int main(int argc, char** argv) {
 
     // MP2 Guess Orbitals
     if(mp2_guess) {
+      if(nalpha != nbeta)
+        throw std::runtime_error("MP2 Guess only implemented for closed-shell");
+
       console->info("Calculating MP2 Natural Orbitals");
       size_t nocc_canon = n_inactive + nalpha;
       size_t nvir_canon = norb - nocc_canon;
@@ -278,13 +341,12 @@ int main(int argc, char** argv) {
     std::vector<double> active_trdm(active_ordm.size() * active_ordm.size());
 
     double E0 = 0;
-
+    double EPT2 = 0;
     // CI
     if(job == Job::CI) {
-      using generator_t = macis::DoubleLoopHamiltonianGenerator<nwfn_bits>;
+      using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
       if(ci_exp == CIExpansion::CAS) {
         std::vector<double> C_local;
-        // TODO: VERIFY MPI + CAS
         E0 = macis::CASRDMFunctor<generator_t>::rdms(
             mcscf_settings, NumOrbital(n_active), nalpha, nbeta,
             T_active.data(), V_active.data(), active_ordm.data(),
@@ -295,10 +357,10 @@ int main(int argc, char** argv) {
           auto det_logger = world_rank
                                 ? spdlog::null_logger_mt("determinants")
                                 : spdlog::stdout_color_mt("determinants");
-          det_logger->info("Print leading determinants > {:.12f}",
+          det_logger->info("Print leading determinants > {:.2e}",
                            determinants_threshold);
-          auto dets = macis::generate_hilbert_space<generator_t::nbits>(
-              n_active, nalpha, nbeta);
+          auto dets =
+              macis::generate_hilbert_space<wfn_type>(n_active, nalpha, nbeta);
           for(size_t i = 0; i < dets.size(); ++i) {
             if(std::abs(C_local[i]) > determinants_threshold) {
               det_logger->info("{:>16.12f}   {}", C_local[i],
@@ -308,13 +370,16 @@ int main(int argc, char** argv) {
         }
 
       } else {
+        // if(nalpha != nbeta)
+        //   throw std::runtime_error("ASCI Only Implemented for Closed-Shell");
+
         // Generate the Hamiltonian Generator
         generator_t ham_gen(
             macis::matrix_span<double>(T_active.data(), n_active, n_active),
             macis::rank4_span<double>(V_active.data(), n_active, n_active,
                                       n_active, n_active));
 
-        std::vector<macis::wfn_t<nwfn_bits>> dets;
+        std::vector<wfn_type> dets;
         std::vector<double> C;
         if(asci_wfn_fname.size()) {
           // Read wave function from standard file
@@ -338,7 +403,7 @@ int main(int argc, char** argv) {
         } else {
           // HF Guess
           console->info("Generating HF Guess for ASCI");
-          dets = {macis::canonical_hf_determinant<nwfn_bits>(nalpha, nalpha)};
+          dets = {wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
           // std::cout << dets[0].to_ullong() << std::endl;
           E0 = ham_gen.matrix_element(dets[0], dets[0]);
           C = {1.0};
@@ -350,13 +415,13 @@ int main(int argc, char** argv) {
         auto asci_st = hrt_t::now();
 
         // Growth phase
-        std::tie(E0, dets, C) = macis::asci_grow(
+        std::tie(E0, dets, C) = macis::asci_grow<nwfn_bits, int64_t>(
             asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
             ham_gen, n_active MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
         // Refinement phase
         if(asci_settings.max_refine_iter) {
-          std::tie(E0, dets, C) = macis::asci_refine(
+          std::tie(E0, dets, C) = macis::asci_refine<nwfn_bits, int64_t>(
               asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
               ham_gen, n_active MACIS_MPI_CODE(, MPI_COMM_WORLD));
         }
@@ -367,7 +432,16 @@ int main(int argc, char** argv) {
 
         if(asci_wfn_out_fname.size() and !world_rank) {
           console->info("Writing ASCI Wavefunction to {}", asci_wfn_out_fname);
+          // if(reference_data_format == "TREXIO") {
+          //   console->info("  * Format TREXIO");
+          //   macis::TREXIOFile trexio_file(asci_wfn_out_fname, 'w',
+          //   TREXIO_HDF5); trexio_file.write_mo_num(nwfn_bits/2); // Trick
+          //   TREXIO trexio_file.write_determinant_list(dets.size(),
+          //     reinterpret_cast<int64_t*>(dets.data()));
+          // } else {
+          console->info("  * Format TEXT");
           macis::write_wavefunction(asci_wfn_out_fname, n_active, dets, C);
+          //}
         }
 
         // Dump Hamiltonian
@@ -378,6 +452,26 @@ int main(int argc, char** argv) {
           sparsexx::write_dist_mm("ham.mtx", H, 1);
         }
 #endif
+        if(pt2) {
+          MPI_Barrier(MPI_COMM_WORLD);
+          auto pt2_st = hrt_t::now();
+          EPT2 = macis::asci_pt2_constraint(
+              asci_settings, dets.begin(), dets.end(),
+              E0 - (E_inactive + E_core), C, n_active, ham_gen.T(),
+              ham_gen.G_red(), ham_gen.V_red(), ham_gen.G(), ham_gen.V(),
+              ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));
+          MPI_Barrier(MPI_COMM_WORLD);
+          auto pt2_en = hrt_t::now();
+          dur_t pt2_dur = pt2_en - pt2_st;
+          console->info("* ASCI_PT2_DUR = {:.2e} ms", pt2_dur.count());
+        }
+      }
+
+      console->info("E(CI)     = {:.12f} Eh", E0);
+
+      if(pt2) {
+        console->info("E(PT2)    = {:.12f} Eh", EPT2);
+        console->info("E(CI+PT2) = {:.12f} Eh", E0 + EPT2);
       }
 
       // MCSCF
@@ -410,9 +504,9 @@ int main(int argc, char** argv) {
           NumVirtual(n_virtual), E_core, T.data(), norb, V.data(), norb,
           active_ordm.data(), n_active, active_trdm.data(),
           n_active MACIS_MPI_CODE(, MPI_COMM_WORLD));
-    }
 
-    console->info("E(CI)  = {:.12f} Eh", E0);
+      console->info("E(CASSCF)  = {:.12f} Eh", E0);
+    }
 
     // Write FCIDUMP file if requested
     if(fci_out_fname.size())

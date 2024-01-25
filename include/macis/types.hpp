@@ -16,8 +16,8 @@
 
 namespace macis {
 
-namespace KokkosEx =
-    MDSPAN_IMPL_STANDARD_NAMESPACE::MDSPAN_IMPL_PROPOSED_NAMESPACE;
+namespace KokkosEx = Kokkos;
+//    MDSPAN_IMPL_STANDARD_NAMESPACE::MDSPAN_IMPL_PROPOSED_NAMESPACE;
 
 template <typename T, size_t rank>
 using col_major_span =
@@ -50,7 +50,7 @@ using wavefunction_iterator_t = typename std::vector<std::bitset<N> >::iterator;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
-using uint128_t = unsigned __int128;
+using uint128_t = __uint128_t;
 #pragma GCC diagnostic pop
 
 template <typename T, typename ParameterType>

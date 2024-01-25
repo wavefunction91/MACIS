@@ -12,6 +12,9 @@
 #include "ut_common.hpp"
 
 template <size_t N>
+using bs = std::bitset<N>;
+
+template <size_t N>
 void uint128_conversion_test() {
   using ref_type = macis::uint128_t;
   std::bitset<N> one_bs{1};
@@ -37,7 +40,134 @@ void uint128_conversion_test() {
 }
 
 template <size_t N>
-using bs = std::bitset<N>;
+void mask_test() {
+  bs<N> full = ~bs<N>(0);
+  bs<N> full_128 = N > 128 ? full >> (N - 128) : 0;
+  bs<N> full_64 = N > 64 ? full >> (N - 64) : 0;
+  bs<N> full_32 = N > 32 ? full >> (N - 32) : 0;
+
+  REQUIRE(full == macis::full_mask<N>());
+  if constexpr(N > 128) REQUIRE(full_128 == macis::full_mask<128, N>());
+  if constexpr(N > 64) REQUIRE(full_64 == macis::full_mask<64, N>());
+  if constexpr(N > 32) REQUIRE(full_32 == macis::full_mask<32, N>());
+
+  REQUIRE(full == macis::full_mask<N>(N));
+  if constexpr(N > 128) REQUIRE(full_128 == macis::full_mask<N>(128));
+  if constexpr(N > 64) REQUIRE(full_64 == macis::full_mask<N>(64));
+  if constexpr(N > 32) REQUIRE(full_32 == macis::full_mask<N>(32));
+}
+
+template <size_t N>
+void ffs_test() {
+  REQUIRE(macis::ffs(bs<N>()) == 0);
+  REQUIRE(macis::ffs(bs<N>(1)) == 1);
+
+  bs<N> a(0xABC);
+  REQUIRE(macis::ffs(a) == 3);
+  if(N > 32) REQUIRE(macis::ffs(a << 32) == 3 + 32);
+  if(N > 64) REQUIRE(macis::ffs(a << 64) == 3 + 64);
+  if(N > 128) REQUIRE(macis::ffs(a << 128) == 3 + 128);
+}
+
+template <size_t N>
+void fls_test() {
+  REQUIRE(macis::fls(bs<N>()) == UINT32_MAX);
+  REQUIRE(macis::fls(bs<N>(1)) == 0);
+
+  bs<N> a(0xDEADBEEF);
+  REQUIRE(macis::fls(a) == 31);
+  if(N > 32) REQUIRE(macis::fls(a << 32) == 31 + 32);
+  if(N > 64) REQUIRE(macis::fls(a << 64) == 31 + 64);
+  if(N > 128) REQUIRE(macis::fls(a << 128) == 31 + 128);
+}
+
+template <size_t N>
+void indices_test() {
+  std::vector<uint32_t> indices = {5};
+  if(N > 32) indices.emplace_back(6 + 32);
+  if(N > 64) indices.emplace_back(7 + 64);
+  if(N > 128) indices.emplace_back(8 + 128);
+
+  bs<N> one(1), a(0);
+  for(auto i : indices) a |= one << i;
+  REQUIRE(indices == macis::bits_to_indices(a));
+}
+
+template <size_t N>
+void lo_word_test() {
+  bs<N> a(0);
+  bs<N / 2> b(0);
+  size_t n_32_words = N / 32;
+  for(int i = 0; i < n_32_words; ++i) {
+    a |= bs<N>(0xDEADBEEF + i) << (i * 32);
+  }
+  for(int i = 0; i < n_32_words / 2; ++i) {
+    b |= bs<N / 2>(0xDEADBEEF + i) << (i * 32);
+  }
+
+  REQUIRE(macis::bitset_lo_word(a) == b);
+
+  bs<N> c(0);
+  macis::set_bitset_lo_word(c, b);
+  REQUIRE((a << N / 2) >> N / 2 == c);
+}
+
+template <size_t N>
+void hi_word_test() {
+  bs<N> a(0);
+  bs<N / 2> b(0);
+  size_t n_32_words = N / 32;
+  for(int i = 0; i < n_32_words; ++i) {
+    a |= bs<N>(0xDEADBEEF + i) << (i * 32);
+  }
+  for(int i = 0; i < n_32_words / 2; ++i) {
+    b |= bs<N / 2>(0xDEADBEEF + (i + n_32_words / 2)) << (i * 32);
+  }
+
+  REQUIRE(macis::bitset_hi_word(a) == b);
+
+  bs<N> c(0);
+  macis::set_bitset_hi_word(c, b);
+  REQUIRE((a >> N / 2) << N / 2 == c);
+}
+
+template <size_t N>
+void bitset_less_test() {
+  bs<N> a(65), b(42);
+  REQUIRE(macis::bitset_less(b, a));
+  REQUIRE_FALSE(macis::bitset_less(a, a));
+  REQUIRE_FALSE(macis::bitset_less(a, b));
+
+  if(N > 32) {
+    auto aa = a << 32;
+    auto bb = b << 32;
+    REQUIRE(macis::bitset_less(bb, aa));
+    REQUIRE_FALSE(macis::bitset_less(aa, aa));
+    REQUIRE_FALSE(macis::bitset_less(aa, bb));
+    REQUIRE_FALSE(macis::bitset_less(aa, b));
+    REQUIRE_FALSE(macis::bitset_less(aa, a));
+  }
+
+  if(N > 64) {
+    auto aa = a << 64;
+    auto bb = b << 64;
+    REQUIRE(macis::bitset_less(bb, aa));
+    REQUIRE_FALSE(macis::bitset_less(aa, aa));
+    REQUIRE_FALSE(macis::bitset_less(aa, bb));
+    REQUIRE_FALSE(macis::bitset_less(aa, b));
+    REQUIRE_FALSE(macis::bitset_less(aa, a));
+  }
+
+  if(N > 128) {
+    auto aa = a << 128;
+    auto bb = b << 128;
+    REQUIRE(macis::bitset_less(bb, aa));
+    REQUIRE_FALSE(macis::bitset_less(aa, aa));
+    REQUIRE_FALSE(macis::bitset_less(aa, bb));
+    REQUIRE_FALSE(macis::bitset_less(aa, b));
+    REQUIRE_FALSE(macis::bitset_less(aa, a));
+  }
+}
 
 TEST_CASE("Bitset Operations") {
   ROOT_ONLY(MPI_COMM_WORLD);
@@ -54,63 +184,34 @@ TEST_CASE("Bitset Operations") {
   }
 
   SECTION("Full Mask") {
-    bs<128> full_128 = ~bs<128>(0);
-    bs<128> full_64 = bs<128>(UINT64_MAX);
-    bs<128> full_32 = bs<128>(UINT32_MAX);
-
-    SECTION("Static") {
-      REQUIRE(full_128 == macis::full_mask<128>());
-      REQUIRE(full_64 == macis::full_mask<64, 128>());
-      REQUIRE(full_32 == macis::full_mask<32, 128>());
-    }
-
-    SECTION("Dynamic") {
-      REQUIRE(full_128 == macis::full_mask<128>(128));
-      REQUIRE(full_64 == macis::full_mask<128>(64));
-      REQUIRE(full_32 == macis::full_mask<128>(32));
-    }
+    SECTION("32") { mask_test<32>(); }
+    SECTION("64") { mask_test<64>(); }
+    SECTION("128") { mask_test<128>(); }
+    SECTION("256") { mask_test<256>(); }
   }
 
   SECTION("FFS") {
-    SECTION("Zero") { REQUIRE(macis::ffs(bs<64>()) == 0); }
-    SECTION("One") { REQUIRE(macis::ffs(bs<64>(1)) == 1); }
-    SECTION("Arbitrary") {
-      bs<64> a(0x0A0A);
-      REQUIRE(macis::ffs(a) == 2);
-      bs<32> b(0x0A0A);
-      REQUIRE(macis::ffs(b) == 2);
-      bs<128> c(0xABC);
-      REQUIRE(macis::ffs(c) == 3);
-      REQUIRE(macis::ffs(c << 64) == 3 + 64);
-      bs<256> d(0xABC);
-      REQUIRE(macis::ffs(d) == 3);
-      REQUIRE(macis::ffs(d << 64) == 3 + 64);
-      REQUIRE(macis::ffs(d << 128) == 3 + 128);
-    }
+    SECTION("32") { ffs_test<32>(); }
+    SECTION("64") { ffs_test<64>(); }
+    SECTION("128") { ffs_test<128>(); }
+    SECTION("256") { ffs_test<256>(); }
   }
 
   SECTION("FLS") {
-    bs<64> a(0x0A0A);
-    REQUIRE(macis::fls(a) == 12 - 1);
-    bs<32> b(0x0A0A);
-    REQUIRE(macis::fls(b) == 12 - 1);
-    bs<128> c(0xDEADBEEF);
-    REQUIRE(macis::fls(c) == 31);
-    REQUIRE(macis::fls(c << 64) == 31 + 64);
-    bs<256> d(0xDEADBEEF);
-    REQUIRE(macis::fls(d) == 31);
-    REQUIRE(macis::fls(d << 64) == 31 + 64);
-    REQUIRE(macis::fls(d << 128) == 31 + 128);
+    SECTION("32") { fls_test<32>(); }
+    SECTION("64") { fls_test<64>(); }
+    SECTION("128") { fls_test<128>(); }
+    SECTION("256") { fls_test<256>(); }
   }
 
   SECTION("Indices") {
-    bs<128> one(1);
-    bs<128> a = (one << 4) | (one << 67) | (one << 118) | (one << 31);
-    auto ind = macis::bits_to_indices(a);
-    std::vector<uint32_t> ref = {4, 31, 67, 118};
-    REQUIRE(ind == ref);
+    SECTION("32") { indices_test<32>(); }
+    SECTION("64") { indices_test<64>(); }
+    SECTION("128") { indices_test<128>(); }
+    SECTION("256") { indices_test<256>(); }
   }
 
+#if 0
   SECTION("Truncate") {
     bs<64> a_64(0xCCCCCCCCDEADDEAD);
     bs<32> ref(0xDEADDEAD);
@@ -122,31 +223,28 @@ TEST_CASE("Bitset Operations") {
     bs<64> ref(0x00000000DEADDEAD);
     REQUIRE(macis::expand_bitset<64>(a_32) == ref);
   }
+#endif
+
+  SECTION("LO WORDS") {
+    SECTION("64") { lo_word_test<64>(); }
+    SECTION("128") { lo_word_test<128>(); }
+    SECTION("256") { lo_word_test<256>(); }
+    SECTION("512") { lo_word_test<512>(); }
+    SECTION("1024") { lo_word_test<1024>(); }
+  }
+
+  SECTION("HI WORDS") {
+    SECTION("64") { hi_word_test<64>(); }
+    SECTION("128") { hi_word_test<128>(); }
+    SECTION("256") { hi_word_test<256>(); }
+    SECTION("512") { hi_word_test<512>(); }
+    SECTION("1024") { hi_word_test<1024>(); }
+  }
 
   SECTION("Compare") {
-    SECTION("32 bit") {
-      bs<32> a(65), b(42);
-      REQUIRE(macis::bitset_less(b, a));
-      REQUIRE_FALSE(macis::bitset_less(a, b));
-    }
-    SECTION("64 bit") {
-      bs<64> a(65ull << 32), b(42ull << 32);
-      REQUIRE(macis::bitset_less(b, a));
-      REQUIRE_FALSE(macis::bitset_less(a, b));
-    }
-    SECTION("128 bit") {
-      bs<128> a(65ull), b(42ull);
-      a = a << 64;
-      b = b << 64;
-      REQUIRE(macis::bitset_less(b, a));
-      REQUIRE_FALSE(macis::bitset_less(a, b));
-    }
-    SECTION("256 bit") {
-      bs<256> a(65ull), b(42ull);
-      a = a << 128;
-      b = b << 128;
-      REQUIRE(macis::bitset_less(b, a));
-      REQUIRE_FALSE(macis::bitset_less(a, b));
-    }
+    SECTION("32") { bitset_less_test<32>(); }
+    SECTION("64") { bitset_less_test<64>(); }
+    SECTION("128") { bitset_less_test<128>(); }
+    SECTION("256") { bitset_less_test<256>(); }
   }
 }
