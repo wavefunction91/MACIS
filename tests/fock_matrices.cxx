@@ -93,15 +93,15 @@ TEST_CASE("Fock Matrices") {
     macis::matrix_span<double> Fi_span(Fi.data(), norb, norb);
 
     auto act_range = std::make_pair(ninact.get(), ninact.get() + nact.get());
-    auto Fi_active = macis::KokkosEx::submdspan(Fi_span, act_range, act_range);
+    auto Fi_active = Kokkos::submdspan(Fi_span, act_range, act_range);
     for(auto i = 0; i < nact.get(); ++i)
       for(auto j = 0; j < nact.get(); ++j) {
         REQUIRE(Ta(i, j) == Fi_active(i, j));
       }
 
     macis::rank4_span<double> V_span(V.data(), norb, norb, norb, norb);
-    auto V_act_span = macis::KokkosEx::submdspan(V_span, act_range, act_range,
-                                                 act_range, act_range);
+    auto V_act_span =
+        Kokkos::submdspan(V_span, act_range, act_range, act_range, act_range);
     macis::rank4_span<double> Va(V_active.data(), nact.get(), nact.get(),
                                  nact.get(), nact.get());
     for(auto i = 0; i < nact.get(); ++i)

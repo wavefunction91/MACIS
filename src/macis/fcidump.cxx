@@ -134,8 +134,8 @@ void read_fcidump_1body(std::string fname, col_major_span<double, 2> T) {
 void read_fcidump_1body(std::string fname, double* T, size_t LDT) {
   auto norb = read_fcidump_norb(fname);
   col_major_span<double, 2> T_map(T, LDT, norb);
-  read_fcidump_1body(fname, KokkosEx::submdspan(T_map, std::pair{0, norb},
-                                                Kokkos::full_extent));
+  read_fcidump_1body(
+      fname, Kokkos::submdspan(T_map, std::pair{0, norb}, Kokkos::full_extent));
 }
 
 void read_fcidump_2body(std::string fname, col_major_span<double, 4> V) {
@@ -177,8 +177,34 @@ void read_fcidump_2body(std::string fname, double* V, size_t LDV) {
   auto norb = read_fcidump_norb(fname);
   col_major_span<double, 4> V_map(V, LDV, LDV, LDV, norb);
   auto sl = std::pair{0, norb};
-  read_fcidump_2body(
-      fname, KokkosEx::submdspan(V_map, sl, sl, sl, Kokkos::full_extent));
+  read_fcidump_2body(fname,
+                     Kokkos::submdspan(V_map, sl, sl, sl, Kokkos::full_extent));
+}
+
+bool is_2body_diagonal(std::string fname) {
+  auto norb = read_fcidump_norb(fname);
+  bool all_diag = true;
+
+  std::ifstream file(fname);
+  std::string line;
+  while(std::getline(file, line)) {
+    auto tokens = split(line, " ");
+    if(tokens.size() != 5) continue;  // not a valid FCIDUMP line
+
+    auto [p, q, r, s, integral] = fcidump_line(tokens);
+    auto lc = line_classification(p, q, r, s);
+    if(lc == LineClassification::TwoBody) {
+      p--;
+      q--;
+      r--;
+      s--;
+      if(p != q || r != s) {
+        all_diag = false;
+        break;
+      }
+    }
+  }
+  return all_diag;
 }
 
 void write_fcidump(std::string fname, size_t norb, const double* T, size_t LDT,
