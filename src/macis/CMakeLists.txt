@@ -6,16 +6,30 @@
 
 add_library( macis
   fcidump.cxx
-  fock_matrices.cxx
   transform.cxx
-  orbital_gradient.cxx
-  casscf.cxx
   moller_plesset.cxx
-  orbital_energies.cxx
-  orbital_rotation_utilities.cxx
-  orbital_hessian.cxx
-  orbital_steps.cxx
+
+  mcscf/fock_matrices.cxx
+  mcscf/casscf.cxx
+  mcscf/orbital_gradient.cxx
+  mcscf/orbital_energies.cxx
+  mcscf/orbital_rotation_utilities.cxx
+  mcscf/orbital_hessian.cxx
+  mcscf/orbital_steps.cxx
+
+  hamiltonian_generator/base.cxx
 )
+
+if(MACIS_ENABLE_TREXIO)
+  FetchContent_Declare( trexio
+    #GIT_REPOSITORY https://github.com/TREX-CoE/trexio
+    GIT_REPOSITORY https://github.com/wavefunction91/trexio
+    GIT_TAG cmake_fixup
+  )
+  FetchContent_MakeAvailable(trexio)
+  target_link_libraries(macis PUBLIC trexio::trexio)
+  target_sources(macis PRIVATE trexio.cxx)
+endif()
 
 target_include_directories( macis PUBLIC 
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>

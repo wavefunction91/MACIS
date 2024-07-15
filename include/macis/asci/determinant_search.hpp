@@ -7,6 +7,7 @@
  */
 
 #pragma once
+#include <omp.h>
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
@@ -27,7 +28,7 @@ template <typename WfnT>
 struct asci_contrib_topk_comparator {
   using type = asci_contrib<WfnT>;
   constexpr bool operator()(const type& a, const type& b) const {
-    return std::abs(a.rv) > std::abs(b.rv);
+    return std::abs(a.rv()) > std::abs(b.rv());
   }
 };
 
@@ -38,6 +39,18 @@ struct ASCISettings {
   double h_el_tol = 1e-8;
   double rv_prune_tol = 1e-8;
   size_t pair_size_max = 5e8;
+
+  double pt2_tol = 1e-16;
+  size_t pt2_reserve_count = 70000000;
+  bool pt2_prune = false;
+  bool pt2_precompute_eps = false;
+  bool pt2_precompute_idx = false;
+  bool pt2_print_progress = false;
+  size_t pt2_bigcon_thresh = 250;
+
+  size_t nxtval_bcount_thresh = 1000;
+  size_t nxtval_bcount_inc = 10;
+
   bool just_singles = false;
   size_t grow_factor = 8;
   size_t max_refine_iter = 6;
@@ -48,6 +61,9 @@ struct ASCISettings {
 
   // bool dist_triplet_random = false;
   int constraint_level = 2;  // Up To Quints
+  int pt2_max_constraint_level = 5;
+  int pt2_min_constraint_level = 0;
+  int64_t pt2_constraint_refine_force = 0;
 };
 
 template <size_t N>
@@ -56,7 +72,10 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs, HamiltonianGenerator<N>& ham_gen) {
+    const double* V_pqrs, HamiltonianGenerator<wfn_t<N>>& ham_gen) {
+  using wfn_traits = wavefunction_traits<wfn_t<N>>;
+  using spin_wfn_type = spin_wfn_t<wfn_t<N>>;
+  using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
   auto logger = spdlog::get("asci_search");
 
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
@@ -68,13 +87,13 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
   for(size_t i = 0; i < ncdets; ++i) {
     // Alias state data
     auto state = *(cdets_begin + i);
-    auto state_alpha = bitset_lo_word(state);
-    auto state_beta = bitset_hi_word(state);
+    auto state_alpha = wfn_traits::alpha_string(state);
+    auto state_beta = wfn_traits::beta_string(state);
     auto coeff = C[i];
 
     // Get occupied and virtual indices
-    bitset_to_occ_vir(norb, state_alpha, occ_alpha, vir_alpha);
-    bitset_to_occ_vir(norb, state_beta, occ_beta, vir_beta);
+    spin_wfn_traits::state_to_occ_vir(norb, state_alpha, occ_alpha, vir_alpha);
+    spin_wfn_traits::state_to_occ_vir(norb, state_beta, occ_beta, vir_beta);
 
     // Precompute orbital energies
     auto eps_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
@@ -86,27 +105,27 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     const double h_el_tol = asci_settings.h_el_tol;
 
     // Singles - AA
-    append_singles_asci_contributions<(N / 2), 0>(
+    append_singles_asci_contributions<Spin::Alpha>(
         coeff, state, state_alpha, occ_alpha, vir_alpha, occ_beta,
         eps_alpha.data(), T_pq, norb, G_red, norb, V_red, norb, h_el_tol,
         h_diag, E_ASCI, ham_gen, asci_pairs);
 
     // Singles - BB
-    append_singles_asci_contributions<(N / 2), (N / 2)>(
+    append_singles_asci_contributions<Spin::Beta>(
         coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
         eps_beta.data(), T_pq, norb, G_red, norb, V_red, norb, h_el_tol, h_diag,
         E_ASCI, ham_gen, asci_pairs);
 
     if(not asci_settings.just_singles) {
       // Doubles - AAAA
-      append_ss_doubles_asci_contributions<N / 2, 0>(
-          coeff, state, state_alpha, occ_alpha, vir_alpha, occ_beta,
+      append_ss_doubles_asci_contributions<Spin::Alpha>(
+          coeff, state, state_alpha, state_beta, occ_alpha, vir_alpha, occ_beta,
           eps_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
           asci_pairs);
 
       // Doubles - BBBB
-      append_ss_doubles_asci_contributions<N / 2, N / 2>(
-          coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
+      append_ss_doubles_asci_contributions<Spin::Beta>(
+          coeff, state, state_beta, state_alpha, occ_beta, vir_beta, occ_alpha,
           eps_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
           asci_pairs);
 
@@ -122,7 +141,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
       // Remove small contributions
       auto it = std::partition(
           asci_pairs.begin(), asci_pairs.end(), [=](const auto& x) {
-            return std::abs(x.rv) > asci_settings.rv_prune_tol;
+            return std::abs(x.rv()) > asci_settings.rv_prune_tol;
           });
       asci_pairs.erase(it, asci_pairs.end());
       logger->info("  * Pruning at DET = {} NSZ = {}", i, asci_pairs.size());
@@ -143,37 +162,31 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
 #ifdef MACIS_ENABLE_MPI
 template <size_t N>
 asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
-    ASCISettings asci_settings, wavefunction_iterator_t<N> cdets_begin,
+    ASCISettings asci_settings, const size_t ntdets,
+    wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs, HamiltonianGenerator<N>& ham_gen, MPI_Comm comm) {
+    const double* V_pqrs, HamiltonianGenerator<wfn_t<N>>& ham_gen,
+    MPI_Comm comm) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
+  using wfn_traits = wavefunction_traits<wfn_t<N>>;
+  using spin_wfn_type = spin_wfn_t<wfn_t<N>>;
+  using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
+  using wfn_comp = typename wfn_traits::spin_comparator;
+  if(!std::is_sorted(cdets_begin, cdets_end, wfn_comp{}))
+    throw std::runtime_error("ASCI Search Only Works with Sorted Wfns");
 
   auto logger = spdlog::get("asci_search");
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
 
-  asci_contrib_container<wfn_t<N>> asci_pairs;
-  std::vector<uint32_t> occ_alpha, vir_alpha;
-  std::vector<uint32_t> occ_beta, vir_beta;
-
-  // Get unique alpha strings
-  std::vector<wfn_t<N>> uniq_alpha_wfn(cdets_begin, cdets_end);
-  std::transform(uniq_alpha_wfn.begin(), uniq_alpha_wfn.end(),
-                 uniq_alpha_wfn.begin(),
-                 [=](const auto& w) { return w & full_mask<N / 2, N>(); });
-  std::sort(uniq_alpha_wfn.begin(), uniq_alpha_wfn.end(),
-            bitset_less_comparator<N>{});
-  {
-    auto it = std::unique(uniq_alpha_wfn.begin(), uniq_alpha_wfn.end());
-    uniq_alpha_wfn.erase(it, uniq_alpha_wfn.end());
-  }
-  const size_t nuniq_alpha = uniq_alpha_wfn.size();
+  auto world_rank = comm_rank(comm);
+  auto world_size = comm_size(comm);
 
   // For each unique alpha, create a list of beta string and store metadata
   struct beta_coeff_data {
-    wfn_t<N> beta_string;
+    spin_wfn_type beta_string;
     std::vector<uint32_t> occ_beta;
     std::vector<uint32_t> vir_beta;
     std::vector<double> orb_ens_alpha;
@@ -183,19 +196,16 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
     beta_coeff_data(double c, size_t norb,
                     const std::vector<uint32_t>& occ_alpha, wfn_t<N> w,
-                    const HamiltonianGenerator<N>& ham_gen) {
+                    const HamiltonianGenerator<wfn_t<N>>& ham_gen) {
       coeff = c;
 
-      // Compute Beta string
-      const auto beta_shift = w >> N / 2;
-      // Reduce the number of times things shift in inner loop
-      beta_string = beta_shift << N / 2;
+      beta_string = wfn_traits::beta_string(w);
 
       // Compute diagonal matrix element
       h_diag = ham_gen.matrix_element(w, w);
 
       // Compute occ/vir for beta string
-      bitset_to_occ_vir(norb, beta_shift, occ_beta, vir_beta);
+      spin_wfn_traits::state_to_occ_vir(norb, beta_string, occ_beta, vir_beta);
 
       // Precompute orbital energies
       orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
@@ -203,32 +213,40 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     }
   };
 
-  struct unique_alpha_data {
-    std::vector<beta_coeff_data> bcd;
-  };
+  auto uniq_alpha = get_unique_alpha(cdets_begin, cdets_end);
+  const size_t nuniq_alpha = uniq_alpha.size();
+  std::vector<wfn_t<N>> uniq_alpha_wfn(nuniq_alpha);
+  std::transform(
+      uniq_alpha.begin(), uniq_alpha.end(), uniq_alpha_wfn.begin(),
+      [](const auto& p) { return wfn_traits::from_spin(p.first, 0); });
 
+  using unique_alpha_data = std::vector<beta_coeff_data>;
   std::vector<unique_alpha_data> uad(nuniq_alpha);
-  for(auto i = 0; i < nuniq_alpha; ++i) {
-    const auto wfn_a = uniq_alpha_wfn[i];
+  for(auto i = 0, iw = 0; i < nuniq_alpha; ++i) {
     std::vector<uint32_t> occ_alpha, vir_alpha;
-    bitset_to_occ_vir(norb, wfn_a, occ_alpha, vir_alpha);
-    for(auto j = 0; j < ncdets; ++j) {
-      const auto w = *(cdets_begin + j);
-      if((w & full_mask<N / 2, N>()) == wfn_a) {
-        uad[i].bcd.emplace_back(C[j], norb, occ_alpha, w, ham_gen);
-      }
+    spin_wfn_traits::state_to_occ_vir(norb, uniq_alpha[i].first, occ_alpha,
+                                      vir_alpha);
+
+    const auto nbeta = uniq_alpha[i].second;
+    uad[i].reserve(nbeta);
+    for(auto j = 0; j < nbeta; ++j, ++iw) {
+      const auto& w = *(cdets_begin + iw);
+      uad[i].emplace_back(C[iw], norb, occ_alpha, w, ham_gen);
     }
   }
 
-  auto world_rank = comm_rank(comm);
-  auto world_size = comm_size(comm);
-
-  const auto n_occ_alpha = uniq_alpha_wfn[0].count();
+  // const auto n_occ_alpha = wfn_traits::count(uniq_alpha_wfn[0]);
+  const auto n_occ_alpha = spin_wfn_traits::count(uniq_alpha[0].first);
   const auto n_vir_alpha = norb - n_occ_alpha;
   const auto n_sing_alpha = n_occ_alpha * n_vir_alpha;
   const auto n_doub_alpha = (n_sing_alpha * (n_sing_alpha - norb + 1)) / 4;
 
-  logger->info("  * NS = {} ND = {}", n_sing_alpha, n_doub_alpha);
+  const auto n_occ_beta = cdets_begin->count() - n_occ_alpha;
+  const auto n_vir_beta = norb - n_occ_beta;
+  const auto n_sing_beta = n_occ_beta * n_vir_beta;
+  const auto n_doub_beta = (n_sing_beta * (n_sing_beta - norb + 1)) / 4;
+
+  // logger->info("  * NS = {} ND = {}", n_sing_alpha, n_doub_alpha);
 
   // Generate mask constraints
   if(!world_rank) {
@@ -255,139 +273,152 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   }
 
   auto gen_c_st = clock_type::now();
-  auto constraints =
-      dist_constraint_general(asci_settings.constraint_level, norb,
-                              n_sing_alpha, n_doub_alpha, uniq_alpha_wfn, comm);
+  auto constraints = gen_constraints_general<wfn_t<N>>(
+      asci_settings.constraint_level, norb, n_sing_beta, n_doub_beta,
+      uniq_alpha, world_size);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
 
-  size_t max_size = std::min(asci_settings.pair_size_max,
-                             ncdets * (2 * n_sing_alpha +  // AA + BB
-                                       2 * n_doub_alpha +  // AAAA + BBBB
-                                       n_sing_alpha * n_sing_alpha  // AABB
-                                       ));
-  asci_pairs.reserve(max_size);
+  size_t max_size =
+      std::min(std::min(ntdets, asci_settings.pair_size_max),
+               ncdets * (n_sing_alpha + n_sing_beta +  // AA + BB
+                         n_doub_alpha + n_doub_beta +  // AAAA + BBBB
+                         n_sing_alpha * n_sing_beta    // AABB
+                         ));
 
-  // Process ASCI pair contributions for each constraint
-  for(auto con : constraints) {
-    auto size_before = asci_pairs.size();
+  const size_t ncon_total = constraints.size();
 
-    const double h_el_tol = asci_settings.h_el_tol;
-    const auto& [C, B, C_min] = con;
-    wfn_t<N> O = full_mask<N>(norb);
+  // Global atomic task-id counter
+  global_atomic<size_t> nxtval(comm);
 
-    // Loop over unique alpha strings
-    for(size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
-      const auto& det = uniq_alpha_wfn[i_alpha];
-      const auto occ_alpha = bits_to_indices(det);
+  asci_contrib_container<wfn_t<N>> asci_pairs_total;
+#pragma omp parallel
+  {
+    // Process ASCI pair contributions for each constraint
+    asci_contrib_container<wfn_t<N>> asci_pairs;
+    asci_pairs.reserve(max_size);
 
-      // AA excitations
-      for(const auto& bcd : uad[i_alpha].bcd) {
-        const auto& beta = bcd.beta_string;
-        const auto& coeff = bcd.coeff;
-        const auto& h_diag = bcd.h_diag;
-        const auto& occ_beta = bcd.occ_beta;
-        const auto& orb_ens_alpha = bcd.orb_ens_alpha;
-        generate_constraint_singles_contributions_ss(
-            coeff, det, C, O, B, beta, occ_alpha, occ_beta,
-            orb_ens_alpha.data(), T_pq, norb, G_red, norb, V_red, norb,
-            h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
-      }
+    size_t ic = 0;
+    while(ic < ncon_total) {
+      auto size_before = asci_pairs.size();
+      const double h_el_tol = asci_settings.h_el_tol;
 
-      // AAAA excitations
-      for(const auto& bcd : uad[i_alpha].bcd) {
-        const auto& beta = bcd.beta_string;
-        const auto& coeff = bcd.coeff;
-        const auto& h_diag = bcd.h_diag;
-        const auto& occ_beta = bcd.occ_beta;
-        const auto& orb_ens_alpha = bcd.orb_ens_alpha;
-        generate_constraint_doubles_contributions_ss(
-            coeff, det, C, O, B, beta, occ_alpha, occ_beta,
-            orb_ens_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-            ham_gen, asci_pairs);
-      }
+      // Atomically get the next task ID and increment for other
+      // MPI ranks and threads
+      size_t ntake = ic < asci_settings.nxtval_bcount_thresh
+                         ? 1
+                         : asci_settings.nxtval_bcount_inc;
+      ic = nxtval.fetch_and_add(ntake);
 
-      // AABB excitations
-      for(const auto& bcd : uad[i_alpha].bcd) {
-        const auto& beta = bcd.beta_string;
-        const auto& coeff = bcd.coeff;
-        const auto& h_diag = bcd.h_diag;
-        const auto& occ_beta = bcd.occ_beta;
-        const auto& vir_beta = bcd.vir_beta;
-        const auto& orb_ens_alpha = bcd.orb_ens_alpha;
-        const auto& orb_ens_beta = bcd.orb_ens_beta;
-        generate_constraint_doubles_contributions_os(
-            coeff, det, C, O, B, beta, occ_alpha, occ_beta, vir_beta,
-            orb_ens_alpha.data(), orb_ens_beta.data(), V_pqrs, norb, h_el_tol,
-            h_diag, E_ASCI, ham_gen, asci_pairs);
-      }
+      // Loop over assigned tasks
+      const size_t c_end = std::min(ncon_total, ic + ntake);
+      for(; ic < c_end; ++ic) {
+        const auto& con = constraints[ic].first;
+        // printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
+        //        omp_get_thread_num(), ic, ncon_total);
 
-      // If the alpha determinant satisfies the constraint,
-      // append BB and BBBB excitations
-      if(satisfies_constraint(det, C, C_min)) {
-        for(const auto& bcd : uad[i_alpha].bcd) {
-          const auto& beta = bcd.beta_string;
-          const auto& coeff = bcd.coeff;
-          const auto& h_diag = bcd.h_diag;
-          const auto& occ_beta = bcd.occ_beta;
-          const auto& vir_beta = bcd.vir_beta;
-          const auto& eps_beta = bcd.orb_ens_beta;
+        for(size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
+          const auto& alpha_det = uniq_alpha[i_alpha].first;
+          const auto occ_alpha = bits_to_indices(alpha_det);
+          const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
 
-          const auto state = det | beta;
-          const auto state_beta = bitset_hi_word(beta);
-          // BB Excitations
-          append_singles_asci_contributions<(N / 2), (N / 2)>(
-              coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
-              eps_beta.data(), T_pq, norb, G_red, norb, V_red, norb, h_el_tol,
-              h_diag, E_ASCI, ham_gen, asci_pairs);
+          const auto& bcd = uad[i_alpha];
+          const size_t nbeta = bcd.size();
+          for(size_t j_beta = 0; j_beta < nbeta; ++j_beta, ++iw) {
+            const auto w = *(cdets_begin + iw);
+            const auto c = C[iw];
+            const auto& beta_det = bcd[j_beta].beta_string;
+            const auto h_diag = bcd[j_beta].h_diag;
+            const auto& occ_beta = bcd[j_beta].occ_beta;
+            const auto& vir_beta = bcd[j_beta].vir_beta;
+            const auto& orb_ens_alpha = bcd[j_beta].orb_ens_alpha;
+            const auto& orb_ens_beta = bcd[j_beta].orb_ens_beta;
 
-          // BBBB Excitations
-          append_ss_doubles_asci_contributions<N / 2, N / 2>(
-              coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
-              eps_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
-              asci_pairs);
+            // AA excitations
+            generate_constraint_singles_contributions_ss(
+                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), T_pq,
+                norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
+                ham_gen, asci_pairs);
 
-        }  // Beta Loop
-      }    // Triplet Check
+            // AAAA excitations
+            generate_constraint_doubles_contributions_ss(
+                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
+                norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
 
-      // Prune Down Contributions
-      if(asci_pairs.size() > asci_settings.pair_size_max) {
-        // Remove small contributions
-        auto it = std::partition(
-            asci_pairs.begin(), asci_pairs.end(), [=](const auto& x) {
-              return std::abs(x.rv) > asci_settings.rv_prune_tol;
-            });
-        asci_pairs.erase(it, asci_pairs.end());
+            // AABB excitations
+            generate_constraint_doubles_contributions_os(
+                c, w, con, occ_alpha, occ_beta, vir_beta, orb_ens_alpha.data(),
+                orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+                ham_gen, asci_pairs);
 
-        auto c_indices = bits_to_indices(C);
-        std::string c_string;
-        for(int i = 0; i < c_indices.size(); ++i)
-          c_string += std::to_string(c_indices[i]) + " ";
-        logger->info("  * Pruning at CON = {}, NSZ = {}", c_string,
-                     asci_pairs.size());
+            if(alpha_satisfies_con) {
+              // BB excitations
+              append_singles_asci_contributions<Spin::Beta>(
+                  c, w, beta_det, occ_beta, vir_beta, occ_alpha,
+                  orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb,
+                  h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
 
-        // Extra Pruning if not sufficient
-        if(asci_pairs.size() > asci_settings.pair_size_max) {
-          logger->info("    * Removing Duplicates");
+              // BBBB excitations
+              append_ss_doubles_asci_contributions<Spin::Beta>(
+                  c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
+                  orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+                  ham_gen, asci_pairs);
+
+              // No excitation (push inf to remove from list)
+              asci_pairs.push_back(
+                  {w, std::numeric_limits<double>::infinity(), 1.0});
+            }
+          }
+
+          // Prune Down Contributions
+          if(asci_pairs.size() > asci_settings.pair_size_max) {
+            logger->info("  * PRUNING AT CON = {} IALPHA = {}", ic, i_alpha);
+            auto uit = sort_and_accumulate_asci_pairs(
+                asci_pairs.begin() + size_before, asci_pairs.end());
+            asci_pairs.erase(uit, asci_pairs.end());
+            if(asci_pairs.size() > asci_settings.pair_size_max)
+              throw std::runtime_error("DIE DIE DIE");
+          }
+
+        }  // Unique Alpha Loop
+
+        // Local S&A for each quad
+        {
+          if(size_before > asci_pairs.size())
+            throw std::runtime_error("DIE DIE DIE");
           auto uit = sort_and_accumulate_asci_pairs(
               asci_pairs.begin() + size_before, asci_pairs.end());
           asci_pairs.erase(uit, asci_pairs.end());
-          logger->info("    * NSZ = {}", asci_pairs.size());
+
+          // Remove small contributions
+          uit = std::partition(asci_pairs.begin() + size_before,
+                               asci_pairs.end(), [=](const auto& x) {
+                                 return std::abs(x.rv()) >
+                                        asci_settings.rv_prune_tol;
+                               });
+          asci_pairs.erase(uit, asci_pairs.end());
         }
+      }  // Loc constraint loop
+    }    // Constraint Loop
 
-      }  // Pruning
-    }    // Unique Alpha Loop
-
-    // Local S&A for each quad
+// Insert into list
+#pragma omp critical
     {
-      auto uit = sort_and_accumulate_asci_pairs(
-          asci_pairs.begin() + size_before, asci_pairs.end());
-      asci_pairs.erase(uit, asci_pairs.end());
+      if(asci_pairs_total.size()) {
+        // Preallocate space for insertion
+        asci_pairs_total.reserve(asci_pairs.size() + asci_pairs_total.size());
+        asci_pairs_total.insert(asci_pairs_total.end(), asci_pairs.begin(),
+                                asci_pairs.end());
+      } else {
+        asci_pairs_total = std::move(asci_pairs);
+      }
+      asci_contrib_container<wfn_t<N>>().swap(asci_pairs);
     }
-  }  // Constraint Loop
 
-  return asci_pairs;
+  }  // OpenMP
+
+  return asci_pairs_total;
 }
 #endif
 
@@ -399,7 +430,7 @@ std::vector<wfn_t<N>> asci_search(
     const std::vector<double>& C, size_t norb, const double* T_pq,
     const double* G_red, const double* V_red, const double* G_pqrs,
     const double* V_pqrs,
-    HamiltonianGenerator<N>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
+    HamiltonianGenerator<wfn_t<N>>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
 
@@ -437,6 +468,9 @@ std::vector<wfn_t<N>> asci_search(
       ncdets, ndets_max, asci_settings.h_el_tol, asci_settings.rv_prune_tol);
   logger->info("  MAX_RV_SIZE = {}, JUST_SINGLES = {}",
                asci_settings.pair_size_max, asci_settings.just_singles);
+  logger->info("  CDET_SUM = {:.2e}",
+               std::accumulate(C.begin(), C.begin() + ncdets, 0.0,
+                               [](auto s, auto c) { return s + c * c; }));
 
   MACIS_MPI_CODE(MPI_Barrier(comm);)
   auto asci_search_st = clock_type::now();
@@ -444,16 +478,16 @@ std::vector<wfn_t<N>> asci_search(
   // Expand Search Space with Connected ASCI Contributions
   auto pairs_st = clock_type::now();
   asci_contrib_container<wfn_t<N>> asci_pairs;
-  if(world_size == 1)
-    asci_pairs = asci_contributions_standard(
-        asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
-        V_red, G_pqrs, V_pqrs, ham_gen);
-#ifdef MACIS_ENABLE_MPI
-  else
-    asci_pairs = asci_contributions_constraint(
-        asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
-        V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
-#endif
+  // if(world_size == 1)
+  //   asci_pairs = asci_contributions_standard(
+  //       asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
+  //       V_red, G_pqrs, V_pqrs, ham_gen);
+  // #ifdef MACIS_ENABLE_MPI
+  // else
+  asci_pairs = asci_contributions_constraint(
+      asci_settings, ndets_max, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq,
+      G_red, V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
+  // #endif
   auto pairs_en = clock_type::now();
 
   {
@@ -463,6 +497,8 @@ std::vector<wfn_t<N>> asci_search(
     size_t npairs = asci_pairs.size();
 #endif
     logger->info("  * ASCI Kept {} Pairs", npairs);
+    if(npairs < ndets_max)
+      logger->info("    * WARNING: Kept ASCI pairs less than requested TDETS");
 
 #ifdef MACIS_ENABLE_MPI
     if(world_size > 1) {
@@ -526,8 +562,12 @@ std::vector<wfn_t<N>> asci_search(
   }
 
   auto keep_large_st = clock_type::now();
+#if 0
   // Finalize scores
-  for(auto& x : asci_pairs) x.rv = -std::abs(x.rv);
+  for(auto& x : asci_pairs) {
+    x.c_times_matel = -std::abs(x.c_times_matel);
+    x.h_diag = std::abs(x.h_diag);
+  }
 
   // Insert all dets with their coefficients as seeds
   for(size_t i = 0; i < ncdets; ++i) {
@@ -540,11 +580,18 @@ std::vector<wfn_t<N>> asci_search(
   keep_only_largest_copy_asci_pairs(asci_pairs);
 
   asci_pairs.erase(std::partition(asci_pairs.begin(), asci_pairs.end(),
-                                  [](const auto& p) { return p.rv < 0.0; }),
+                                  [](const auto& p) { return p.rv() < 0.0; }),
                    asci_pairs.end());
 
-  // Only do top-K on (ndets_max - ncdets) b/c CDETS will be added later
-  const size_t top_k_elements = ndets_max - ncdets;
+#else
+  // Remove core dets
+  // XXX: This assumes the constraint search for now
+  {
+    auto inf_ptr = std::partition(asci_pairs.begin(), asci_pairs.end(),
+                                  [](auto& p) { return !std::isinf(p.rv()); });
+    asci_pairs.erase(inf_ptr, asci_pairs.end());
+  }
+#endif
 
   auto keep_large_en = clock_type::now();
   duration_type keep_large_dur = keep_large_en - keep_large_st;
@@ -560,6 +607,9 @@ std::vector<wfn_t<N>> asci_search(
     logger->info("  * KEEP_LARG_DUR = {:.2e} s", keep_large_dur.count());
   }
 
+  // Only do top-K on (ndets_max - ncdets) b/c CDETS will be added later
+  const size_t top_k_elements = ndets_max - ncdets;
+
   // Do Top-K to get the largest determinant contributions
   auto asci_sort_st = clock_type::now();
   if(world_size > 1 or asci_pairs.size() > top_k_elements) {
@@ -569,18 +619,19 @@ std::vector<wfn_t<N>> asci_search(
       // Strip scores
       std::vector<double> scores(asci_pairs.size());
       std::transform(asci_pairs.begin(), asci_pairs.end(), scores.begin(),
-                     [](const auto& p) { return std::abs(p.rv); });
+                     [](const auto& p) { return std::abs(p.rv()); });
 
       // Determine kth-ranked scores
       auto kth_score =
           dist_quickselect(scores.begin(), scores.end(), top_k_elements, comm,
                            std::greater<double>{}, std::equal_to<double>{});
 
+      logger->info("  * Kth Score Pivot = {:.2e}", kth_score);
       // Partition local pairs into less / eq batches
       auto [g_begin, e_begin, l_begin, _end] = leg_partition(
           asci_pairs.begin(), asci_pairs.end(), kth_score,
-          [=](const auto& p, const auto& s) { return std::abs(p.rv) > s; },
-          [=](const auto& p, const auto& s) { return std::abs(p.rv) == s; });
+          [=](const auto& p, const auto& s) { return std::abs(p.rv()) > s; },
+          [=](const auto& p, const auto& s) { return std::abs(p.rv()) == s; });
 
       // Determine local counts
       size_t n_greater = std::distance(g_begin, e_begin);

@@ -67,7 +67,7 @@ void read_wavefunction(std::string fname, std::vector<std::bitset<N>>& states,
     std::stringstream ss{line};
     std::string c, d;
     ss >> c >> d;
-    states.emplace_back(from_canonical_string<N>(d));
+    states.emplace_back(from_canonical_string<wfn_t<N>>(d));
     coeffs.emplace_back(std::stod(c));
   }
 }

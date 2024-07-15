@@ -11,6 +11,7 @@
 #if __has_include(<boost/sort/pdqsort/pdqsort.hpp>)
 #define MACIS_USE_BOOST_SORT
 #include <boost/sort/pdqsort/pdqsort.hpp>
+#include <boost/sort/sort.hpp>
 #endif
 
 namespace macis {
@@ -36,6 +37,54 @@ void reorder_ci_on_coeff(std::vector<WfnT>& dets, std::vector<double>& C) {
   dets = std::move(reorder_dets);
 }
 
+template <typename WfnIterator>
+void reorder_ci_on_alpha(WfnIterator begin, WfnIterator end, double* C) {
+  using wfn_type = typename WfnIterator::value_type;
+  using wfn_traits = wavefunction_traits<wfn_type>;
+  using cmp_type = typename wfn_traits::spin_comparator;
+  const size_t ndets = std::distance(begin, end);
+
+  cmp_type comparator{};
+  std::vector<size_t> idx(ndets);
+  std::iota(idx.begin(), idx.end(), 0);
+  std::sort(idx.begin(), idx.end(), [&](auto i, auto j) {
+    return comparator(*(begin + i), *(begin + j));
+  });
+
+  std::vector<double> reorder_C(ndets);
+  std::vector<wfn_type> reorder_dets(ndets);
+  for(auto i = 0ul; i < ndets; ++i) {
+    reorder_C[i] = C[idx[i]];
+    reorder_dets[i] = *(begin + idx[i]);
+  }
+
+  std::copy(reorder_dets.begin(), reorder_dets.end(), begin);
+  std::copy(reorder_C.begin(), reorder_C.end(), C);
+}
+
+template <typename PairIterator>
+PairIterator accumulate_asci_pairs(PairIterator pairs_begin,
+                                   PairIterator pairs_end) {
+  // Accumulate the ASCI scores into first instance of unique bitstrings
+  auto cur_it = pairs_begin;
+  for(auto it = cur_it + 1; it != pairs_end; ++it) {
+    // If iterate is not the one being tracked, update the iterator
+    if(it->state != cur_it->state) {
+      cur_it = it;
+    }
+
+    // Accumulate
+    else {
+      cur_it->c_times_matel += it->c_times_matel;
+      it->c_times_matel = NAN;  // Zero out to expose potential bugs
+    }
+  }
+
+  // Remote duplicate bitstrings
+  return std::unique(pairs_begin, pairs_end,
+                     [](auto x, auto y) { return x.state == y.state; });
+}
+
 template <typename PairIterator>
 PairIterator sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
                                             PairIterator pairs_end) {
@@ -55,24 +104,29 @@ PairIterator sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
 #endif
       (pairs_begin, pairs_end, comparator);
 
-  // Accumulate the ASCI scores into first instance of unique bitstrings
-  auto cur_it = pairs_begin;
-  for(auto it = cur_it + 1; it != pairs_end; ++it) {
-    // If iterate is not the one being tracked, update the iterator
-    if(it->state != cur_it->state) {
-      cur_it = it;
-    }
+  return accumulate_asci_pairs(pairs_begin, pairs_end);
+}
 
-    // Accumulate
-    else {
-      cur_it->rv += it->rv;
-      it->rv = 0;  // Zero out to expose potential bugs
-    }
-  }
+template <typename PairIterator>
+PairIterator stable_sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
+                                                   PairIterator pairs_end) {
+  const size_t npairs = std::distance(pairs_begin, pairs_end);
 
-  // Remote duplicate bitstrings
-  return std::unique(pairs_begin, pairs_end,
-                     [](auto x, auto y) { return x.state == y.state; });
+  if(!npairs) return pairs_end;
+
+  auto comparator = [](const auto& x, const auto& y) {
+    return bitset_less(x.state, y.state);
+  };
+
+// Sort by bitstring
+#ifdef MACIS_USE_BOOST_SORT
+  boost::sort::flat_stable_sort
+#else
+  std::stable_sort
+#endif
+      (pairs_begin, pairs_end, comparator);
+
+  return accumulate_asci_pairs(pairs_begin, pairs_end);
 }
 
 template <typename WfnT>
@@ -108,7 +162,8 @@ void keep_only_largest_copy_asci_pairs(
 
     // Keep only max value
     else {
-      cur_it->rv = std::max(cur_it->rv, it->rv);
+      cur_it->c_times_matel =
+          std::max(cur_it->c_times_matel, it->c_times_matel);
     }
   }
 

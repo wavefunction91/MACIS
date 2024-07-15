@@ -26,6 +26,8 @@ target_include_directories( macis_test PUBLIC ${PROJECT_BINARY_DIR}/tests )
 
 add_executable( standalone_driver standalone_driver.cxx ini_input.cxx )
 target_link_libraries( standalone_driver PUBLIC macis )
+add_executable( fcidump_to_trexio fcidump_to_trexio.cxx )
+target_link_libraries( fcidump_to_trexio PUBLIC macis )
 
 set(REF_DATA_PREFIX "${PROJECT_SOURCE_DIR}/tests/ref_data")
 configure_file( ut_common.hpp.in ${PROJECT_BINARY_DIR}/tests/ut_common.hpp)

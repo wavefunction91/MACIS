@@ -13,6 +13,7 @@
 #include <macis/solvers/davidson.hpp>
 #include <macis/types.hpp>
 #include <macis/util/mpi.hpp>
+#include <sparsexx/io/write_dist_mm.hpp>
 #include <sparsexx/matrix_types/dense_conversions.hpp>
 #include <sparsexx/util/submatrix.hpp>
 
@@ -121,10 +122,9 @@ double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
   return E;
 }
 
-template <size_t N, typename index_t = int32_t>
-double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
-                        wavefunction_iterator_t<N> dets_end,
-                        HamiltonianGenerator<N>& ham_gen, double h_el_tol,
+template <typename index_t, typename WfnType, typename WfnIterator>
+double selected_ci_diag(WfnIterator dets_begin, WfnIterator dets_end,
+                        HamiltonianGenerator<WfnType>& ham_gen, double h_el_tol,
                         size_t davidson_max_m, double davidson_res_tol,
                         std::vector<double>& C_local,
                         MACIS_MPI_CODE(MPI_Comm comm, )
@@ -146,9 +146,25 @@ double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
   MACIS_MPI_CODE(MPI_Barrier(comm);)
   auto H_st = clock_type::now();
 
+  auto world_size = comm_size(comm);
+  auto world_rank = comm_rank(comm);
+  //{
+  // std::ofstream wfn_file("wfn_" +
+  // std::to_string(std::distance(dets_begin,dets_end)) + "_" +
+  // std::to_string(world_rank) + "." + std::to_string(world_size) + ".txt");
+  // for(auto it = dets_begin; it != dets_end; ++it) {
+  //  wfn_file << *it << "\n";
+  //}
+  // wfn_file << std::flush;
+  //}
+
 #ifdef MACIS_ENABLE_MPI
   auto H = make_dist_csr_hamiltonian<index_t>(comm, dets_begin, dets_end,
                                               ham_gen, h_el_tol);
+  // sparsexx::write_dist_mm("ham_" + std::to_string(H.n()) + "." +
+  // std::to_string(world_size) + ".mtx", H, 1);
+  // MACIS_MPI_CODE(MPI_Barrier(comm);)
+  // if(H.n() >= 10000000) throw "DIE DIE DIE";
 #else
   auto H =
       make_csr_hamiltonian<index_t>(dets_begin, dets_end, ham_gen, h_el_tol);
@@ -171,7 +187,6 @@ double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
                duration_type(H_en - H_st).count());
 
 #ifdef MACIS_ENABLE_MPI
-  auto world_size = comm_size(comm);
   if(world_size > 1) {
     double local_hdur = duration_type(H_en - H_st).count();
     double max_hdur = allreduce(local_hdur, MPI_MAX, comm);
@@ -185,7 +200,7 @@ double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
 #endif
   logger->info("  {} = {:.2e} GiB", "HMEM_LOC",
                H.mem_footprint() / 1073741824.);
-  logger->info("  {} = {:.2f}%", "H_SPARSE",
+  logger->info("  {} = {:.2e}%", "H_SPARSE",
                total_nnz / double(H.n() * H.n()) * 100);
 #ifdef MACIS_ENABLE_MPI
   if(world_size > 1) {
