@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
 
     // ASCI Settings
     macis::ASCISettings asci_settings;
-    std::string asci_wfn_fname, asci_wfn_out_fname;
+    std::string asci_wfn_fname, asci_wfn_out_fname, asci_ham_out_fname;
     double asci_E0 = 0.0;
     bool compute_asci_E0 = true, pt2 = true;
     OPT_KEYWORD("ASCI.NTDETS_MAX", asci_settings.ntdets_max, size_t);
@@ -219,6 +219,7 @@ int main(int argc, char** argv) {
       asci_E0 = input.getData<double>("ASCI.E0_WFN");
       compute_asci_E0 = false;
     }
+    OPT_KEYWORD("ASCI.HAM_OUT_FILE", asci_ham_out_fname, std::string);
     OPT_KEYWORD("ASCI.PT2", pt2, bool);
     OPT_KEYWORD("ASCI.PT2_TOL", asci_settings.pt2_tol, double);
     OPT_KEYWORD("ASCI.PT2_RESERVE_COUNT", asci_settings.pt2_reserve_count,
@@ -445,11 +446,13 @@ int main(int argc, char** argv) {
         }
 
         // Dump Hamiltonian
-#if 0
-        if(0) {
+#if 1
+        std::cout << "ASCI HAM FNAME = " << asci_ham_out_fname << std::endl;
+        if(asci_ham_out_fname.size()) {
+          std::cout << "HERE" << std::endl;
           auto H = macis::make_dist_csr_hamiltonian<int64_t>(
               MPI_COMM_WORLD, dets.begin(), dets.end(), ham_gen, 1e-16);
-          sparsexx::write_dist_mm("ham.mtx", H, 1);
+          sparsexx::write_dist_mm(asci_ham_out_fname, H, 1);
         }
 #endif
         if(pt2) {
