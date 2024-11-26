@@ -11,6 +11,7 @@
 #include <macis/csr_hamiltonian.hpp>
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/solvers/davidson.hpp>
+#include <macis/solvers/lobpcg.hpp>
 #include <macis/types.hpp>
 #include <macis/util/mpi.hpp>
 #include <sparsexx/matrix_types/dense_conversions.hpp>
@@ -22,7 +23,8 @@ namespace macis {
 template <typename SpMatType>
 double parallel_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
                                  double davidson_res_tol,
-                                 std::vector<double>& C_local, MPI_Comm comm) {
+                                 std::vector<double>& C_local, MPI_Comm comm,
+                                 const size_t nstates = 1) {
   auto logger = spdlog::get("ci_solver");
   if(!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
@@ -56,10 +58,25 @@ double parallel_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
   // Solve EVP
   MPI_Barrier(comm);
   auto dav_st = clock_type::now();
+  double E = 0.;
+  size_t niter = 0;
 
-  auto [niter, E] =
-      p_davidson(H.local_row_extent(), davidson_max_m, op, D_local.data(),
-                 davidson_res_tol, C_local.data() MACIS_MPI_CODE(, H.comm()));
+  if(nstates == 1) {
+    auto [niter0, E0] =
+        p_davidson(H.local_row_extent(), davidson_max_m, op, D_local.data(),
+                   davidson_res_tol, C_local.data() MACIS_MPI_CODE(, H.comm()));
+    niter = niter0;
+    E = E0;
+  } else {
+    std::vector<double> evals;
+    std::vector<double> evecs;
+    LobpcgGS(H.m(), nstates, op, evals, evecs, 10000, davidson_res_tol);
+    logger->info("  Hamiltonian Eigenvalues:");
+    for(int ii = 0; ii < nstates; ii++)
+      logger->info("    --> Eval #{:4}: {:.6e}", ii, evals[ii]);
+    E = evals[0];
+    for(int ii = 0; ii < H.m(); ii++) C_local[ii] = evecs[ii];
+  }
 
   MPI_Barrier(comm);
   auto dav_en = clock_type::now();
@@ -74,8 +91,8 @@ double parallel_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
 
 template <typename SpMatType>
 double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
-                               double davidson_res_tol,
-                               std::vector<double>& C) {
+                               double davidson_res_tol, std::vector<double>& C,
+                               const size_t nstates = 1) {
   auto logger = spdlog::get("ci_solver");
   if(!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
@@ -108,9 +125,24 @@ double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
 
   // Solve EVP
   auto dav_st = clock_type::now();
+  double E = 0.;
+  size_t niter = 0;
 
-  auto [niter, E] =
-      davidson(H.m(), davidson_max_m, op, D.data(), davidson_res_tol, C.data());
+  if(nstates == 1) {
+    auto [niter0, E0] = davidson(H.m(), davidson_max_m, op, D.data(),
+                                 davidson_res_tol, C.data());
+    niter = niter0;
+    E = E0;
+  } else {
+    std::vector<double> evals;
+    std::vector<double> evecs;
+    LobpcgGS(H.m(), nstates, op, evals, evecs, 10000, davidson_res_tol);
+    logger->info("  Hamiltonian Eigenvalues:");
+    for(int ii = 0; ii < nstates; ii++)
+      logger->info("    --> Eval #{:4}: {:.6e}", ii, evals[ii]);
+    E = evals[0];
+    for(int ii = 0; ii < H.m(); ii++) C[ii] = evecs[ii];
+  }
 
   auto dav_en = clock_type::now();
 
@@ -128,7 +160,8 @@ double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
                         size_t davidson_max_m, double davidson_res_tol,
                         std::vector<double>& C_local,
                         MACIS_MPI_CODE(MPI_Comm comm, )
-                            const bool quiet = false) {
+                            const bool quiet = false,
+                        const size_t nstates = 1) {
   auto logger = spdlog::get("ci_solver");
   if(!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
@@ -197,10 +230,10 @@ double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
   // Solve EVP
 #ifdef MACIS_ENABLE_MPI
   auto E = parallel_selected_ci_diag(H, davidson_max_m, davidson_res_tol,
-                                     C_local, comm);
+                                     C_local, comm, nstates);
 #else
-  auto E =
-      serial_selected_ci_diag(H, davidson_max_m, davidson_res_tol, C_local);
+  auto E = serial_selected_ci_diag(H, davidson_max_m, davidson_res_tol, C_local,
+                                   nstates);
 #endif
 
   return E;

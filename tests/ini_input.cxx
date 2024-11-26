@@ -8,6 +8,8 @@
 
 #include "ini_input.hpp"
 
+#include <sstream>
+
 // Misc string functions
 
 /**
@@ -330,6 +332,24 @@ int INIFile::getData(std::string query) {
 }  // INIFile::getData<int>
 
 /**
+ *  \brief Specialization of getData to return vector<int> of query
+ *  data field
+ *
+ *  \param [in] query Formatted query string to be parsed
+ *  \return     Value of query data field as a vector<int>
+ */
+template <>
+std::vector<int> INIFile::getData(std::string query) {
+  std::string line = getData<std::string>(query);
+  std::istringstream iss(line);
+  std::vector<int> res;
+  int tmp;
+  while(iss >> tmp) res.push_back(tmp);
+  return res;
+
+}  // INIFile::getData<std::vector<int>>
+
+/**
  *  \brief Specialization of getData to return bool of query
  *  data field
  *
@@ -343,6 +363,27 @@ bool INIFile::getData(std::string query) {
   return b;
 
 }  // INIFile::getData<bool>
+
+/**
+ *  \brief Specialization of getData to return std::vector<bool> of query
+ *  data field
+ *
+ *  \param [in] query Formatted query string to be parsed
+ *  \return     Value of query data field as a std::vector<bool>
+ */
+template <>
+std::vector<bool> INIFile::getData(std::string query) {
+  std::string line = getData<std::string>(query);
+  std::istringstream iss(line);
+  std::vector<bool> res;
+  std::string tmp;
+  while(iss >> tmp) {
+    bool b = (not tmp.compare("TRUE") or not tmp.compare("ON"));
+    res.push_back(b);
+  }
+  return res;
+
+}  // INIFile::getData<std::vector<bool>>
 
 /**
  *  \brief Specialization of getData to return size_t of query

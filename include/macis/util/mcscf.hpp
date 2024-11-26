@@ -27,6 +27,8 @@ struct MCSCFSettings {
   double ci_res_tol = 1e-8;
   size_t ci_max_subspace = 20;
   double ci_matel_tol = std::numeric_limits<double>::epsilon();
+
+  size_t ci_nstates = 1;
 };
 
 double casscf_diis(MCSCFSettings settings, NumElectron nalpha,

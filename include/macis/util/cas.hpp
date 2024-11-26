@@ -53,7 +53,7 @@ double compute_casci_rdms(
   double E0 =
       selected_ci_diag(dets.begin(), dets.end(), ham_gen, settings.ci_matel_tol,
                        settings.ci_max_subspace, settings.ci_res_tol, C,
-                       MACIS_MPI_CODE(comm, ) true);
+                       MACIS_MPI_CODE(comm, ) true, settings.ci_nstates);
 
   // Compute RDMs
   ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),

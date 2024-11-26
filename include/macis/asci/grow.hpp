@@ -61,7 +61,8 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     dur_t ai_dur = ai_en - ai_st;
     logger->trace("  * ASCI_ITER_DUR = {:.2e} ms", ai_dur.count());
     if(ndets_new > wfn.size())
-      throw std::runtime_error("Wavefunction didn't grow enough...");
+      logger->info("Wavefunction didn't grow enough...");
+    // throw std::runtime_error("Wavefunction didn't grow enough...");
 
     logger->info(fmt_string, iter++, E, E - E0, wfn.size());
     if(asci_settings.grow_with_rot and
@@ -127,7 +128,7 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       selected_ci_diag(
           wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
           mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol,
-          X_local MACIS_MPI_CODE(, comm));
+          X_local MACIS_MPI_CODE(, comm), false, mcscf_settings.ci_nstates);
 
       if(world_size > 1) {
 #ifdef MACIS_ENABLE_MPI

@@ -37,3 +37,5 @@ const std::string water_ccpvdz_nzval_fname  =
   REF_DATA_PREFIX "/h2o.ccpvdz.cisd.nzval.bin";
 const std::string ch4_wfn_fname =
   REF_DATA_PREFIX "/ch4.wfn.dat";
+const std::string hubbard10_fcidump =
+  REF_DATA_PREFIX "/hubbard10.fci.dat";
