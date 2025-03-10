@@ -54,9 +54,10 @@ template <size_t N>
 asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     ASCISettings asci_settings, wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
-    const std::vector<double>& C, size_t norb, const double* T_pq,
-    const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs, HamiltonianGenerator<N>& ham_gen) {
+    const std::vector<double>& C, size_t norb, const double* Tu_pq,
+    const double* Td_pq, const double* G_red, const double* V_red, 
+    const double* G_pqrs, const double* V_pqrs, 
+    HamiltonianGenerator<N>& ham_gen) {
   auto logger = spdlog::get("asci_search");
 
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
@@ -77,8 +78,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     bitset_to_occ_vir(norb, state_beta, occ_beta, vir_beta);
 
     // Precompute orbital energies
-    auto eps_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
-    auto eps_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
+    auto eps_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta, ham_gen.Tu_pq_);
+    auto eps_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha, ham_gen.Td_pq_);
 
     // Compute base diagonal matrix element
     double h_diag = ham_gen.matrix_element(state, state);
@@ -88,13 +89,13 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     // Singles - AA
     append_singles_asci_contributions<(N / 2), 0>(
         coeff, state, state_alpha, occ_alpha, vir_alpha, occ_beta,
-        eps_alpha.data(), T_pq, norb, G_red, norb, V_red, norb, h_el_tol,
+        eps_alpha.data(), Tu_pq, norb, G_red, norb, V_red, norb, h_el_tol,
         h_diag, E_ASCI, ham_gen, asci_pairs);
 
     // Singles - BB
     append_singles_asci_contributions<(N / 2), (N / 2)>(
         coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
-        eps_beta.data(), T_pq, norb, G_red, norb, V_red, norb, h_el_tol, h_diag,
+        eps_beta.data(), Td_pq, norb, G_red, norb, V_red, norb, h_el_tol, h_diag,
         E_ASCI, ham_gen, asci_pairs);
 
     if(not asci_settings.just_singles) {
@@ -145,9 +146,10 @@ template <size_t N>
 asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     ASCISettings asci_settings, wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
-    const std::vector<double>& C, size_t norb, const double* T_pq,
-    const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs, HamiltonianGenerator<N>& ham_gen, MPI_Comm comm) {
+    const std::vector<double>& C, size_t norb, const double* Tu_pq,
+    const double* Td_pq, const double* G_red, const double* V_red, 
+    const double* G_pqrs, const double* V_pqrs, 
+    HamiltonianGenerator<N>& ham_gen, MPI_Comm comm) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
 
@@ -198,8 +200,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       bitset_to_occ_vir(norb, beta_shift, occ_beta, vir_beta);
 
       // Precompute orbital energies
-      orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta);
-      orb_ens_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha);
+      orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta, ham_gen.Tu_pq_);
+      orb_ens_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha, ham_gen.Td_pq_);
     }
   };
 
@@ -291,7 +293,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         const auto& orb_ens_alpha = bcd.orb_ens_alpha;
         generate_constraint_singles_contributions_ss(
             coeff, det, C, O, B, beta, occ_alpha, occ_beta,
-            orb_ens_alpha.data(), T_pq, norb, G_red, norb, V_red, norb,
+            orb_ens_alpha.data(), Tu_pq, norb, G_red, norb, V_red, norb,
             h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
       }
 
@@ -339,7 +341,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
           // BB Excitations
           append_singles_asci_contributions<(N / 2), (N / 2)>(
               coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
-              eps_beta.data(), T_pq, norb, G_red, norb, V_red, norb, h_el_tol,
+              eps_beta.data(), Td_pq, norb, G_red, norb, V_red, norb, h_el_tol,
               h_diag, E_ASCI, ham_gen, asci_pairs);
 
           // BBBB Excitations
@@ -396,9 +398,9 @@ std::vector<wfn_t<N>> asci_search(
     ASCISettings asci_settings, size_t ndets_max,
     wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
-    const std::vector<double>& C, size_t norb, const double* T_pq,
-    const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs,
+    const std::vector<double>& C, size_t norb, const double* Tu_pq,
+    const double* Td_pq, const double* G_red, const double* V_red, 
+    const double* G_pqrs, const double* V_pqrs,
     HamiltonianGenerator<N>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
@@ -446,13 +448,13 @@ std::vector<wfn_t<N>> asci_search(
   asci_contrib_container<wfn_t<N>> asci_pairs;
   if(world_size == 1)
     asci_pairs = asci_contributions_standard(
-        asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
-        V_red, G_pqrs, V_pqrs, ham_gen);
+        asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, Tu_pq, Td_pq, 
+	G_red, V_red, G_pqrs, V_pqrs, ham_gen);
 #ifdef MACIS_ENABLE_MPI
   else
     asci_pairs = asci_contributions_constraint(
-        asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
-        V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
+        asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, Tu_pq, Td_pq,
+	G_red, V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
 #endif
   auto pairs_en = clock_type::now();
 

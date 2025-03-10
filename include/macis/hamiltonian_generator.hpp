@@ -40,7 +40,8 @@ class HamiltonianGenerator {
   size_t norb_;
   size_t norb2_;
   size_t norb3_;
-  matrix_span_t T_pq_;
+  matrix_span_t Tu_pq_;
+  matrix_span_t Td_pq_;
   rank4_span_t V_pqrs_;
 
   // G(i,j,k,l) = (ij|kl) - (il|kj)
@@ -72,12 +73,15 @@ class HamiltonianGenerator {
       full_det_iterator, double) = 0;
 
  public:
-  HamiltonianGenerator(matrix_span_t T, rank4_span_t V);
+  HamiltonianGenerator(matrix_span_t Tu, rank4_span_t V);
   virtual ~HamiltonianGenerator() noexcept = default;
+
+  void ReadTdo( matrix_span_t Td );
 
   void generate_integral_intermediates(rank4_span_t V);
 
-  inline auto* T() const { return T_pq_.data_handle(); }
+  inline auto* Tu() const { return Tu_pq_.data_handle(); }
+  inline auto* Td() const { return Td_pq_.data_handle(); }
   inline auto* G_red() const { return G_red_data_.data(); }
   inline auto* V_red() const { return V_red_data_.data(); }
   inline auto* G() const { return G_pqrs_data_.data(); }
@@ -90,7 +94,8 @@ class HamiltonianGenerator {
 
   double matrix_element_2(spin_det_t bra, spin_det_t ket, spin_det_t ex,
                           const std::vector<uint32_t>& bra_occ_alpha,
-                          const std::vector<uint32_t>& bra_occ_beta) const;
+                          const std::vector<uint32_t>& bra_occ_beta,
+			  const matrix_span_t& T_pq_) const;
 
   double matrix_element_diag(const std::vector<uint32_t>& occ_alpha,
                              const std::vector<uint32_t>& occ_beta) const;
@@ -102,15 +107,18 @@ class HamiltonianGenerator {
                         const std::vector<uint32_t>& bra_occ_beta) const;
 
   double single_orbital_en(uint32_t orb, const std::vector<uint32_t>& ss_occ,
-                           const std::vector<uint32_t>& os_occ) const;
+                           const std::vector<uint32_t>& os_occ,
+			   const matrix_span_t& T_pq_) const;
 
   std::vector<double> single_orbital_ens(
       size_t norb, const std::vector<uint32_t>& ss_occ,
-      const std::vector<uint32_t>& os_occ) const;
+      const std::vector<uint32_t>& os_occ,
+      const matrix_span_t& T_pq_) const;
 
   double fast_diag_single(const std::vector<uint32_t>& ss_occ,
                           const std::vector<uint32_t>& os_occ, uint32_t orb_hol,
-                          uint32_t orb_par, double orig_det_Hii) const;
+                          uint32_t orb_par, double orig_det_Hii,
+			  const matrix_span_t& T_pq_) const;
 
   double fast_diag_single(double hol_en, double par_en, uint32_t orb_hol,
                           uint32_t orb_par, double orig_det_Hii) const;
@@ -124,7 +132,8 @@ class HamiltonianGenerator {
                              const std::vector<uint32_t>& os_occ,
                              uint32_t orb_hol1, uint32_t orb_hol2,
                              uint32_t orb_par1, uint32_t orb_par2,
-                             double orig_det_Hii) const;
+                             double orig_det_Hii,
+			     const matrix_span_t& T_pq_) const;
 
   double fast_diag_os_double(double en_holu, double en_hold, double en_paru,
                              double en_pard, uint32_t orb_holu,
@@ -160,21 +169,32 @@ class HamiltonianGenerator {
   void rdm_contributions_22(spin_det_t bra_alpha, spin_det_t ket_alpha,
                             spin_det_t ex_alpha, spin_det_t bra_beta,
                             spin_det_t ket_beta, spin_det_t ex_beta, double val,
-                            rank4_span_t trdm);
+                            rank4_span_t trdm_ud, rank4_span_t trdm_du);
   void rdm_contributions_2(spin_det_t bra, spin_det_t ket, spin_det_t ex,
                            const std::vector<uint32_t>& bra_occ_alpha,
                            const std::vector<uint32_t>& bra_occ_beta,
-                           double val, matrix_span_t ordm, rank4_span_t trdm);
+                           double val, matrix_span_t ordm, rank4_span_t trdm_ss,
+			   rank4_span_t trdm_so, rank4_span_t trdm_os);
   void rdm_contributions_diag(const std::vector<uint32_t>& occ_alpha,
                               const std::vector<uint32_t>& occ_beta, double val,
-                              matrix_span_t ordm, rank4_span_t trdm);
+                              matrix_span_t ordm_u, matrix_span_t ordm_d,
+			      rank4_span_t trdm_uu, rank4_span_t trdm_ud,
+			      rank4_span_t trdm_du, rank4_span_t trdm_dd);
 
   void rdm_contributions(spin_det_t bra_alpha, spin_det_t ket_alpha,
                          spin_det_t ex_alpha, spin_det_t bra_beta,
                          spin_det_t ket_beta, spin_det_t ex_beta,
                          const std::vector<uint32_t>& bra_occ_alpha,
                          const std::vector<uint32_t>& bra_occ_beta, double val,
-                         matrix_span_t ordm, rank4_span_t trdm);
+                         matrix_span_t ordm_u, matrix_span_t ordm_d, 
+			 rank4_span_t trdm_uu, rank4_span_t trdm_ud,
+			 rank4_span_t trdm_du, rank4_span_t trdm_dd);
+
+  virtual void form_rdms(full_det_iterator, full_det_iterator,
+                         full_det_iterator, full_det_iterator, double* C,
+                         matrix_span_t ordm_u, matrix_span_t ordm_d,
+			 rank4_span_t trdm_uu, rank4_span_t trdm_ud,
+			 rank4_span_t trdm_du, rank4_span_t trdm_dd) = 0;
 
   virtual void form_rdms(full_det_iterator, full_det_iterator,
                          full_det_iterator, full_det_iterator, double* C,

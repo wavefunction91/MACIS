@@ -46,15 +46,25 @@ void HamiltonianGenerator<N>::rotate_hamiltonian_ordm(const double* ordm) {
 
   std::vector<double> tmp(norb3_ * norb_), tmp2(norb3_ * norb_);
 
-  // Transform T
-  // T <- N**H * T * N
-  auto* T_pq_ptr = T_pq_.data_handle();
+  // Transform Tu
+  // Tu <- N**H * Tu * N
+  auto* Tu_pq_ptr = Tu_pq_.data_handle();
   blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-             norb_, norb_, norb_, 1., T_pq_ptr, norb_, natural_orbitals.data(),
+             norb_, norb_, norb_, 1., Tu_pq_ptr, norb_, natural_orbitals.data(),
              norb_, 0., tmp.data(), norb_);
   blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, norb_,
              norb_, norb_, 1., natural_orbitals.data(), norb_, tmp.data(),
-             norb_, 0., T_pq_ptr, norb_);
+             norb_, 0., Tu_pq_ptr, norb_);
+
+  // Transform Td
+  // Td <- N**H * Td * N
+  auto* Td_pq_ptr = Td_pq_.data_handle();
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             norb_, norb_, norb_, 1., Td_pq_ptr, norb_, natural_orbitals.data(),
+             norb_, 0., tmp.data(), norb_);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, norb_,
+             norb_, norb_, 1., natural_orbitals.data(), norb_, tmp.data(),
+             norb_, 0., Td_pq_ptr, norb_);
 
   // Transorm V
 

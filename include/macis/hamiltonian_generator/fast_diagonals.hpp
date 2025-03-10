@@ -14,7 +14,8 @@ namespace macis {
 template <size_t N>
 double HamiltonianGenerator<N>::single_orbital_en(
     uint32_t orb, const std::vector<uint32_t>& ss_occ,
-    const std::vector<uint32_t>& os_occ) const {
+    const std::vector<uint32_t>& os_occ,
+    const matrix_span_t& T_pq_) const {
   // One electron component
   double orb_en = T_pq_(orb, orb);
 
@@ -31,7 +32,8 @@ double HamiltonianGenerator<N>::single_orbital_en(
 template <size_t N>
 std::vector<double> HamiltonianGenerator<N>::single_orbital_ens(
     size_t norb, const std::vector<uint32_t>& ss_occ,
-    const std::vector<uint32_t>& os_occ) const {
+    const std::vector<uint32_t>& os_occ,
+    const matrix_span_t& T_pq_) const {
   std::vector<double> ens(norb);
   for(size_t i = 0; i < norb; ++i) {
     // One electron component
@@ -63,9 +65,10 @@ template <size_t N>
 double HamiltonianGenerator<N>::fast_diag_single(
     // These refer to original determinant
     const std::vector<uint32_t>& ss_occ, const std::vector<uint32_t>& os_occ,
-    uint32_t orb_hol, uint32_t orb_par, double orig_det_Hii) const {
-  const auto hol_en = single_orbital_en(orb_hol, ss_occ, os_occ);
-  const auto par_en = single_orbital_en(orb_par, ss_occ, os_occ);
+    uint32_t orb_hol, uint32_t orb_par, double orig_det_Hii,
+    const matrix_span_t& T_pq_) const {
+  const auto hol_en = single_orbital_en(orb_hol, ss_occ, os_occ, T_pq_);
+  const auto par_en = single_orbital_en(orb_par, ss_occ, os_occ, T_pq_);
   return fast_diag_single(hol_en, par_en, orb_hol, orb_par, orig_det_Hii);
 }
 
@@ -89,11 +92,11 @@ double HamiltonianGenerator<N>::fast_diag_ss_double(
     // These refer to original determinant
     const std::vector<uint32_t>& ss_occ, const std::vector<uint32_t>& os_occ,
     uint32_t orb_hol1, uint32_t orb_hol2, uint32_t orb_par1, uint32_t orb_par2,
-    double orig_det_Hii) const {
-  auto hol1_en = single_orbital_en(orb_hol1, ss_occ, os_occ);
-  auto hol2_en = single_orbital_en(orb_hol2, ss_occ, os_occ);
-  auto par1_en = single_orbital_en(orb_par1, ss_occ, os_occ);
-  auto par2_en = single_orbital_en(orb_par2, ss_occ, os_occ);
+    double orig_det_Hii, const matrix_span_t& T_pq_) const {
+  auto hol1_en = single_orbital_en(orb_hol1, ss_occ, os_occ, T_pq_);
+  auto hol2_en = single_orbital_en(orb_hol2, ss_occ, os_occ, T_pq_);
+  auto par1_en = single_orbital_en(orb_par1, ss_occ, os_occ, T_pq_);
+  auto par2_en = single_orbital_en(orb_par2, ss_occ, os_occ, T_pq_);
   return fast_diag_ss_double(hol1_en, hol2_en, par1_en, par2_en, orb_hol1,
                              orb_hol2, orb_par1, orb_par2, orig_det_Hii);
 }
@@ -117,10 +120,10 @@ double HamiltonianGenerator<N>::fast_diag_os_double(
     const std::vector<uint32_t>& ss_occ, const std::vector<uint32_t>& os_occ,
     uint32_t orb_holu, uint32_t orb_hold, uint32_t orb_paru, uint32_t orb_pard,
     double orig_det_Hii) const {
-  auto holu_en = single_orbital_en(orb_holu, ss_occ, os_occ);
-  auto hold_en = single_orbital_en(orb_hold, os_occ, ss_occ);
-  auto paru_en = single_orbital_en(orb_paru, ss_occ, os_occ);
-  auto pard_en = single_orbital_en(orb_pard, os_occ, ss_occ);
+  auto holu_en = single_orbital_en(orb_holu, ss_occ, os_occ, Tu_pq_);
+  auto hold_en = single_orbital_en(orb_hold, os_occ, ss_occ, Td_pq_);
+  auto paru_en = single_orbital_en(orb_paru, ss_occ, os_occ, Tu_pq_);
+  auto pard_en = single_orbital_en(orb_pard, os_occ, ss_occ, Td_pq_);
   return fast_diag_os_double(holu_en, hold_en, paru_en, pard_en, orb_holu,
                              orb_hold, orb_paru, orb_pard, orig_det_Hii);
 }

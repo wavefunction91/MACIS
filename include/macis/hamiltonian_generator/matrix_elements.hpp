@@ -52,11 +52,11 @@ double HamiltonianGenerator<N>::matrix_element(
 
   else if(ex_alpha_count == 2)
     return matrix_element_2(bra_alpha, ket_alpha, ex_alpha, bra_occ_alpha,
-                            bra_occ_beta);
+                            bra_occ_beta, Tu_pq_);
 
   else if(ex_beta_count == 2)
     return matrix_element_2(bra_beta, ket_beta, ex_beta, bra_occ_beta,
-                            bra_occ_alpha);
+                            bra_occ_alpha, Td_pq_);
 
   else
     return matrix_element_diag(bra_occ_alpha, bra_occ_beta);
@@ -87,7 +87,8 @@ template <size_t N>
 double HamiltonianGenerator<N>::matrix_element_2(
     spin_det_t bra, spin_det_t ket, spin_det_t ex,
     const std::vector<uint32_t>& bra_occ_alpha,
-    const std::vector<uint32_t>& bra_occ_beta) const {
+    const std::vector<uint32_t>& bra_occ_beta,
+    const matrix_span_t& T_pq_) const {
   auto [o1, v1, sign] = single_excitation_sign_indices(bra, ket, ex);
 
   double h_el = T_pq_(v1, o1);
@@ -112,8 +113,8 @@ double HamiltonianGenerator<N>::matrix_element_diag(
   double h_el = 0;
 
   // One-electron piece
-  for(auto p : occ_alpha) h_el += T_pq_(p, p);
-  for(auto p : occ_beta) h_el += T_pq_(p, p);
+  for(auto p : occ_alpha) h_el += Tu_pq_(p, p);
+  for(auto p : occ_beta) h_el += Td_pq_(p, p);
 
   // Same-spin two-body term
   for(auto q : occ_alpha)

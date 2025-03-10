@@ -109,6 +109,13 @@ int main(int argc, char** argv) {
   if(input.containsData(STR)) {      \
     RES = input.getData<DTYPE>(STR); \
   }
+    // Possibility of hoppings for the spin-down orbitals
+    std::string fcidump_do_fname = "NONE";
+    std::vector<double> Td(norb2);
+    OPT_KEYWORD( "CI.FCIDUMP_DO", fcidump_do_fname, std::string );
+    if( fcidump_do_fname != "NONE" ){
+      macis::read_fcidump_1body( fcidump_do_fname, Td.data(), norb );
+    }
 
     // Set up job
     std::string job_str = "MCSCF";
@@ -259,14 +266,21 @@ int main(int argc, char** argv) {
 
     // Copy integrals into active subsets
     std::vector<double> T_active(n_active * n_active);
+    std::vector<double> Td_active(n_active * n_active);
     std::vector<double> V_active(n_active * n_active * n_active * n_active);
 
     // Compute active-space Hamiltonian and inactive Fock matrix
     std::vector<double> F_inactive(norb2);
+    std::vector<double> Fd_inactive(norb2);
     macis::active_hamiltonian(NumOrbital(norb), NumActive(n_active),
                               NumInactive(n_inactive), T.data(), norb, V.data(),
                               norb, F_inactive.data(), norb, T_active.data(),
                               n_active, V_active.data(), n_active);
+    if( fcidump_do_fname != "NONE" )
+      macis::active_hamiltonian(NumOrbital(norb), NumActive(n_active),
+                                NumInactive(n_inactive), Td.data(), norb, V.data(),
+                                norb, Fd_inactive.data(), norb, Td_active.data(),
+                                n_active, V_active.data(), n_active);
 
     console->debug("FINACTIVE_SUM = {:.12f}", vec_sum(F_inactive));
     console->debug("VACTIVE_SUM   = {:.12f}", vec_sum(V_active));
@@ -275,10 +289,15 @@ int main(int argc, char** argv) {
     // Compute Inactive energy
     auto E_inactive = macis::inactive_energy(NumInactive(n_inactive), T.data(),
                                              norb, F_inactive.data(), norb);
+    if( fcidump_do_fname != "NONE" ){
+      for( int ii = 0; ii < n_inactive; ii++ )
+        E_inactive += Td[ ii * (1 + n_inactive)] - T[ ii * (1 + n_inactive)];
+    }
     console->info("E(inactive) = {:.12f}", E_inactive);
 
     // Storage for active RDMs
     std::vector<double> active_ordm(n_active * n_active);
+    std::vector<double> active_ordmd(n_active * n_active);
     std::vector<double> active_trdm(active_ordm.size() * active_ordm.size());
 
     double E0 = 0;
@@ -289,10 +308,18 @@ int main(int argc, char** argv) {
       if(ci_exp == CIExpansion::CAS) {
         std::vector<double> C_local;
         // TODO: VERIFY MPI + CAS
-        E0 = macis::CASRDMFunctor<generator_t>::rdms(
-            mcscf_settings, NumOrbital(n_active), nalpha, nbeta,
-            T_active.data(), V_active.data(), active_ordm.data(),
-            active_trdm.data(), C_local MACIS_MPI_CODE(, MPI_COMM_WORLD));
+	if( fcidump_do_fname == "NONE" )
+          E0 = macis::CASRDMFunctor<generator_t>::rdms(
+              mcscf_settings, NumOrbital(n_active), nalpha, nbeta,
+              T_active.data(), V_active.data(), active_ordm.data(),
+              active_trdm.data(), C_local MACIS_MPI_CODE(, MPI_COMM_WORLD));
+	else
+          E0 = macis::CASRDMFunctor<generator_t>::rdms(
+              mcscf_settings, NumOrbital(n_active), nalpha, nbeta,
+              T_active.data(), V_active.data(), active_ordm.data(),
+              active_trdm.data(), C_local MACIS_MPI_CODE(, MPI_COMM_WORLD), 
+	      Td_active.data(), active_ordmd.data(), active_trdm.data(),
+	      active_trdm.data(), active_trdm.data());
         E0 += E_inactive + E_core;
 
         if(print_determinants) {
@@ -310,6 +337,22 @@ int main(int argc, char** argv) {
             }
           }
         }
+
+	std::ofstream ordmf("ordm_up.dat", std::ios::out);
+	ordmf.precision(15);
+	for( int ii = 0; ii < n_active; ii++ ){
+	  for( int jj = 0; jj < n_active; jj++)
+	    ordmf << active_ordm[jj + ii * n_active] << "  ";
+	  ordmf << std::endl;
+	}
+	ordmf.close();
+	ordmf.open("ordm_do.dat", std::ios::out);
+	ordmf.precision(15);
+	for( int ii = 0; ii < n_active; ii++ ){
+	  for( int jj = 0; jj < n_active; jj++)
+	    ordmf << active_ordmd[jj + ii * n_active] << "  ";
+	  ordmf << std::endl;
+	}
 
         // Testing GF
         bool testGF = false;

@@ -102,8 +102,10 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
         logger->trace("  * Doing Natural Orbital Rotation");
         auto rot_st = hrt_t::now();
-        macis::two_index_transform(norb, norb, ham_gen.T(), norb, ordm.data(),
-                                   norb, ham_gen.T(), norb);
+        macis::two_index_transform(norb, norb, ham_gen.Tu(), norb, ordm.data(),
+                                   norb, ham_gen.Tu(), norb);
+        macis::two_index_transform(norb, norb, ham_gen.Td(), norb, ordm.data(),
+                                   norb, ham_gen.Td(), norb);
         macis::four_index_transform(norb, norb, ham_gen.V(), norb, ordm.data(),
                                     norb, ham_gen.V(), norb);
         auto rot_en = hrt_t::now();
@@ -114,7 +116,8 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       // Broadcast rotated integrals
 #ifdef MACIS_ENABLE_MPI
       if(world_size > 1) {
-        bcast(ham_gen.T(), norb * norb, 0, comm);
+        bcast(ham_gen.Tu(), norb * norb, 0, comm);
+        bcast(ham_gen.Td(), norb * norb, 0, comm);
         bcast(ham_gen.V(), norb * norb * norb * norb, 0, comm);
       }
 #endif

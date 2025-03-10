@@ -12,14 +12,20 @@
 namespace macis {
 
 template <size_t N>
-HamiltonianGenerator<N>::HamiltonianGenerator(matrix_span<double> T,
+HamiltonianGenerator<N>::HamiltonianGenerator(matrix_span<double> Tu,
                                               rank4_span_t V)
-    : norb_(T.extent(0)),
+    : norb_(Tu.extent(0)),
       norb2_(norb_ * norb_),
       norb3_(norb2_ * norb_),
-      T_pq_(T),
+      Tu_pq_(Tu),
+      Td_pq_(Tu),
       V_pqrs_(V) {
   generate_integral_intermediates(V_pqrs_);
+}
+
+template <size_t N> 
+void HamiltonianGenerator<N>::ReadTdo( matrix_span<double> Td ){
+  Td_pq_ = Td;
 }
 
 template <size_t N>

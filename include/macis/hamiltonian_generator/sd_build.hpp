@@ -174,7 +174,9 @@ class SDBuildHamiltonianGenerator : public HamiltonianGenerator<N> {
  public:
   void form_rdms(full_det_iterator bra_begin, full_det_iterator bra_end,
                  full_det_iterator ket_begin, full_det_iterator ket_end,
-                 double* C, matrix_span_t ordm, rank4_span_t trdm) override {
+                 double* C, matrix_span_t ordm_u, matrix_span_t ordm_d, 
+		 rank4_span_t trdm_uu, rank4_span_t trdm_ud,
+		 rank4_span_t trdm_du, rank4_span_t trdm_dd) override {
     const size_t nbra_dets = std::distance(bra_begin, bra_end);
     const size_t nket_dets = std::distance(ket_begin, ket_end);
 
@@ -203,7 +205,7 @@ class SDBuildHamiltonianGenerator : public HamiltonianGenerator<N> {
 
         // Get singles and doubles
         std::vector<full_det_t> excs;
-        if(trdm.data_handle()) {
+        if(trdm_uu.data_handle()) {
           std::vector<full_det_t> doubles;
           generate_singles_doubles_spin(this->norb_, bra, excs, doubles);
           excs.insert(excs.end(), doubles.begin(), doubles.end());
@@ -219,7 +221,7 @@ class SDBuildHamiltonianGenerator : public HamiltonianGenerator<N> {
         // Compute Matrix Element
         rdm_contributions(bra_alpha, bra_alpha, exd_alpha, bra_beta, bra_beta,
                           exd_beta, bra_occ_alpha, bra_occ_beta, C[i] * C[i],
-                          ordm, trdm);
+                          ordm_u, ordm_d, trdm_uu, trdm_ud, trdm_du, trdm_dd);
 
         // Loop over excitations
         for(const auto pos_ket : excs) {
@@ -234,7 +236,7 @@ class SDBuildHamiltonianGenerator : public HamiltonianGenerator<N> {
 
             full_det_t ex_total = bra ^ pos_ket;
             int ex_lim = 2;
-            if(trdm.data_handle()) ex_lim = 4;
+            if(trdm_uu.data_handle()) ex_lim = 4;
             if(ex_total.count() <= ex_lim) {
               spin_det_t ex_alpha = bitset_lo_word(ex_total);
               spin_det_t ex_beta = bitset_hi_word(ex_total);
@@ -244,7 +246,8 @@ class SDBuildHamiltonianGenerator : public HamiltonianGenerator<N> {
               // Compute Matrix Element
               rdm_contributions(bra_alpha, ket_alpha, ex_alpha, bra_beta,
                                 ket_beta, ex_beta, bra_occ_alpha, bra_occ_beta,
-                                val, ordm, trdm);
+                                val, ordm_u, ordm_d, trdm_uu, trdm_ud,
+				trdm_du, trdm_dd);
 
             }  // Possible non-zero connection (Hamming distance)
 
@@ -253,6 +256,15 @@ class SDBuildHamiltonianGenerator : public HamiltonianGenerator<N> {
 
       }  // Non-zero bra determinant
     }    // Loop over bra determinants
+  }
+
+  void form_rdms(full_det_iterator bra_begin, full_det_iterator bra_end,
+                 full_det_iterator ket_begin, full_det_iterator ket_end,
+                 double* C, matrix_span_t ordm, rank4_span_t trdm) override {
+    form_rdms( bra_begin, bra_end, ket_begin, ket_end,
+               C, ordm, ordm,
+	       trdm, trdm, trdm, trdm);
+
   }
 
  public:
