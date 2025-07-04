@@ -61,7 +61,8 @@ TEST_CASE("Double Loop") {
       const auto ES = ham_gen.matrix_element(state, state);
       REQUIRE(ES == Approx(-6.488097259228e+01));
 
-      auto fast_ES = ham_gen.fast_diag_single(occ, occ, 0, nocc, EHF, ham_gen.Tu_pq_);
+      auto fast_ES =
+          ham_gen.fast_diag_single(occ, occ, 0, nocc, EHF, ham_gen.Tu_pq_);
       REQUIRE(ES == Approx(fast_ES));
     }
 
@@ -70,8 +71,8 @@ TEST_CASE("Double Loop") {
       const auto ED = ham_gen.matrix_element(state, state);
       REQUIRE(ED == Approx(-6.314093508151e+01));
 
-      auto fast_ED =
-          ham_gen.fast_diag_ss_double(occ, occ, 0, 1, nocc, nocc + 1, EHF, ham_gen.Tu_pq_);
+      auto fast_ED = ham_gen.fast_diag_ss_double(occ, occ, 0, 1, nocc, nocc + 1,
+                                                 EHF, ham_gen.Tu_pq_);
       REQUIRE(ED == Approx(fast_ED));
     }
 

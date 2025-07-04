@@ -26,9 +26,9 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
   // Perform the ASCI search
   wfn = asci_search(asci_settings, ndets_max, wfn.begin(), wfn.begin() + nkeep,
-                    E0, X, norb, ham_gen.Tu(), ham_gen.Td(), ham_gen.G_red(), 
-		    ham_gen.V_red(), ham_gen.G(), ham_gen.V(), 
-		    ham_gen MACIS_MPI_CODE(, comm));
+                    E0, X, norb, ham_gen.Tu(), ham_gen.Td(), ham_gen.G_red(),
+                    ham_gen.V_red(), ham_gen.G(), ham_gen.V(),
+                    ham_gen MACIS_MPI_CODE(, comm));
 
   // Rediagonalize
   std::vector<double> X_local;  // Precludes guess reuse

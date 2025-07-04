@@ -34,9 +34,9 @@ template <typename HamGen>
 double compute_casci_rdms(
     MCSCFSettings settings, NumOrbital norb, size_t nalpha, size_t nbeta,
     double* Tu, double* V, double* ORDM, double* TRDM,
-    std::vector<double>& C MACIS_MPI_CODE(, MPI_Comm comm),
-    double* Td = NULL, double* ORDMd = NULL, double* TRDMud =NULL,
-    double* TRDMdu = NULL, double* TRDMdd = NULL) {
+    std::vector<double>& C MACIS_MPI_CODE(, MPI_Comm comm), double* Td = NULL,
+    double* ORDMd = NULL, double* TRDMud = NULL, double* TRDMdu = NULL,
+    double* TRDMdd = NULL) {
   constexpr auto nbits = HamGen::nbits;
 
 #ifdef MACIS_ENABLE_MPI
@@ -50,8 +50,7 @@ double compute_casci_rdms(
   size_t no = norb.get();
   HamGen ham_gen(matrix_span<double>(Tu, no, no),
                  rank4_span<double>(V, no, no, no, no));
-  if( Td )
-    ham_gen.ReadTdo(matrix_span<double>(Td, no, no));
+  if(Td) ham_gen.ReadTdo(matrix_span<double>(Td, no, no));
 
   // Compute Lowest Energy Eigenvalue (ED)
   auto dets = generate_hilbert_space<nbits>(norb.get(), nalpha, nbeta);
@@ -61,18 +60,18 @@ double compute_casci_rdms(
                        MACIS_MPI_CODE(comm, ) true, settings.ci_nstates);
 
   // Compute RDMs
-  if( ORDMd == NULL )
+  if(ORDMd == NULL)
     ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
                       C.data(), matrix_span<double>(ORDM, no, no),
                       rank4_span<double>(TRDM, no, no, no, no));
   else
     ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
                       C.data(), matrix_span<double>(ORDM, no, no),
-                      matrix_span<double>( ORDMd, no, no ),
-		      rank4_span<double>(TRDM, no, no, no, no),
-		      rank4_span<double>(TRDMud, no, no, no, no),
-		      rank4_span<double>(TRDMdu, no, no, no, no),
-		      rank4_span<double>(TRDMdd, no, no, no, no));
+                      matrix_span<double>(ORDMd, no, no),
+                      rank4_span<double>(TRDM, no, no, no, no),
+                      rank4_span<double>(TRDMud, no, no, no, no),
+                      rank4_span<double>(TRDMdu, no, no, no, no),
+                      rank4_span<double>(TRDMdd, no, no, no, no));
 
   return E0;
 }

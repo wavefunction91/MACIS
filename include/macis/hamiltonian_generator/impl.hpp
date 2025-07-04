@@ -23,8 +23,8 @@ HamiltonianGenerator<N>::HamiltonianGenerator(matrix_span<double> Tu,
   generate_integral_intermediates(V_pqrs_);
 }
 
-template <size_t N> 
-void HamiltonianGenerator<N>::ReadTdo( matrix_span<double> Td ){
+template <size_t N>
+void HamiltonianGenerator<N>::ReadTdo(matrix_span<double> Td) {
   Td_pq_ = Td;
 }
 

@@ -14,8 +14,7 @@ namespace macis {
 template <size_t N>
 double HamiltonianGenerator<N>::single_orbital_en(
     uint32_t orb, const std::vector<uint32_t>& ss_occ,
-    const std::vector<uint32_t>& os_occ,
-    const matrix_span_t& T_pq_) const {
+    const std::vector<uint32_t>& os_occ, const matrix_span_t& T_pq_) const {
   // One electron component
   double orb_en = T_pq_(orb, orb);
 
@@ -32,8 +31,7 @@ double HamiltonianGenerator<N>::single_orbital_en(
 template <size_t N>
 std::vector<double> HamiltonianGenerator<N>::single_orbital_ens(
     size_t norb, const std::vector<uint32_t>& ss_occ,
-    const std::vector<uint32_t>& os_occ,
-    const matrix_span_t& T_pq_) const {
+    const std::vector<uint32_t>& os_occ, const matrix_span_t& T_pq_) const {
   std::vector<double> ens(norb);
   for(size_t i = 0; i < norb; ++i) {
     // One electron component

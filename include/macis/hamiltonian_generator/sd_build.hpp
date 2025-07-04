@@ -174,9 +174,9 @@ class SDBuildHamiltonianGenerator : public HamiltonianGenerator<N> {
  public:
   void form_rdms(full_det_iterator bra_begin, full_det_iterator bra_end,
                  full_det_iterator ket_begin, full_det_iterator ket_end,
-                 double* C, matrix_span_t ordm_u, matrix_span_t ordm_d, 
-		 rank4_span_t trdm_uu, rank4_span_t trdm_ud,
-		 rank4_span_t trdm_du, rank4_span_t trdm_dd) override {
+                 double* C, matrix_span_t ordm_u, matrix_span_t ordm_d,
+                 rank4_span_t trdm_uu, rank4_span_t trdm_ud,
+                 rank4_span_t trdm_du, rank4_span_t trdm_dd) override {
     const size_t nbra_dets = std::distance(bra_begin, bra_end);
     const size_t nket_dets = std::distance(ket_begin, ket_end);
 
@@ -246,8 +246,8 @@ class SDBuildHamiltonianGenerator : public HamiltonianGenerator<N> {
               // Compute Matrix Element
               rdm_contributions(bra_alpha, ket_alpha, ex_alpha, bra_beta,
                                 ket_beta, ex_beta, bra_occ_alpha, bra_occ_beta,
-                                val, ordm_u, ordm_d, trdm_uu, trdm_ud,
-				trdm_du, trdm_dd);
+                                val, ordm_u, ordm_d, trdm_uu, trdm_ud, trdm_du,
+                                trdm_dd);
 
             }  // Possible non-zero connection (Hamming distance)
 
@@ -261,10 +261,8 @@ class SDBuildHamiltonianGenerator : public HamiltonianGenerator<N> {
   void form_rdms(full_det_iterator bra_begin, full_det_iterator bra_end,
                  full_det_iterator ket_begin, full_det_iterator ket_end,
                  double* C, matrix_span_t ordm, rank4_span_t trdm) override {
-    form_rdms( bra_begin, bra_end, ket_begin, ket_end,
-               C, ordm, ordm,
-	       trdm, trdm, trdm, trdm);
-
+    form_rdms(bra_begin, bra_end, ket_begin, ket_end, C, ordm, ordm, trdm, trdm,
+              trdm, trdm);
   }
 
  public:

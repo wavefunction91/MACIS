@@ -55,8 +55,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     ASCISettings asci_settings, wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* Tu_pq,
-    const double* Td_pq, const double* G_red, const double* V_red, 
-    const double* G_pqrs, const double* V_pqrs, 
+    const double* Td_pq, const double* G_red, const double* V_red,
+    const double* G_pqrs, const double* V_pqrs,
     HamiltonianGenerator<N>& ham_gen) {
   auto logger = spdlog::get("asci_search");
 
@@ -78,8 +78,10 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     bitset_to_occ_vir(norb, state_beta, occ_beta, vir_beta);
 
     // Precompute orbital energies
-    auto eps_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta, ham_gen.Tu_pq_);
-    auto eps_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha, ham_gen.Td_pq_);
+    auto eps_alpha =
+        ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta, ham_gen.Tu_pq_);
+    auto eps_beta =
+        ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha, ham_gen.Td_pq_);
 
     // Compute base diagonal matrix element
     double h_diag = ham_gen.matrix_element(state, state);
@@ -95,8 +97,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     // Singles - BB
     append_singles_asci_contributions<(N / 2), (N / 2)>(
         coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
-        eps_beta.data(), Td_pq, norb, G_red, norb, V_red, norb, h_el_tol, h_diag,
-        E_ASCI, ham_gen, asci_pairs);
+        eps_beta.data(), Td_pq, norb, G_red, norb, V_red, norb, h_el_tol,
+        h_diag, E_ASCI, ham_gen, asci_pairs);
 
     if(not asci_settings.just_singles) {
       // Doubles - AAAA
@@ -147,8 +149,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     ASCISettings asci_settings, wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* Tu_pq,
-    const double* Td_pq, const double* G_red, const double* V_red, 
-    const double* G_pqrs, const double* V_pqrs, 
+    const double* Td_pq, const double* G_red, const double* V_red,
+    const double* G_pqrs, const double* V_pqrs,
     HamiltonianGenerator<N>& ham_gen, MPI_Comm comm) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
@@ -200,8 +202,10 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       bitset_to_occ_vir(norb, beta_shift, occ_beta, vir_beta);
 
       // Precompute orbital energies
-      orb_ens_alpha = ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta, ham_gen.Tu_pq_);
-      orb_ens_beta = ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha, ham_gen.Td_pq_);
+      orb_ens_alpha =
+          ham_gen.single_orbital_ens(norb, occ_alpha, occ_beta, ham_gen.Tu_pq_);
+      orb_ens_beta =
+          ham_gen.single_orbital_ens(norb, occ_beta, occ_alpha, ham_gen.Td_pq_);
     }
   };
 
@@ -399,7 +403,7 @@ std::vector<wfn_t<N>> asci_search(
     wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* Tu_pq,
-    const double* Td_pq, const double* G_red, const double* V_red, 
+    const double* Td_pq, const double* G_red, const double* V_red,
     const double* G_pqrs, const double* V_pqrs,
     HamiltonianGenerator<N>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
   using clock_type = std::chrono::high_resolution_clock;
@@ -448,13 +452,13 @@ std::vector<wfn_t<N>> asci_search(
   asci_contrib_container<wfn_t<N>> asci_pairs;
   if(world_size == 1)
     asci_pairs = asci_contributions_standard(
-        asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, Tu_pq, Td_pq, 
-	G_red, V_red, G_pqrs, V_pqrs, ham_gen);
+        asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, Tu_pq, Td_pq,
+        G_red, V_red, G_pqrs, V_pqrs, ham_gen);
 #ifdef MACIS_ENABLE_MPI
   else
     asci_pairs = asci_contributions_constraint(
         asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, Tu_pq, Td_pq,
-	G_red, V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
+        G_red, V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
 #endif
   auto pairs_en = clock_type::now();
 
