@@ -43,6 +43,9 @@ struct ASCISettings {
   size_t max_refine_iter = 6;
   double refine_energy_tol = 1e-6;
 
+  int n_imp_orbs = -1;
+  bool no_constraint_search = false;
+
   bool grow_with_rot = false;
   size_t rot_size_start = 1000;
 
@@ -66,6 +69,16 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
   std::vector<uint32_t> occ_alpha, vir_alpha;
   std::vector<uint32_t> occ_beta, vir_beta;
   asci_pairs.reserve(asci_settings.pair_size_max);
+
+  // For considering only doubles among the impurity
+  // orbitals, if applicable.
+  size_t n_imp_orbs = asci_settings.n_imp_orbs >= 0 ? asci_settings.n_imp_orbs : norb;
+  std::vector<uint32_t> occ_alpha_as, vir_alpha_as;
+  std::vector<uint32_t> occ_beta_as, vir_beta_as;
+  std::vector<uint32_t> as_orbs( n_imp_orbs );
+  for( int ii = 0; ii < as_orbs.size(); ii++ )
+    as_orbs[ii] = ii;
+
   for(size_t i = 0; i < ncdets; ++i) {
     // Alias state data
     auto state = *(cdets_begin + i);
@@ -100,23 +113,26 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
         eps_beta.data(), Td_pq, norb, G_red, norb, V_red, norb, h_el_tol,
         h_diag, E_ASCI, ham_gen, asci_pairs);
 
-    if(not asci_settings.just_singles) {
+    if(!asci_settings.just_singles) {
+      // Potentially consider only doubles from impurity orbitals
+      bitset_to_occ_vir_as(norb, state_alpha, occ_alpha_as, vir_alpha_as, as_orbs);
+      bitset_to_occ_vir_as(norb,  state_beta,  occ_beta_as,  vir_beta_as, as_orbs);
       // Doubles - AAAA
       append_ss_doubles_asci_contributions<N / 2, 0>(
-          coeff, state, state_alpha, occ_alpha, vir_alpha, occ_beta,
+          coeff, state, state_alpha, occ_alpha_as, vir_alpha_as, occ_beta_as,
           eps_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
           asci_pairs);
 
       // Doubles - BBBB
       append_ss_doubles_asci_contributions<N / 2, N / 2>(
-          coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
+          coeff, state, state_beta, occ_beta_as, vir_beta_as, occ_alpha_as,
           eps_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
           asci_pairs);
 
       // Doubles - AABB
       append_os_doubles_asci_contributions(
-          coeff, state, state_alpha, state_beta, occ_alpha, occ_beta, vir_alpha,
-          vir_beta, eps_alpha.data(), eps_beta.data(), V_pqrs, norb, h_el_tol,
+          coeff, state, state_alpha, state_beta, occ_alpha_as, occ_beta_as, vir_alpha_as,
+          vir_beta_as, eps_alpha.data(), eps_beta.data(), V_pqrs, norb, h_el_tol,
           h_diag, E_ASCI, ham_gen, asci_pairs);
     }
 
@@ -450,7 +466,7 @@ std::vector<wfn_t<N>> asci_search(
   // Expand Search Space with Connected ASCI Contributions
   auto pairs_st = clock_type::now();
   asci_contrib_container<wfn_t<N>> asci_pairs;
-  if(world_size == 1)
+  if(world_size == 1 || asci_settings.no_constraint_search )
     asci_pairs = asci_contributions_standard(
         asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, Tu_pq, Td_pq,
         G_red, V_red, G_pqrs, V_pqrs, ham_gen);
