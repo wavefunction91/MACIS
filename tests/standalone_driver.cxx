@@ -419,7 +419,7 @@ int main(int argc, char** argv) {
           Eigen::VectorXd psi0 = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(
               C_local.data(), C_local.size());
 
-          E0 -= E_inactive + E_core;
+          E0 -= (E_inactive + E_core);
           // Evaluate particle GF
           macis::RunGFCalc<nwfn_bits>(GF, psi0, ham_gen, dets, E0, true, ws,
                                       occs, gf_settings);
