@@ -25,7 +25,7 @@ double parallel_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
                                  double davidson_res_tol,
                                  std::vector<double>& C_local, MPI_Comm comm,
                                  const size_t nstates = 1,
-				 std::vector<double>* C_exc = nullptr) {
+                                 std::vector<double>* C_exc = nullptr) {
   auto logger = spdlog::get("ci_solver");
   if(!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
@@ -77,10 +77,10 @@ double parallel_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
       logger->info("    --> Eval #{:4}: {:.6e}", ii, evals[ii]);
     E = evals[0];
     for(int ii = 0; ii < H.m(); ii++) C_local[ii] = evecs[ii];
-    if( C_exc )
-    {
-      C_exc->clear(); C_exc->resize( H.m() * nstates - 1 );
-      for( int ii = H.m(); ii < evecs.size(); ii++ )
+    if(C_exc) {
+      C_exc->clear();
+      C_exc->resize(H.m() * nstates - 1);
+      for(int ii = H.m(); ii < evecs.size(); ii++)
         C_exc->at(ii - H.m()) = evecs[ii];
     }
   }
@@ -100,7 +100,7 @@ template <typename SpMatType>
 double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
                                double davidson_res_tol, std::vector<double>& C,
                                const size_t nstates = 1,
-			       std::vector<double>* C_exc = nullptr) {
+                               std::vector<double>* C_exc = nullptr) {
   auto logger = spdlog::get("ci_solver");
   if(!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
@@ -150,10 +150,10 @@ double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
       logger->info("    --> Eval #{:4}: {:.6e}", ii, evals[ii]);
     E = evals[0];
     for(int ii = 0; ii < H.m(); ii++) C[ii] = evecs[ii];
-    if( C_exc )
-    {
-      C_exc->clear(); C_exc->resize( H.m() * nstates - 1 );
-      for( int ii = H.m(); ii < evecs.size(); ii++ )
+    if(C_exc) {
+      C_exc->clear();
+      C_exc->resize(H.m() * nstates - 1);
+      for(int ii = H.m(); ii < evecs.size(); ii++)
         C_exc->at(ii - H.m()) = evecs[ii];
     }
   }
@@ -168,15 +168,12 @@ double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
 }
 
 template <size_t N, typename index_t = int32_t>
-double selected_ci_diag(wavefunction_iterator_t<N> dets_begin,
-                        wavefunction_iterator_t<N> dets_end,
-                        HamiltonianGenerator<N>& ham_gen, double h_el_tol,
-                        size_t davidson_max_m, double davidson_res_tol,
-                        std::vector<double>& C_local,
-                        MACIS_MPI_CODE(MPI_Comm comm, )
-                            const bool quiet = false,
-                        const size_t nstates = 1,
-			std::vector<double>* C_exc = nullptr) {
+double selected_ci_diag(
+    wavefunction_iterator_t<N> dets_begin, wavefunction_iterator_t<N> dets_end,
+    HamiltonianGenerator<N>& ham_gen, double h_el_tol, size_t davidson_max_m,
+    double davidson_res_tol, std::vector<double>& C_local,
+    MACIS_MPI_CODE(MPI_Comm comm, ) const bool quiet = false,
+    const size_t nstates = 1, std::vector<double>* C_exc = nullptr) {
   auto logger = spdlog::get("ci_solver");
   if(!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
